@@ -4,4 +4,5 @@ r/place klonas benda pikselių drobė, kurioje kiekvienas gali idėti po vieną 
 ## Komandos nariai:
 * Dmitrij Kosmakov
 * Rokas Petronis
+* Lukas Vielius
 * Renatas Podberiozko
