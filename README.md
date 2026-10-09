@@ -5,3 +5,5 @@ r/place klonas benda pikselių drobė, kurioje kiekvienas gali idėti po vieną 
 * Dmitrij Kosmakov
 * Rokas Petronis
 * Lukas Petkevicius
+* Lukas Vielius
+* Renatas Podberiozko
