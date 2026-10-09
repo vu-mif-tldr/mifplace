@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "build": "npx tsc",
+    "typecheck": "npx tsc --noEmit",
     "watch": "npx tsc --watch",
     "start": "node dist/server.js"
   },
