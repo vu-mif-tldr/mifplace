@@ -5,57 +5,31 @@ using Node.js, typescript, package manager npm
 ## Requirements
 
 
-- Node.js 20+
-- npm 10+
-- Git
-
+- Node.js 24.x (justification: Stable LTS)
+- npm 11+
 ## Setup
 
 ### 1. Check if you have node, npm and git
 
-   - Open cmd
+```
+node --version
+npm --version
+git --version
+```
 
-   - node --version
+### 2. Go to mifplace folder in Command Prompt and run these commands, scripts
 
-   - npm --version
+   ```
+   cd backend
 
-   - git --version
+   npm install
 
-### 2. If cmd writes external command does not exist
-
-   - Go to https://nodejs.org/en/download and install Windows Installer (.msi)
-
-   - press okay to all
-
-   - install git https://git-scm.com/install/windows
-
-   - repeat step 1.
-
-### 3. if step 1. works start here
-
-   - choose where you want to clone the project for example:
-   
-     cd C:\Users\your-username\Documents
-
-   - git clone https://github.com/vu-mif-tldr/mifplace.git
-
-### 4. go to where you cloned the project
-
-   - cd mifplace
-
-   - git status 
-
-### 5. if git status says nothing to commit, working tree clean go forward
-
-   - cd backend
-
-   - npm install
-
-   - npm run build
+   npm run build
  
-   - npm start
+   npm start
+   ```
 
-### 6. The server should now be running at:
+### 3. The server should now be running at:
 
    http://127.0.0.1:3000
 
