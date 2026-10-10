@@ -149,7 +149,6 @@ vite.config.ts.timestamp-*
 .turbo
 
 # for ignoring created javascript files they can be created by running npx tsc if needed.
-frontend/public/*.js
 backend/dist/*.js
 
 # Local SQLite database
