@@ -24,10 +24,16 @@ cd backend
 
 npm install
 
+cp .env.example .env
+
+npm run db:setup:dev
+
 npm run build
 
 npm start
 ```
+
+`.env` holds `DB_PATH` and `MIGRATIONS_DIR` (required for the database scripts), see `.env.example`.
 
 ### 3. The server should now be running at:
 
@@ -35,11 +41,28 @@ http://127.0.0.1:3000
 
 ## Scripts
 
-- `npm run build` — Compile TypeScript
+### Build and run
+
+- `npm run build` — Compile TypeScript (`tsconfig.build.json`) to `dist/`
 - `npm run watch` — Auto-compile on changes
-- `npm start` — Start the server
+- `npm start` — Start the compiled server (`dist/server.js`)
+
+### Code quality
+
+- `npm run typecheck` — Type-check without emitting files
 - `npm run lint` — Check code with ESLint
 - `npm run format` — Format code with Prettier
+- `npm run format:check` — Check formatting without changing files
+- `npm test` — Run unit tests (`node:test` via `tsx`)
+- `npm run check` — Run typecheck, lint, format:check and test in a row (same as CI)
+
+### Database
+
+- `npm run db:setup:dev` — Create the SQLite file (if missing) and apply pending migrations, runs from TypeScript via `tsx`
+- `npm run db:setup:prod` — Same, but runs the compiled `dist/scripts/setup-db.js` (run `npm run build` first)
+- `npm run db:seed:dev -- <sprite.c> [offsetX] [offsetY]` — Dev only: fill the `events` table with a sprite exported as a C array, see the header of `src/scripts/seed-events.ts`
+
+Migrations are described in [`migrations/README.md`](migrations/README.md).
 
 ## Editor Setup
 
