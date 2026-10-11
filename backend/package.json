@@ -5,15 +5,23 @@
   "main": "server.js",
   "scripts": {
     "build": "npx tsc",
+    "typecheck": "npx tsc --noEmit",
     "watch": "npx tsc --watch",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "devDependencies": {
-    "@types/node": "^26.6.4",
-    "typescript": "^7.0.2"
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.9",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1"
   }
 }
