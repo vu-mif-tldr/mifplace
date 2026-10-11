@@ -3,7 +3,7 @@
     "target": "ES2020",
     "module": "Node16",
     "moduleResolution": "node16",
-    "outDir": "./public",
+    "outDir": "./public/js",
     "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,

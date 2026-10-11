@@ -74,4 +74,27 @@ describe('openDb / MifDb', () => {
     mif.close();
     fs.rmSync(dir, { recursive: true });
   });
+
+  it('builds a canvas snapshot where the last event wins', () => {
+    const dir = tmpDir();
+    const file = path.join(dir, 't.db');
+    new Database(file).close();
+    const db = openDb(file);
+    migrate(db, loadMigrations(REAL_MIGRATIONS_DIR));
+    const mif = new MifDb(db);
+
+    mif.appendEvent({ user_id: 0, color_id: 2, position: 5 }, 1000);
+    mif.appendEvent({ user_id: 0, color_id: 4, position: 5 }, 1001);
+
+    const painted = mif.getCanvasSnapshot();
+    assert.deepEqual(painted, [{ position: 5, color_id: 4 }]);
+
+    const palette = mif.getPalette();
+    assert.deepEqual(palette[4], { id: 4, rgb: '#0000FF' });
+
+    assert.deepEqual(mif.getCanvasSize(), { width: 128, height: 128 });
+
+    mif.close();
+    fs.rmSync(dir, { recursive: true });
+  });
 });

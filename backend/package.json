@@ -14,7 +14,7 @@
     "db:setup:prod": "node dist/scripts/setup-db.js",
     "db:setup:dev": "tsx src/scripts/setup-db.ts",
     "db:seed:dev": "tsx src/scripts/seed-events.ts",
-    "watch": "npx tsc -p tsconfig.build.json --watch",
+    "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js"
   },
   "keywords": [],

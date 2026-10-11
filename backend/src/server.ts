@@ -3,6 +3,8 @@ import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
 import { MifDb, getDbVersion, openDb, resolveDbPath } from './db.js';
+import { CanvasState } from './canvas-state.js';
+import { InvalidPixelError, parsePixel, placePixel, type PixelLimits } from './place-pixel.js';
 import { loadDotEnv } from './env.js';
 
 // Settings come from the environment, then from .env (see .env.example).
@@ -18,12 +20,26 @@ const hostname: string = process.env.HOST ?? '127.0.0.1';
 const dbPath = resolveDbPath();
 const db = openDb(dbPath);
 let mifDb: MifDb;
+// The canvas lives in memory, the database is read once at start.
+let canvas: CanvasState;
+// The palette is fixed while the server runs, it is serialized once at start.
+let paletteJson: string;
+// What POST /api/pixel is checked against, also fixed while the server runs.
+let pixelLimits: PixelLimits;
 try {
   // Version 0 means a file without any applied migration, MifDb cannot work with it.
   if (getDbVersion(db) === 0) {
     throw new Error(`Database ${dbPath} has no schema, run "npm run db:setup:dev" first`);
   }
   mifDb = new MifDb(db);
+  const size = mifDb.getCanvasSize();
+  const palette = mifDb.getPalette();
+  canvas = new CanvasState(size, mifDb.getCanvasSnapshot());
+  paletteJson = JSON.stringify(palette);
+  pixelLimits = {
+    cellCount: size.width * size.height,
+    colorIds: new Set(palette.map((c) => c.id)),
+  };
   console.log(
     `DB: ${dbPath}, schema version ${getDbVersion(db)}, last event id: ${mifDb.getLastEventId()}`
   );
@@ -41,6 +57,62 @@ const MIME_TYPES: Record<string, string> = {
   css: 'text/css',
   png: 'image/png',
 };
+
+// There is no sign-in yet, every pixel is written as the dev user from migration 001.
+const DEV_USER_ID = 0;
+const MAX_BODY_BYTES = 1024;
+
+class BodyTooLargeError extends Error {}
+
+async function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > MAX_BODY_BYTES) throw new BodyTooLargeError();
+    chunks.push(chunk as Buffer);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
+function sendJson(res: http.ServerResponse, status: number, body: unknown): void {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store');
+  res.end(JSON.stringify(body));
+}
+
+// POST /api/pixel { position, color_id } -> 201 { id } with the id of the new event.
+// The pixel is in the database and in the canvas state, or in neither (see placePixel).
+async function handlePlacePixel(req: http.IncomingMessage, res: http.ServerResponse) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    sendJson(res, 405, { error: 'Use POST' });
+    return;
+  }
+  if (!req.headers['content-type']?.startsWith('application/json')) {
+    sendJson(res, 415, { error: 'Content-Type must be application/json' });
+    return;
+  }
+  try {
+    const pixel = parsePixel(await readJsonBody(req), pixelLimits);
+    const id = placePixel(mifDb, canvas, pixel, DEV_USER_ID);
+    sendJson(res, 201, { id });
+  } catch (e) {
+    if (e instanceof BodyTooLargeError) {
+      res.setHeader('Connection', 'close');
+      sendJson(res, 413, { error: 'Body is too large' });
+    } else if (e instanceof InvalidPixelError) {
+      sendJson(res, 400, { error: e.message });
+    } else if (e instanceof SyntaxError) {
+      sendJson(res, 400, { error: 'Body is not valid JSON' });
+    } else {
+      // The database error stays in the log, the client only learns that it failed.
+      console.error('POST /api/pixel failed:', e);
+      sendJson(res, 500, { error: 'Could not save the pixel' });
+    }
+  }
+}
 
 const STATIC_PATH = path.join(process.cwd(), '../frontend/public');
 
@@ -66,6 +138,25 @@ const prepareFile = async (url: string) => {
 };
 
 const server = http.createServer(async (req, res) => {
+  if (req.url === '/api/palette') {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(paletteJson);
+    return;
+  }
+
+  if (req.url === '/api/pixel') {
+    await handlePlacePixel(req, res);
+    return;
+  }
+
+  if (req.url === '/api/canvas') {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(canvas.toJson());
+    return;
+  }
+
   // everyime a request is made it reads the file again
   // fs.createReadStream from disk takes the file and makes it readable
   // ?? checks if the left side is not null of undefined

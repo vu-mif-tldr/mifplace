@@ -17,6 +17,23 @@ export interface EventRow {
   timestamp: number;
 }
 
+export interface Color {
+  id: number;
+  // "#RRGGBB"
+  rgb: string;
+}
+
+export interface CanvasSize {
+  width: number;
+  height: number;
+}
+
+// Current color of one painted cell (position = y * width + x).
+export interface Pixel {
+  position: number;
+  color_id: number;
+}
+
 export interface NewEvent {
   user_id: number;
   color_id: number;
@@ -70,8 +87,19 @@ export class MifDb {
   private readonly selectEventsAfter;
   private readonly selectLastEventId;
   private readonly appendTx;
+  private readonly selectPalette;
+  private readonly selectCanvasSize;
+  private readonly selectPixels;
 
   constructor(private readonly db: Db) {
+    this.selectPalette = db.prepare(`SELECT color_id AS id, rgb FROM palette ORDER BY color_id`);
+    this.selectCanvasSize = db.prepare(`SELECT width, height FROM canvas`);
+    // The last event of every position wins. Positions are validated before an event is
+    // appended, so there is no bounds check here.
+    this.selectPixels = db.prepare(
+      `SELECT position, color_id FROM events
+        WHERE id IN (SELECT MAX(id) FROM events GROUP BY position)`
+    );
     this.insertEvent = db.prepare(
       `INSERT INTO events (user_id, color_id, position, timestamp) 
             VALUES (?, ?, ?, ?)`
@@ -105,6 +133,25 @@ export class MifDb {
   // without loading the whole log into memory.
   iterateEvents(afterId: number): IterableIterator<EventRow> {
     return this.selectEventsAfter.iterate(afterId) as IterableIterator<EventRow>;
+  }
+
+  // The palette and the canvas size do not change while the server runs,
+  // so the caller is expected to read them once and keep the result.
+  getPalette(): Color[] {
+    const palette = this.selectPalette.all() as Color[];
+    if (palette.length === 0) throw new Error('getPalette: palette is not set');
+    return palette;
+  }
+
+  getCanvasSize(): CanvasSize {
+    const size = this.selectCanvasSize.get() as CanvasSize | undefined;
+    if (!size) throw new Error('getCanvasSize: canvas size is not set');
+    return size;
+  }
+
+  // Current state of the canvas: only painted cells, in no particular order.
+  getCanvasSnapshot(): Pixel[] {
+    return this.selectPixels.all() as Pixel[];
   }
 
   // Online backup that is safe while the server is running.

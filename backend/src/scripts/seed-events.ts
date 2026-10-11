@@ -74,8 +74,8 @@ try {
     );
   }
 
-  const insertColor = db.prepare(`INSERT OR IGNORE INTO palette (text) VALUES (?)`);
-  const selectColor = db.prepare(`SELECT color_id FROM palette WHERE text = ?`);
+  const insertColor = db.prepare(`INSERT OR IGNORE INTO palette (rgb) VALUES (?)`);
+  const selectColor = db.prepare(`SELECT color_id FROM palette WHERE rgb = ?`);
   const colorIds = new Map<string, number>();
   const colorId = (hex: string): number => {
     let id = colorIds.get(hex);
