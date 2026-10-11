@@ -37,9 +37,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Runs only if a "test" script is present in package.json
       - name: Test
-        run: npm test --if-present
+        run: npm test
 
   audit:
     name: Dependency audit

@@ -4,9 +4,14 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "build": "npx tsc",
+    "build": "npx tsc -p tsconfig.build.json",
     "typecheck": "npx tsc --noEmit",
-    "watch": "npx tsc --watch",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "check": "npm run typecheck && npm test",
+    "watch": "npx tsc -p tsconfig.build.json --watch",
+    "db:setup:prod": "node dist/scripts/setup-db.js",
+    "db:setup:dev": "tsx src/scripts/setup-db.ts",
+    "db:seed:dev": "tsx src/scripts/seed-events.ts data/pixil-frame-hellomif.c",
     "start": "node dist/server.js"
   },
   "keywords": [],
@@ -14,7 +19,12 @@
   "license": "ISC",
   "type": "module",
   "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3"
   }
 }
