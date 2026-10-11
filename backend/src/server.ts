@@ -114,7 +114,7 @@ async function handlePlacePixel(req: http.IncomingMessage, res: http.ServerRespo
   }
 }
 
-const STATIC_PATH = path.join(process.cwd(), '../frontend/public');
+const STATIC_PATH = path.join(process.cwd(), '../frontend/dist');
 
 const toBool = [() => true, () => false];
 

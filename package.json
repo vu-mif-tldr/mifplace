@@ -3,9 +3,9 @@
   "private": true,
   "scripts": {
     "install:all": "npm ci && npm ci --prefix backend && npm ci --prefix frontend",
-    "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev --prefix backend\" \"npm run watch --prefix frontend\"",
+    "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
     "build": "npm run build --prefix backend && npm run build --prefix frontend",
-    "check": "npm run check --prefix backend && npm run lint --prefix frontend && npm run format:check --prefix frontend"
+    "check": "npm run check --prefix backend && npm run typecheck --prefix frontend && npm run lint --prefix frontend && npm run format:check --prefix frontend && npm run test --prefix frontend"
   },
   "devDependencies": {
     "concurrently": "^10.0.6"

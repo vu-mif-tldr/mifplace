@@ -1,0 +1,84 @@
+body {
+  margin: 0;
+}
+
+/* Controls on top, the canvas centred in the rest of the window. When the canvas is larger than
+   the window, the auto margins collapse and the page scrolls instead of cutting off its start. */
+#page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+#controls {
+  padding: 8px;
+}
+
+#stage {
+  display: flex;
+  flex: 1;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+#status {
+  min-height: 1.2em;
+  margin: 0 0 8px;
+  color: #b00020;
+}
+
+#canvas {
+  display: block;
+  margin: auto;
+  image-rendering: pixelated;
+  border: 1px solid #888;
+}
+
+#picker {
+  position: absolute;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #888;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+#swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 28px);
+  gap: 4px;
+}
+
+.swatch {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #888;
+  cursor: pointer;
+}
+
+.swatch[aria-pressed='true'] {
+  outline: 2px solid #000;
+  outline-offset: 1px;
+}
+
+.swatch:disabled {
+  opacity: 0.5;
+}
+
+/* A check mark on the chosen colour: clicking it again places the pixel. White with a dark
+   outline stays readable on any palette colour. */
+.swatch[aria-pressed='true']::after {
+  content: '✓';
+  color: #fff;
+  font-size: 20px;
+  font-weight: bold;
+  line-height: 1;
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000;
+}

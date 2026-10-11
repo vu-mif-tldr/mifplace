@@ -1,22 +1,27 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import pluginVue from 'eslint-plugin-vue';
 
 export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  ...pluginVue.configs['flat/essential'],
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.{ts,vue}'],
     languageOptions: {
+      parserOptions: { parser: tseslint.parser },
       globals: {
         document: 'readonly',
         window: 'readonly',
         console: 'readonly',
         fetch: 'readonly',
-        HTMLElement: 'readonly',
-        HTMLInputElement: 'readonly',
-        HTMLButtonElement: 'readonly',
+        AbortSignal: 'readonly',
         HTMLDivElement: 'readonly',
-        Event: 'readonly',
+        HTMLCanvasElement: 'readonly',
+        CanvasRenderingContext2D: 'readonly',
+        ImageData: 'readonly',
+        MouseEvent: 'readonly',
+        KeyboardEvent: 'readonly',
       },
     },
     rules: {
@@ -25,6 +30,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['public/**', 'node_modules/**'],
+    ignores: ['dist/**', 'node_modules/**'],
   }
 );

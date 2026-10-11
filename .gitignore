@@ -1,9 +1,8 @@
 # Dependencies
 node_modules/
 
-# Build output (backend: tsc -> dist, frontend: tsc -> public/js; static files in frontend/public stay tracked)
+# Build output (backend: tsc, frontend: vite)
 dist/
-frontend/public/js/
 
 # Environment variables (the template stays tracked)
 .env

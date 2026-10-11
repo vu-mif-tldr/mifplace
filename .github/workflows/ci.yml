@@ -47,7 +47,7 @@ jobs:
         run: npm test
 
   frontend:
-    name: Frontend (build, lint, format)
+    name: Frontend (typecheck, build, lint, format, test)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -70,8 +70,14 @@ jobs:
       - name: Format check
         run: npm run format:check
 
-      - name: Build (typecheck)
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
         run: npm run build
+
+      - name: Test
+        run: npm test
 
   audit:
     name: Dependency audit (${{ matrix.package }})
