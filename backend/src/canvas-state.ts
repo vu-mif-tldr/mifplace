@@ -4,8 +4,8 @@ import type { CanvasSize, Pixel } from './db.js';
 export type ContentEncoding = 'br' | 'gzip' | 'identity';
 
 // Brotli's default quality 11 takes seconds on a large canvas, 5 is fast and almost as small
-// (see bench-canvas-format.ts).
-const BROTLI_QUALITY = 5;
+// (see bench-canvas-format.ts). The server may override it with CANVAS_BROTLI_QUALITY.
+export const DEFAULT_BROTLI_QUALITY = 5;
 // Offset of last_event_id in the header, see HEADER_BYTES.
 const LAST_EVENT_ID_OFFSET = 9;
 
@@ -33,7 +33,12 @@ export class CanvasState {
   private readonly bodies = new Map<ContentEncoding, Buffer>();
 
   // lastEventId is the id of the last event included in painted (0 for an empty log).
-  constructor(size: CanvasSize, painted: Iterable<Pixel>, lastEventId: number) {
+  constructor(
+    size: CanvasSize,
+    painted: Iterable<Pixel>,
+    lastEventId: number,
+    private readonly brotliQuality: number = DEFAULT_BROTLI_QUALITY
+  ) {
     this.bytes = Buffer.alloc(
       CanvasState.HEADER_BYTES + size.width * size.height,
       CanvasState.EMPTY
@@ -71,7 +76,7 @@ export class CanvasState {
     if (body === undefined) {
       if (encoding === 'br') {
         body = zlib.brotliCompressSync(this.bytes, {
-          params: { [zlib.constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY },
+          params: { [zlib.constants.BROTLI_PARAM_QUALITY]: this.brotliQuality },
         });
       } else if (encoding === 'gzip') {
         body = zlib.gzipSync(this.bytes);

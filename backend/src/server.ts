@@ -3,18 +3,28 @@ import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
 import { MifDb, getDbVersion, openDb, resolveDbPath } from './db.js';
-import { CanvasState, type ContentEncoding } from './canvas-state.js';
+import { CanvasState, DEFAULT_BROTLI_QUALITY, type ContentEncoding } from './canvas-state.js';
 import { InvalidPixelError, parsePixel, placePixel, type PixelLimits } from './place-pixel.js';
-import { loadDotEnv } from './env.js';
+import { envInt, loadDotEnv } from './env.js';
+import { DEFAULT_LIVE_OPTIONS, LiveUpdates, type LiveUpdatesOptions } from './live-updates.js';
 
 // Settings come from the environment, then from .env (see .env.example).
 loadDotEnv('.env');
 
-const PORT: number = Number(process.env.PORT ?? 3000);
-if (!Number.isInteger(PORT) || PORT < 0 || PORT > 65535) {
-  throw new Error(`Invalid PORT: ${process.env.PORT}`);
-}
+const PORT = envInt('PORT', 3000, 0, 65535);
 const hostname: string = process.env.HOST ?? '127.0.0.1';
+const BROTLI_QUALITY = envInt('CANVAS_BROTLI_QUALITY', DEFAULT_BROTLI_QUALITY, 0, 11);
+const LIVE_OPTIONS: LiveUpdatesOptions = {
+  batchMs: envInt('WS_BATCH_MS', DEFAULT_LIVE_OPTIONS.batchMs, 10, 10_000),
+  maxCatchUp: envInt('WS_MAX_CATCH_UP', DEFAULT_LIVE_OPTIONS.maxCatchUp, 0, 1_000_000),
+  maxBufferedBytes: envInt(
+    'WS_MAX_BUFFERED_BYTES',
+    DEFAULT_LIVE_OPTIONS.maxBufferedBytes,
+    64 * 1024,
+    256 * 1024 * 1024
+  ),
+  pingMs: envInt('WS_PING_MS', DEFAULT_LIVE_OPTIONS.pingMs, 1000, 600_000),
+};
 
 // Fails loudly if DB_PATH is not set or the file does not exist (run db:setup first).
 const dbPath = resolveDbPath();
@@ -24,6 +34,8 @@ let mifDb: MifDb;
 let canvas: CanvasState;
 // The palette is fixed while the server runs, it is serialized once at start.
 let paletteJson: string;
+// Pushes new pixels to the browsers over /api/ws.
+let live: LiveUpdates;
 // What POST /api/pixel is checked against, also fixed while the server runs.
 let pixelLimits: PixelLimits;
 try {
@@ -41,7 +53,8 @@ try {
     );
   }
   const snapshot = mifDb.getCanvasSnapshot();
-  canvas = new CanvasState(size, snapshot.pixels, snapshot.lastEventId);
+  canvas = new CanvasState(size, snapshot.pixels, snapshot.lastEventId, BROTLI_QUALITY);
+  live = new LiveUpdates(mifDb, snapshot.lastEventId, LIVE_OPTIONS);
   paletteJson = JSON.stringify(palette);
   pixelLimits = {
     cellCount: size.width * size.height,
@@ -104,6 +117,7 @@ async function handlePlacePixel(req: http.IncomingMessage, res: http.ServerRespo
   try {
     const pixel = parsePixel(await readJsonBody(req), pixelLimits);
     const id = placePixel(mifDb, canvas, pixel, DEV_USER_ID);
+    live.publish({ id, ...pixel });
     sendJson(res, 201, { id });
   } catch (e) {
     if (e instanceof BodyTooLargeError) {
@@ -192,6 +206,15 @@ const server = http.createServer(async (req, res) => {
   file.stream.pipe(res);
 });
 
+// WebSocket connections start as an HTTP upgrade request; only /api/ws accepts them.
+server.on('upgrade', (req, socket, head) => {
+  if (new URL(req.url ?? '', 'http://localhost').pathname === '/api/ws') {
+    live.handleUpgrade(req, socket, head);
+  } else {
+    socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
+  }
+});
+
 server.listen(PORT, hostname, () => {
   console.log(`Server running at http://${hostname}:${PORT}/`);
 });
@@ -199,6 +222,8 @@ server.listen(PORT, hostname, () => {
 // Stop accepting connections, then close the database so the WAL is checkpointed.
 // The database is closed in the callback: it is not needed until open connections are done.
 const shutdown = () => {
+  // Upgraded connections are not tracked by server.close, they would keep the process alive.
+  live.close();
   server.close(() => mifDb.close());
   // Idle keep-alive connections would keep server.close waiting.
   server.closeIdleConnections();
