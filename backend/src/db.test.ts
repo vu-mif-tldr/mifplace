@@ -83,11 +83,15 @@ describe('openDb / MifDb', () => {
     migrate(db, loadMigrations(REAL_MIGRATIONS_DIR));
     const mif = new MifDb(db);
 
-    mif.appendEvent({ user_id: 0, color_id: 2, position: 5 }, 1000);
-    mif.appendEvent({ user_id: 0, color_id: 4, position: 5 }, 1001);
+    assert.deepEqual(mif.getCanvasSnapshot(), { lastEventId: 0, pixels: [] });
 
-    const painted = mif.getCanvasSnapshot();
-    assert.deepEqual(painted, [{ position: 5, color_id: 4 }]);
+    mif.appendEvent({ user_id: 0, color_id: 2, position: 5 }, 1000);
+    const last = mif.appendEvent({ user_id: 0, color_id: 4, position: 5 }, 1001);
+
+    assert.deepEqual(mif.getCanvasSnapshot(), {
+      lastEventId: last,
+      pixels: [{ position: 5, color_id: 4 }],
+    });
 
     const palette = mif.getPalette();
     assert.deepEqual(palette[4], { id: 4, rgb: '#0000FF' });

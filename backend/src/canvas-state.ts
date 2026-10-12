@@ -6,6 +6,8 @@ export type ContentEncoding = 'br' | 'gzip' | 'identity';
 // Brotli's default quality 11 takes seconds on a large canvas, 5 is fast and almost as small
 // (see bench-canvas-format.ts).
 const BROTLI_QUALITY = 5;
+// Offset of last_event_id in the header, see HEADER_BYTES.
+const LAST_EVENT_ID_OFFSET = 9;
 
 // Current state of the canvas, kept in memory so that GET /api/canvas does not touch the database.
 // Built once at server start from the database; every event appended later must also go through
@@ -15,8 +17,11 @@ export class CanvasState {
   static readonly EMPTY = 255;
   // A byte silently wraps larger values, the server checks the palette against this at start.
   static readonly MAX_COLOR_ID = CanvasState.EMPTY - 1;
-  // width and height, both u32 little-endian.
-  static readonly HEADER_BYTES = 8;
+  // Changes whenever the layout of the body changes, the client refuses other versions.
+  static readonly FORMAT_VERSION = 1;
+  // version u8, then width, height and the id of the last event in the cells, each u32
+  // little-endian.
+  static readonly HEADER_BYTES = 13;
 
   // Body of GET /api/canvas, kept ready to send: the header, then one byte per cell
   // (position = y * width + x) with the color_id or EMPTY. 1 MB for 1000x1000, a Map with
@@ -27,13 +32,16 @@ export class CanvasState {
   // Response bodies by encoding, dropped on every change and rebuilt on the next read.
   private readonly bodies = new Map<ContentEncoding, Buffer>();
 
-  constructor(size: CanvasSize, painted: Iterable<Pixel>) {
+  // lastEventId is the id of the last event included in painted (0 for an empty log).
+  constructor(size: CanvasSize, painted: Iterable<Pixel>, lastEventId: number) {
     this.bytes = Buffer.alloc(
       CanvasState.HEADER_BYTES + size.width * size.height,
       CanvasState.EMPTY
     );
-    this.bytes.writeUInt32LE(size.width, 0);
-    this.bytes.writeUInt32LE(size.height, 4);
+    this.bytes.writeUInt8(CanvasState.FORMAT_VERSION, 0);
+    this.bytes.writeUInt32LE(size.width, 1);
+    this.bytes.writeUInt32LE(size.height, 5);
+    this.bytes.writeUInt32LE(lastEventId, LAST_EVENT_ID_OFFSET);
     this.cells = this.bytes.subarray(CanvasState.HEADER_BYTES);
     for (const p of painted) this.cells[p.position] = p.color_id;
   }
@@ -43,9 +51,16 @@ export class CanvasState {
     return this.cells[position];
   }
 
-  // Positions are validated before an event is appended, there is no bounds check here.
-  setCell(position: number, colorId: number): void {
+  // Id of the last event applied to the cells.
+  getLastEventId(): number {
+    return this.bytes.readUInt32LE(LAST_EVENT_ID_OFFSET);
+  }
+
+  // Applies the event with the given id. Positions are validated before an event is appended,
+  // there is no bounds check here.
+  setCell(position: number, colorId: number, eventId: number): void {
     this.cells[position] = colorId;
+    this.bytes.writeUInt32LE(eventId, LAST_EVENT_ID_OFFSET);
     this.bodies.clear();
   }
 

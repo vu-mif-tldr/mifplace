@@ -42,6 +42,6 @@ export function placePixel(
   now: number = Date.now()
 ): number {
   const id = mifDb.appendEvent({ user_id: userId, ...pixel }, now);
-  canvas.setCell(pixel.position, pixel.color_id);
+  canvas.setCell(pixel.position, pixel.color_id, id);
   return id;
 }

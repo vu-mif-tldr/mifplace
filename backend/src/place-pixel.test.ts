@@ -68,7 +68,7 @@ describe('placePixel', () => {
   });
 
   it('leaves the memory unchanged when the database fails', () => {
-    const canvas = new CanvasState(size, [{ position: 1, color_id: 2 }]);
+    const canvas = new CanvasState(size, [{ position: 1, color_id: 2 }], 1);
     const before = canvas.body('identity');
     const mifDb = {
       appendEvent: () => {
@@ -89,17 +89,18 @@ describe('placePixel', () => {
 
     it('stores the event and the cell', () => {
       const { mif, db, dir } = openMigrated();
-      const canvas = new CanvasState(size, []);
+      const canvas = new CanvasState(size, [], 0);
       const id = placePixel(mif, canvas, { position: 5, color_id: 4 }, 0, 1000);
       assert.equal(mif.getLastEventId(), id);
       assert.equal(canvas.getCell(5), 4);
+      assert.equal(canvas.getLastEventId(), id);
       db.close();
       fs.rmSync(dir, { recursive: true });
     });
 
     it('keeps the memory clean when the insert violates a constraint or the db is closed', () => {
       const { mif, db, dir } = openMigrated();
-      const canvas = new CanvasState(size, []);
+      const canvas = new CanvasState(size, [], 0);
       const before = canvas.body('identity');
 
       // unknown user: foreign key violation inside SQLite

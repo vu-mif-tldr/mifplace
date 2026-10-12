@@ -40,14 +40,15 @@ try {
       `color_id ${tooLarge.id} does not fit CanvasState (max ${CanvasState.MAX_COLOR_ID})`
     );
   }
-  canvas = new CanvasState(size, mifDb.getCanvasSnapshot());
+  const snapshot = mifDb.getCanvasSnapshot();
+  canvas = new CanvasState(size, snapshot.pixels, snapshot.lastEventId);
   paletteJson = JSON.stringify(palette);
   pixelLimits = {
     cellCount: size.width * size.height,
     colorIds: new Set(palette.map((c) => c.id)),
   };
   console.log(
-    `DB: ${dbPath}, schema version ${getDbVersion(db)}, last event id: ${mifDb.getLastEventId()}`
+    `DB: ${dbPath}, schema version ${getDbVersion(db)}, last event id: ${canvas.getLastEventId()}`
   );
 } catch (e) {
   db.close();

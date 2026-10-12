@@ -3,26 +3,31 @@ import { EMPTY_CELL, parseCanvas } from './api';
 import { fillRgba, fitScale, hexToRgb } from './canvas';
 
 describe('parseCanvas', () => {
-  // The layout written by CanvasState on the backend: width, height (u32 LE), then the cells.
-  function body(width: number, height: number, cells: number[]): ArrayBuffer {
-    const bytes = new Uint8Array(8 + cells.length);
+  // The layout written by CanvasState on the backend: version u8, width, height,
+  // last event id (u32 LE), then the cells.
+  function body(width: number, height: number, cells: number[], version = 1): ArrayBuffer {
+    const bytes = new Uint8Array(13 + cells.length);
     const view = new DataView(bytes.buffer);
-    view.setUint32(0, width, true);
-    view.setUint32(4, height, true);
-    bytes.set(cells, 8);
+    view.setUint8(0, version);
+    view.setUint32(1, width, true);
+    view.setUint32(5, height, true);
+    view.setUint32(9, 70000, true);
+    bytes.set(cells, 13);
     return bytes.buffer;
   }
 
-  it('reads the size and the cells', () => {
+  it('reads the size, the last event id and the cells', () => {
     const snap = parseCanvas(body(3, 2, [0, EMPTY_CELL, 2, 3, 4, 5]));
     expect(snap.width).toBe(3);
     expect(snap.height).toBe(2);
+    expect(snap.lastEventId).toBe(70000);
     expect([...snap.cells]).toEqual([0, EMPTY_CELL, 2, 3, 4, 5]);
   });
 
   it('rejects a body that does not match the size', () => {
     expect(() => parseCanvas(body(3, 2, [0, 1, 2]))).toThrow(/3 cells, expected 3x2/);
     expect(() => parseCanvas(new ArrayBuffer(4))).toThrow(/too short/);
+    expect(() => parseCanvas(body(1, 1, [0], 2))).toThrow(/format version 2/);
   });
 });
 

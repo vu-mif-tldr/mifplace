@@ -34,6 +34,12 @@ export interface Pixel {
   color_id: number;
 }
 
+// Painted cells together with the id of the last event they include.
+export interface CanvasSnapshot {
+  lastEventId: number;
+  pixels: Pixel[];
+}
+
 export interface NewEvent {
   user_id: number;
   color_id: number;
@@ -90,6 +96,7 @@ export class MifDb {
   private readonly selectPalette;
   private readonly selectCanvasSize;
   private readonly selectPixels;
+  private readonly snapshotTx;
 
   constructor(private readonly db: Db) {
     this.selectPalette = db.prepare(`SELECT color_id AS id, rgb FROM palette ORDER BY color_id`);
@@ -106,6 +113,12 @@ export class MifDb {
     );
     this.selectEventsAfter = db.prepare(`SELECT * FROM events WHERE id > ? ORDER BY id`);
     this.selectLastEventId = db.prepare(`SELECT COALESCE(MAX(id), 0) AS id FROM events`);
+
+    // Both reads in one transaction, so lastEventId matches the pixels exactly.
+    this.snapshotTx = db.transaction((): CanvasSnapshot => ({
+      lastEventId: this.getLastEventId(),
+      pixels: this.selectPixels.all() as Pixel[],
+    }));
 
     // The event and the cooldown timestamp must change together.
     this.appendTx = db.transaction((event: NewEvent, now: number): number => {
@@ -149,9 +162,10 @@ export class MifDb {
     return size;
   }
 
-  // Current state of the canvas: only painted cells, in no particular order.
-  getCanvasSnapshot(): Pixel[] {
-    return this.selectPixels.all() as Pixel[];
+  // Current state of the canvas: only painted cells, in no particular order, and the id of
+  // the last event in it. A client that loads it catches up with the events after that id.
+  getCanvasSnapshot(): CanvasSnapshot {
+    return this.snapshotTx();
   }
 
   // Online backup that is safe while the server is running.
