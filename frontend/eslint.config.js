@@ -22,6 +22,7 @@ export default tseslint.config(
         ImageData: 'readonly',
         MouseEvent: 'readonly',
         KeyboardEvent: 'readonly',
+        PointerEvent: 'readonly',
         location: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',

@@ -1,11 +1,48 @@
 import { EMPTY_CELL, type CanvasSnapshot, type Color } from './api';
 
-const BACKGROUND_COLOR = '#FFFFFF';
+export const BACKGROUND_COLOR = '#FFFFFF';
 
 export const SCALE_MIN = 1;
 export const SCALE_MAX = 20;
 // Width of the canvas border on each side, keep in sync with `#canvas` in styles.css.
 export const CANVAS_BORDER = 1;
+
+export interface Cell {
+  x: number;
+  y: number;
+}
+
+// The colour selected before the user picks one: the palette colour of the background, so
+// that drawing without a choice does not suddenly paint in some colour. Falls back to the
+// first colour if the palette has no such colour.
+export function defaultColor(palette: Color[]): Color | null {
+  const background = palette.find((c) => c.rgb.toUpperCase() === BACKGROUND_COLOR);
+  return background ?? palette[0] ?? null;
+}
+
+// Cells of the straight line from a to b, both included, in order (Bresenham).
+export function cellsOnLine(a: Cell, b: Cell): Cell[] {
+  const cells: Cell[] = [];
+  const dx = Math.abs(b.x - a.x);
+  const dy = -Math.abs(b.y - a.y);
+  const sx = a.x < b.x ? 1 : -1;
+  const sy = a.y < b.y ? 1 : -1;
+  let err = dx + dy;
+  let { x, y } = a;
+  for (;;) {
+    cells.push({ x, y });
+    if (x === b.x && y === b.y) return cells;
+    const e2 = 2 * err;
+    if (e2 >= dy) {
+      err += dy;
+      x += sx;
+    }
+    if (e2 <= dx) {
+      err += dx;
+      y += sy;
+    }
+  }
+}
 
 // Fill colour of a cell: its palette colour, or the background for an empty cell and for a
 // colour missing from the palette.
@@ -79,10 +116,7 @@ export function fitScale(
 
 // Cell under the mouse, or null outside the canvas. The scale is taken from the rendered size,
 // so this stays correct for any scale. clientLeft/clientTop skip the border.
-export function cellAt(
-  canvas: HTMLCanvasElement,
-  event: MouseEvent
-): { x: number; y: number } | null {
+export function cellAt(canvas: HTMLCanvasElement, event: MouseEvent): Cell | null {
   const rect = canvas.getBoundingClientRect();
   const scale = canvas.clientWidth / canvas.width;
   const x = Math.floor((event.clientX - rect.left - canvas.clientLeft) / scale);

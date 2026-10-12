@@ -1,43 +1,33 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { postPixel, type CanvasSnapshot, type Color } from '../api';
-import { cellAt, cellFill, drawSnapshot } from '../canvas';
+import { cellAt, cellFill, cellsOnLine, drawSnapshot, type Cell } from '../canvas';
 import { LiveConnection, type LiveEvent } from '../live';
-import ColorPicker from './ColorPicker.vue';
 
-// The canvas with the colour picker opened by a click on a cell.
-// - choosing a colour previews it on the cell;
-// - a second click on the chosen colour sends the pixel to the server and keeps it only if the
-//   server saved it (clicking another colour only moves the preview);
-// - a click outside the picker, Escape or a scale change puts the old colour back.
-// While the pixel is being saved the picker is locked: a cancel at that moment would remove
-// the pixel from the canvas that the server is about to store.
+// The canvas you draw on with the colour chosen in the palette: a click paints one cell,
+// dragging with the button held paints every cell under the cursor. Each cell is drawn at once
+// and sent to the server on its own, without confirmation; if the server does not store it, the
+// cell goes back to the colour the server has.
 //
 // Pixels of other people arrive over /api/ws. `cells` is the canvas as the server has it:
-// the snapshot plus every event after it. The preview is drawn over it and never written
-// into it, so closing the picker redraws the cell from `cells`, even if somebody repainted
-// it while the picker was open.
+// the snapshot plus every event after it. A cell of ours still being saved is drawn over it
+// and not repainted by incoming events until its request finishes.
 
-const props = defineProps<{ palette: Color[]; snapshot: CanvasSnapshot; scale: number }>();
+const props = defineProps<{
+  palette: Color[];
+  snapshot: CanvasSnapshot;
+  scale: number;
+  // The colour to draw with.
+  color: Color;
+}>();
 const emit = defineEmits<{
   status: [message: string];
   // The server cannot catch this canvas up, the parent must load it again.
   reload: [];
 }>();
 
-interface Selection {
-  x: number;
-  y: number;
-  anchor: { x: number; y: number };
-}
-
 const canvas = ref<HTMLCanvasElement | null>(null);
 let ctx: CanvasRenderingContext2D | null = null;
-
-// Not a deep ref: ImageData must stay a real object for putImageData.
-const selected = shallowRef<Selection | null>(null);
-const chosen = ref<Color | null>(null);
-const saving = ref(false);
 
 const cells = props.snapshot.cells.slice();
 // The last event applied to cells.
@@ -47,27 +37,36 @@ let live: LiveConnection | null = null;
 // Whether the "connection lost" message is shown, so that a reconnect clears only it.
 let showsConnectionLost = false;
 
-function positionOf(cell: { x: number; y: number }): number {
+// Cells of ours being saved: position -> colour drawn there and the request number. A newer
+// request for the same cell replaces the entry, so only the last one decides what is drawn
+// when it finishes.
+const saving = new Map<number, { colorId: number; request: number }>();
+let requestCount = 0;
+// The cell under the cursor while the button is held, null otherwise.
+let stroke: Cell | null = null;
+
+function positionOf(cell: Cell): number {
   return cell.y * props.snapshot.width + cell.x;
 }
 
-// Draws the cell as it is in cells.
-function drawCell(position: number): void {
+function fill(position: number, colorId: number): void {
   if (!ctx) return;
-  ctx.fillStyle = cellFill(colors, cells[position]);
+  ctx.fillStyle = cellFill(colors, colorId);
   ctx.fillRect(position % props.snapshot.width, Math.floor(position / props.snapshot.width), 1, 1);
 }
 
-// The cell under the preview keeps the preview, it is redrawn when the picker closes.
+// Draws the cell as it is in cells, or our colour while it is being saved.
+function drawCell(position: number): void {
+  fill(position, saving.get(position)?.colorId ?? cells[position]);
+}
+
 function applyEvents(events: LiveEvent[]): void {
-  const cell = selected.value;
-  const previewed = cell && chosen.value ? positionOf(cell) : -1;
   for (const e of events) {
     // Already in the snapshot.
     if (e.id <= lastEventId) continue;
     cells[e.position] = e.color_id;
     lastEventId = e.id;
-    if (e.position !== previewed) drawCell(e.position);
+    drawCell(e.position);
   }
 }
 
@@ -81,80 +80,56 @@ function onConnectedChange(connected: boolean): void {
   }
 }
 
-function open(cell: { x: number; y: number }, event: MouseEvent): void {
-  if (!ctx) return;
-  selected.value = { ...cell, anchor: { x: event.pageX, y: event.pageY } };
-  chosen.value = null;
-  emit('status', '');
-}
-
-// Closes the picker and replaces the preview with the real colour of the cell.
-function close(): void {
-  const cell = selected.value;
-  selected.value = null;
-  chosen.value = null;
-  if (cell) drawCell(positionOf(cell));
-}
-
-function cancel(): void {
-  if (saving.value) return;
-  close();
-}
-
-async function save(): Promise<void> {
-  const cell = selected.value;
-  const color = chosen.value;
-  if (!ctx || !cell || !color || saving.value) return;
-  saving.value = true;
+async function paint(cell: Cell): Promise<void> {
   const position = positionOf(cell);
+  const colorId = props.color.id;
+  // Already this colour: nothing to send.
+  if ((saving.get(position)?.colorId ?? cells[position]) === colorId) return;
+  const request = ++requestCount;
+  saving.set(position, { colorId, request });
+  fill(position, colorId);
   try {
-    const id = await postPixel(position, color.id);
+    const id = await postPixel(position, colorId);
     // Usually the response comes before the event itself (it is sent in the next batch), so
     // the pixel is put into cells now. If the event or a later one has already arrived, cells
     // is up to date and must not be changed.
-    if (id > lastEventId) cells[position] = color.id;
+    if (id > lastEventId) cells[position] = colorId;
   } catch (e) {
-    // Not saved (server error, network, timeout): close() puts the real colour back.
     console.error(e);
-    emit('status', 'Could not save the pixel, it was removed from the canvas.');
+    emit('status', 'Could not save a pixel, it was removed from the canvas.');
   }
-  close();
-  saving.value = false;
+  // A newer request for this cell is still running, it draws the cell when it finishes.
+  if (saving.get(position)?.request !== request) return;
+  saving.delete(position);
+  drawCell(position);
 }
 
-function onPick(color: Color): void {
-  const cell = selected.value;
-  if (!ctx || !cell || saving.value) return;
-  if (chosen.value?.id === color.id) {
-    void save();
-    return;
-  }
-  chosen.value = color;
-  ctx.fillStyle = color.rgb;
-  ctx.fillRect(cell.x, cell.y, 1, 1);
-}
-
-function onDocumentClick(event: MouseEvent): void {
-  if (saving.value) return;
-  // A click outside an open picker only closes it, even if it landed on another cell.
-  if (selected.value) {
-    cancel();
-    return;
-  }
-  if (!canvas.value || event.target !== canvas.value) return;
+function onPointerDown(event: PointerEvent): void {
+  if (!canvas.value || event.button !== 0) return;
   const cell = cellAt(canvas.value, event);
-  if (cell) open(cell, event);
+  if (!cell) return;
+  // Keeps the pointer events coming while the cursor leaves the canvas during a stroke.
+  canvas.value.setPointerCapture(event.pointerId);
+  stroke = cell;
+  void paint(cell);
 }
 
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') cancel();
+function onPointerMove(event: PointerEvent): void {
+  if (!canvas.value || !stroke) return;
+  const cell = cellAt(canvas.value, event);
+  if (!cell || (cell.x === stroke.x && cell.y === stroke.y)) return;
+  // A fast move skips cells, the line between the two positions fills them.
+  for (const c of cellsOnLine(stroke, cell).slice(1)) void paint(c);
+  stroke = cell;
+}
+
+function onPointerUp(): void {
+  stroke = null;
 }
 
 onMounted(() => {
   if (!canvas.value) return;
   ctx = drawSnapshot(canvas.value, props.palette, props.snapshot);
-  document.addEventListener('click', onDocumentClick);
-  document.addEventListener('keydown', onKeydown);
   live = new LiveConnection(() => lastEventId, {
     onEvents: applyEvents,
     onReload: () => emit('reload'),
@@ -165,12 +140,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   live?.stop();
-  document.removeEventListener('click', onDocumentClick);
-  document.removeEventListener('keydown', onKeydown);
 });
-
-// The picker position is wrong after the resize.
-watch(() => props.scale, cancel);
 </script>
 
 <template>
@@ -178,13 +148,9 @@ watch(() => props.scale, cancel);
     id="canvas"
     ref="canvas"
     :style="{ width: `${snapshot.width * scale}px`, height: `${snapshot.height * scale}px` }"
-  />
-  <ColorPicker
-    v-if="selected"
-    :palette="palette"
-    :chosen-id="chosen?.id ?? null"
-    :saving="saving"
-    :anchor="selected.anchor"
-    @pick="onPick"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerUp"
   />
 </template>

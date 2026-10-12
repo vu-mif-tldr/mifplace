@@ -35,20 +35,16 @@ label {
   margin: auto;
   image-rendering: pixelated;
   border: 1px solid #888;
+  cursor: crosshair;
+  /* Dragging on a touch screen draws instead of scrolling the page. */
+  touch-action: none;
 }
 
-#picker {
-  position: absolute;
-  padding: 8px;
-  background: #fff;
-  border: 1px solid #888;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-}
-
-#swatches {
-  display: grid;
-  grid-template-columns: repeat(4, 28px);
+#palette {
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px;
+  margin-bottom: 8px;
 }
 
 .swatch {
@@ -64,12 +60,8 @@ label {
   outline-offset: 1px;
 }
 
-.swatch:disabled {
-  opacity: 0.5;
-}
-
-/* A check mark on the chosen colour: clicking it again places the pixel. White with a dark
-   outline stays readable on any palette colour. */
+/* A check mark on the chosen colour. White with a dark outline stays readable on any palette
+   colour. */
 .swatch[aria-pressed='true']::after {
   content: '✓';
   color: #fff;

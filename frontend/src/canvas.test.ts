@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_CELL, parseCanvas } from './api';
-import { fillRgba, fitScale, hexToRgb } from './canvas';
+import { cellsOnLine, defaultColor, fillRgba, fitScale, hexToRgb } from './canvas';
 
 describe('parseCanvas', () => {
   // The layout written by CanvasState on the backend: version u8, width, height,
@@ -71,5 +71,42 @@ describe('fitScale', () => {
   it('stays within the allowed range', () => {
     expect(fitScale(256, 256, 100, 100)).toBe(1);
     expect(fitScale(16, 16, 5000, 5000)).toBe(20);
+  });
+});
+
+describe('cellsOnLine', () => {
+  it('includes both ends and has no gaps', () => {
+    expect(cellsOnLine({ x: 2, y: 2 }, { x: 2, y: 2 })).toEqual([{ x: 2, y: 2 }]);
+    expect(cellsOnLine({ x: 0, y: 0 }, { x: 3, y: 0 })).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+      { x: 3, y: 0 },
+    ]);
+    expect(cellsOnLine({ x: 3, y: 3 }, { x: 0, y: 0 })).toEqual([
+      { x: 3, y: 3 },
+      { x: 2, y: 2 },
+      { x: 1, y: 1 },
+      { x: 0, y: 0 },
+    ]);
+    // A steep line: every step moves to a neighbouring cell.
+    const line = cellsOnLine({ x: 0, y: 0 }, { x: 2, y: 7 });
+    expect(line[0]).toEqual({ x: 0, y: 0 });
+    expect(line[line.length - 1]).toEqual({ x: 2, y: 7 });
+    expect(line).toHaveLength(8);
+    for (let i = 1; i < line.length; i++) {
+      expect(Math.abs(line[i].x - line[i - 1].x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(line[i].y - line[i - 1].y)).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+describe('defaultColor', () => {
+  it('is the background colour of the palette, else the first one', () => {
+    const black = { id: 0, rgb: '#000000' };
+    const white = { id: 1, rgb: '#ffffff' };
+    expect(defaultColor([black, white])).toBe(white);
+    expect(defaultColor([black])).toBe(black);
+    expect(defaultColor([])).toBeNull();
   });
 });
