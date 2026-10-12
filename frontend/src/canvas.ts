@@ -7,6 +7,13 @@ export const SCALE_MAX = 20;
 // Width of the canvas border on each side, keep in sync with `#canvas` in styles.css.
 export const CANVAS_BORDER = 1;
 
+// Fill colour of a cell: its palette colour, or the background for an empty cell and for a
+// colour missing from the palette.
+export function cellFill(colors: ReadonlyMap<number, string>, colorId: number): string {
+  if (colorId === EMPTY_CELL) return BACKGROUND_COLOR;
+  return colors.get(colorId) ?? BACKGROUND_COLOR;
+}
+
 export function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];

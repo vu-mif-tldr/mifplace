@@ -60,7 +60,8 @@ export async function fetchCanvas(): Promise<CanvasSnapshot> {
   return parseCanvas(await response.arrayBuffer());
 }
 
-export async function postPixel(position: number, colorId: number): Promise<void> {
+// Returns the id of the stored event.
+export async function postPixel(position: number, colorId: number): Promise<number> {
   const response = await fetch('/api/pixel', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -68,4 +69,5 @@ export async function postPixel(position: number, colorId: number): Promise<void
     signal: AbortSignal.timeout(SAVE_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`POST /api/pixel failed: ${response.status}`);
+  return ((await response.json()) as { id: number }).id;
 }

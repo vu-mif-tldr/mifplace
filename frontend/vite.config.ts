@@ -7,7 +7,8 @@ const BACKEND_URL = 'http://127.0.0.1:3000';
 export default defineConfig({
   plugins: [vue()],
   server: {
-    proxy: { '/api': BACKEND_URL },
+    // ws: also proxy the WebSocket of /api/ws.
+    proxy: { '/api': { target: BACKEND_URL, ws: true } },
   },
   test: {
     environment: 'node',
