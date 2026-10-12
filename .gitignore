@@ -18,3 +18,6 @@ data/
 # OS / editor
 .DS_Store
 .idea/
+
+# Release archives built by npm run package
+/release/
