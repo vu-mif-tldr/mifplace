@@ -1,4 +1,4 @@
-import type { CanvasSnapshot, Color } from './api';
+import { EMPTY_CELL, type CanvasSnapshot, type Color } from './api';
 
 const BACKGROUND_COLOR = '#FFFFFF';
 
@@ -24,32 +24,33 @@ export function drawSnapshot(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D canvas is not supported');
   const image = ctx.createImageData(snap.width, snap.height);
-  const background = hexToRgb(BACKGROUND_COLOR);
-  const cellCount = snap.width * snap.height;
-  for (let i = 0; i < cellCount; i++) {
-    image.data.set([...background, 255], i * 4);
-  }
-
-  const colors = new Map(palette.map((c) => [c.id, c.rgb]));
-  if (snap.position.length !== snap.color_id.length) {
-    throw new Error('Canvas snapshot: position and color_id have different lengths');
-  }
-  for (let i = 0; i < snap.position.length; i++) {
-    const position = snap.position[i];
-    const color_id = snap.color_id[i];
-    if (!Number.isInteger(position) || position < 0 || position >= cellCount) {
-      console.warn(`Ignoring pixel outside the canvas: position ${position}, cells ${cellCount}`);
-      continue;
-    }
-    const hex = colors.get(color_id);
-    if (!hex) {
-      console.warn(`Ignoring pixel with unknown color: position ${position}, color ${color_id}`);
-      continue;
-    }
-    image.data.set([...hexToRgb(hex), 255], position * 4);
+  const unknown = fillRgba(image.data, palette, snap.cells);
+  if (unknown > 0) {
+    console.warn(`Canvas snapshot: ${unknown} cells have a color missing from the palette`);
   }
   ctx.putImageData(image, 0, 0);
   return ctx;
+}
+
+// Writes one RGBA pixel per cell. Empty cells and cells with a color missing from the
+// palette get the background color. Returns the number of cells with a missing color.
+export function fillRgba(rgba: Uint8ClampedArray, palette: Color[], cells: Uint8Array): number {
+  const rgbById: [number, number, number][] = [];
+  for (const c of palette) rgbById[c.id] = hexToRgb(c.rgb);
+  const background = hexToRgb(BACKGROUND_COLOR);
+  let unknown = 0;
+  for (let i = 0; i < cells.length; i++) {
+    let rgb = cells[i] === EMPTY_CELL ? background : rgbById[cells[i]];
+    if (rgb === undefined) {
+      unknown++;
+      rgb = background;
+    }
+    rgba[i * 4] = rgb[0];
+    rgba[i * 4 + 1] = rgb[1];
+    rgba[i * 4 + 2] = rgb[2];
+    rgba[i * 4 + 3] = 255; //alpha
+  }
+  return unknown;
 }
 
 // The largest whole scale at which the canvas, with its border, fits the available area

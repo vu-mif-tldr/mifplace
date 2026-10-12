@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
 import { MifDb, getDbVersion, openDb, resolveDbPath } from './db.js';
-import { CanvasState } from './canvas-state.js';
+import { CanvasState, type ContentEncoding } from './canvas-state.js';
 import { InvalidPixelError, parsePixel, placePixel, type PixelLimits } from './place-pixel.js';
 import { loadDotEnv } from './env.js';
 
@@ -34,6 +34,12 @@ try {
   mifDb = new MifDb(db);
   const size = mifDb.getCanvasSize();
   const palette = mifDb.getPalette();
+  const tooLarge = palette.find((c) => c.id > CanvasState.MAX_COLOR_ID);
+  if (tooLarge) {
+    throw new Error(
+      `color_id ${tooLarge.id} does not fit CanvasState (max ${CanvasState.MAX_COLOR_ID})`
+    );
+  }
   canvas = new CanvasState(size, mifDb.getCanvasSnapshot());
   paletteJson = JSON.stringify(palette);
   pixelLimits = {
@@ -114,6 +120,15 @@ async function handlePlacePixel(req: http.IncomingMessage, res: http.ServerRespo
   }
 }
 
+// Brotli if the client takes it, then gzip, otherwise no compression. q-values are ignored:
+// browsers send both with the default q=1.
+function pickEncoding(acceptEncoding: string | undefined): ContentEncoding {
+  const accepted = (acceptEncoding ?? '').split(',').map((s) => s.split(';')[0].trim());
+  if (accepted.includes('br')) return 'br';
+  if (accepted.includes('gzip')) return 'gzip';
+  return 'identity';
+}
+
 const STATIC_PATH = path.join(process.cwd(), '../frontend/dist');
 
 const toBool = [() => true, () => false];
@@ -150,10 +165,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Binary body, the layout is described in CanvasState.
   if (req.url === '/api/canvas') {
-    res.setHeader('Content-Type', 'application/json');
+    const encoding = pickEncoding(req.headers['accept-encoding']);
+    res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Cache-Control', 'no-store');
-    res.end(canvas.toJson());
+    res.setHeader('Vary', 'Accept-Encoding');
+    if (encoding !== 'identity') res.setHeader('Content-Encoding', encoding);
+    res.end(canvas.body(encoding));
     return;
   }
 

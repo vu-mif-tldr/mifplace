@@ -1,35 +1,70 @@
+import * as zlib from 'node:zlib';
 import type { CanvasSize, Pixel } from './db.js';
+
+export type ContentEncoding = 'br' | 'gzip' | 'identity';
+
+// Brotli's default quality 11 takes seconds on a large canvas, 5 is fast and almost as small
+// (see bench-canvas-format.ts).
+const BROTLI_QUALITY = 5;
 
 // Current state of the canvas, kept in memory so that GET /api/canvas does not touch the database.
 // Built once at server start from the database; every event appended later must also go through
-// set(), otherwise the state goes stale. Only one server process may write to the database.
+// setCell(), otherwise the state goes stale. Only one server process may write to the database.
 export class CanvasState {
-  private readonly cells = new Map<number, number>();
-  // Serialized response, dropped on every change and rebuilt on the next read.
-  private json: string | undefined;
+  // Marks a cell nobody has painted yet. color_id 0 is a real color (black), so it cannot be used.
+  static readonly EMPTY = 255;
+  // A byte silently wraps larger values, the server checks the palette against this at start.
+  static readonly MAX_COLOR_ID = CanvasState.EMPTY - 1;
+  // width and height, both u32 little-endian.
+  static readonly HEADER_BYTES = 8;
 
-  constructor(
-    private readonly size: CanvasSize,
-    painted: Pixel[]
-  ) {
-    for (const p of painted) this.cells.set(p.position, p.color_id);
+  // Body of GET /api/canvas, kept ready to send: the header, then one byte per cell
+  // (position = y * width + x) with the color_id or EMPTY. 1 MB for 1000x1000, a Map with
+  // 632k painted cells (1M random events) took ~28 MB.
+  private readonly bytes: Buffer;
+  // The cells part of bytes, the same memory.
+  private readonly cells: Uint8Array;
+  // Response bodies by encoding, dropped on every change and rebuilt on the next read.
+  private readonly bodies = new Map<ContentEncoding, Buffer>();
+
+  constructor(size: CanvasSize, painted: Iterable<Pixel>) {
+    this.bytes = Buffer.alloc(
+      CanvasState.HEADER_BYTES + size.width * size.height,
+      CanvasState.EMPTY
+    );
+    this.bytes.writeUInt32LE(size.width, 0);
+    this.bytes.writeUInt32LE(size.height, 4);
+    this.cells = this.bytes.subarray(CanvasState.HEADER_BYTES);
+    for (const p of painted) this.cells[p.position] = p.color_id;
+  }
+
+  // color_id of the cell, or EMPTY.
+  getCell(position: number): number {
+    return this.cells[position];
   }
 
   // Positions are validated before an event is appended, there is no bounds check here.
   setCell(position: number, colorId: number): void {
-    this.cells.set(position, colorId);
-    this.json = undefined;
+    this.cells[position] = colorId;
+    this.bodies.clear();
   }
 
-  // Body of GET /api/canvas: { width, height, position, color_id }. Only painted cells are
-  // listed, as two parallel arrays (position[i] is painted with color_id[i]). Arrays instead of
-  // an array of objects: ~3x smaller and much faster to parse, see MP-63.
-  toJson(): string {
-    if (this.json === undefined) {
-      const position = Array.from(this.cells.keys());
-      const color_id = Array.from(this.cells.values());
-      this.json = JSON.stringify({ ...this.size, position, color_id });
+  // Body of GET /api/canvas in the given Content-Encoding. 'identity' is a copy as well:
+  // the socket may still be sending it when the next setCell() changes the cells.
+  body(encoding: ContentEncoding): Buffer {
+    let body = this.bodies.get(encoding);
+    if (body === undefined) {
+      if (encoding === 'br') {
+        body = zlib.brotliCompressSync(this.bytes, {
+          params: { [zlib.constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY },
+        });
+      } else if (encoding === 'gzip') {
+        body = zlib.gzipSync(this.bytes);
+      } else {
+        body = Buffer.from(this.bytes);
+      }
+      this.bodies.set(encoding, body);
     }
-    return this.json;
+    return body;
   }
 }

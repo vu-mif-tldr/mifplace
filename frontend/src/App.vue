@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref, shallowRef } from 'vue';
-import { fetchJson, type CanvasSnapshot, type Color } from './api';
+import { fetchCanvas, fetchJson, type CanvasSnapshot, type Color } from './api';
 import { fitScale, SCALE_MIN } from './canvas';
 import CanvasBoard from './components/CanvasBoard.vue';
 import ScaleControl from './components/ScaleControl.vue';
 
-// Shallow refs: the snapshot holds tens of thousands of numbers, no need to make them reactive.
+// Shallow refs: the snapshot holds a byte per cell, no need to make it reactive.
 const palette = shallowRef<Color[]>([]);
 const snapshot = shallowRef<CanvasSnapshot | null>(null);
 const scale = ref(SCALE_MIN);
@@ -16,7 +16,7 @@ onMounted(async () => {
   try {
     const [loadedPalette, loadedSnapshot] = await Promise.all([
       fetchJson<Color[]>('/api/palette'),
-      fetchJson<CanvasSnapshot>('/api/canvas'),
+      fetchCanvas(),
     ]);
     // At first the canvas fits the window completely; the controls above it take their height.
     scale.value = fitScale(

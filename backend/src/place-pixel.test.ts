@@ -69,14 +69,14 @@ describe('placePixel', () => {
 
   it('leaves the memory unchanged when the database fails', () => {
     const canvas = new CanvasState(size, [{ position: 1, color_id: 2 }]);
-    const before = canvas.toJson();
+    const before = canvas.body('identity');
     const mifDb = {
       appendEvent: () => {
         throw new Error('disk I/O error');
       },
     };
     assert.throws(() => placePixel(mifDb, canvas, { position: 5, color_id: 1 }, 0), /disk I\/O/);
-    assert.equal(canvas.toJson(), before);
+    assert.deepEqual(canvas.body('identity'), before);
   });
 
   describe('with a real database', () => {
@@ -92,7 +92,7 @@ describe('placePixel', () => {
       const canvas = new CanvasState(size, []);
       const id = placePixel(mif, canvas, { position: 5, color_id: 4 }, 0, 1000);
       assert.equal(mif.getLastEventId(), id);
-      assert.deepEqual(JSON.parse(canvas.toJson()).position, [5]);
+      assert.equal(canvas.getCell(5), 4);
       db.close();
       fs.rmSync(dir, { recursive: true });
     });
@@ -100,16 +100,16 @@ describe('placePixel', () => {
     it('keeps the memory clean when the insert violates a constraint or the db is closed', () => {
       const { mif, db, dir } = openMigrated();
       const canvas = new CanvasState(size, []);
-      const before = canvas.toJson();
+      const before = canvas.body('identity');
 
       // unknown user: foreign key violation inside SQLite
       assert.throws(() => placePixel(mif, canvas, { position: 5, color_id: 4 }, 12345));
-      assert.equal(canvas.toJson(), before);
+      assert.deepEqual(canvas.body('identity'), before);
       assert.equal(mif.getLastEventId(), 0);
 
       db.close();
       assert.throws(() => placePixel(mif, canvas, { position: 5, color_id: 4 }, 0));
-      assert.equal(canvas.toJson(), before);
+      assert.deepEqual(canvas.body('identity'), before);
       fs.rmSync(dir, { recursive: true });
     });
   });
