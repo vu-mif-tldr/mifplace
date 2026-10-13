@@ -1,12 +1,17 @@
 import js from '@eslint/js';
+import pluginVue from 'eslint-plugin-vue';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  ...pluginVue.configs['flat/essential'],
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'src/**/*.vue'],
     languageOptions: {
+      parserOptions: {
+        parser: tseslint.parser,
+      },
       globals: {
         document: 'readonly',
         window: 'readonly',
@@ -25,6 +30,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['public/**', 'node_modules/**'],
+    ignores: ['dist/**', 'public/**', 'node_modules/**'],
   }
 );
