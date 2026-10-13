@@ -20,16 +20,15 @@ git --version
 ### 2. Go to mifplace folder in Command Prompt and run these commands, scripts
 
 ```
-cd backend
-
+cd frontend
 npm install
-
-cp .env.example .env
-
-npm run db:setup:dev
-
 npm run build
 
+cd ../backend
+npm install
+cp .env.example .env
+npm run db:setup:dev
+npm run build
 npm start
 ```
 

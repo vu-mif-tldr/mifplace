@@ -33,14 +33,14 @@ try {
   throw e;
 }
 
-const STATIC_PATH = path.join(process.cwd(), '../frontend/public');
+const STATIC_PATH = path.join(process.cwd(), '../frontend/dist');
 // Express serves static files (HTML, CSS, JS, etc.) from this directory.
 // It handles file lookup, Content-Type headers, and streaming automatically.
 app.use(express.static(STATIC_PATH));
 
 // Show our custom 404 page when no static file matches the request.
 app.use((_req, res) => {
-  res.status(404).sendFile(path.join(STATIC_PATH, '404.html'));
+  res.status(404).sendFile(path.join(process.cwd(), '../frontend/public/404.html'));
 });
 
 // Start the Express HTTP server and keep a reference for shutdown.
