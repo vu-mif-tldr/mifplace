@@ -33,6 +33,33 @@ try {
   throw e;
 }
 
+const healthQuery = db.prepare('SELECT 1');
+
+app.get('/health', (_req, res) => {
+  try {
+    const start = performance.now();
+    healthQuery.get();
+    const latencyMs = performance.now() - start;
+    res.status(200).json({
+      status: 'ok',
+      DB: {
+        status: 'ok',
+        latencyMs: latencyMs.toFixed(2),
+      },
+      WS: {},
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'down',
+      DB: {
+        staus: 'down',
+        error: error instanceof Error ? error.message : 'Unknown database error',
+      },
+      WS: {},
+    });
+  }
+});
+
 const STATIC_PATH = path.join(process.cwd(), '../frontend/dist');
 // Express serves static files (HTML, CSS, JS, etc.) from this directory.
 // It handles file lookup, Content-Type headers, and streaming automatically.
