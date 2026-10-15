@@ -33,30 +33,43 @@ try {
   throw e;
 }
 
-const healthQuery = db.prepare('SELECT 1');
+type HealthResponse = {
+  status: 'ok' | 'down';
+  DB: {
+    status: 'ok' | 'down';
+    latencyMs?: string;
+  };
+  WS: Record<string, never>;
+};
 
 app.get('/health', (_req, res) => {
   try {
     const start = performance.now();
-    healthQuery.get();
+    mifDb.checkHealth();
     const latencyMs = performance.now() - start;
-    res.status(200).json({
+
+    const response: HealthResponse = {
       status: 'ok',
       DB: {
         status: 'ok',
         latencyMs: latencyMs.toFixed(2),
       },
       WS: {},
-    });
+    };
+
+    res.status(200).json(response);
   } catch (error) {
-    res.status(503).json({
+    console.error('Database health check failed:', error);
+
+    const response: HealthResponse = {
       status: 'down',
       DB: {
-        staus: 'down',
-        error: error instanceof Error ? error.message : 'Unknown database error',
+        status: 'down',
       },
       WS: {},
-    });
+    };
+
+    res.status(503).json(response);
   }
 });
 

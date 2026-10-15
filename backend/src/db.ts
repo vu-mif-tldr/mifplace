@@ -69,6 +69,7 @@ export class MifDb {
   private readonly insertEvent;
   private readonly selectEventsAfter;
   private readonly selectLastEventId;
+  private readonly healthQuery;
   private readonly appendTx;
 
   constructor(private readonly db: Db) {
@@ -78,12 +79,17 @@ export class MifDb {
     );
     this.selectEventsAfter = db.prepare(`SELECT * FROM events WHERE id > ? ORDER BY id`);
     this.selectLastEventId = db.prepare(`SELECT COALESCE(MAX(id), 0) AS id FROM events`);
+    this.healthQuery = db.prepare('SELECT 1');
 
     // The event and the cooldown timestamp must change together.
     this.appendTx = db.transaction((event: NewEvent, now: number): number => {
       const result = this.insertEvent.run(event.user_id, event.color_id, event.position, now);
       return Number(result.lastInsertRowid);
     });
+  }
+
+  checkHealth(): void {
+    this.healthQuery.get();
   }
 
   // Appends an event to the log and returns its id.
