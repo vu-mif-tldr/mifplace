@@ -33,6 +33,46 @@ try {
   throw e;
 }
 
+type HealthResponse = {
+  status: 'ok' | 'down';
+  DB: {
+    status: 'ok' | 'down';
+    latencyMs?: string;
+  };
+  WS: Record<string, never>;
+};
+
+app.get('/health', (_req, res) => {
+  try {
+    const start = performance.now();
+    mifDb.checkHealth();
+    const latencyMs = performance.now() - start;
+
+    const response: HealthResponse = {
+      status: 'ok',
+      DB: {
+        status: 'ok',
+        latencyMs: latencyMs.toFixed(2),
+      },
+      WS: {},
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Database health check failed:', error);
+
+    const response: HealthResponse = {
+      status: 'down',
+      DB: {
+        status: 'down',
+      },
+      WS: {},
+    };
+
+    res.status(503).json(response);
+  }
+});
+
 const STATIC_PATH = path.join(process.cwd(), '../frontend/dist');
 // Express serves static files (HTML, CSS, JS, etc.) from this directory.
 // It handles file lookup, Content-Type headers, and streaming automatically.
