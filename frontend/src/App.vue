@@ -1,27 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { paintPixel } from './canvas';
 import { PALETTE } from './palette';
 
 // Šiuo metu pasirinkta spalva (pradžioje juoda)
 const selectedColor = ref(PALETTE[0]);
 
-// Vieno pikselio dydis: 800x600 canvas tampa 80x60 langelių
-const PIXEL_SIZE = 10;
-
 // Nuoroda į <canvas> elementą (ref="canvasEl" template'e)
 const canvasEl = ref<HTMLCanvasElement | null>(null);
 
-function paintPixel(event: MouseEvent) {
-  const ctx = canvasEl.value?.getContext('2d');
-  if (!ctx) return;
-
-  // Kuriame langelyje paspausta (offsetX/offsetY - vieta canvas viduje)
-  const column = Math.floor(event.offsetX / PIXEL_SIZE);
-  const row = Math.floor(event.offsetY / PIXEL_SIZE);
-
-  // Nudažom tą langelį pasirinkta spalva
-  ctx.fillStyle = selectedColor.value;
-  ctx.fillRect(column * PIXEL_SIZE, row * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+function onCanvasClick(event: MouseEvent) {
+  if (!canvasEl.value) return;
+  paintPixel(canvasEl.value, selectedColor.value, event);
 }
 </script>
 
@@ -29,7 +19,7 @@ function paintPixel(event: MouseEvent) {
   <main>
     <section id="canvas-section">
       <h2>MIF PLACE</h2>
-      <canvas id="canvas" ref="canvasEl" width="800" height="600" @click="paintPixel"></canvas>
+      <canvas id="canvas" ref="canvasEl" width="800" height="600" @click="onCanvasClick"></canvas>
     </section>
 
     <section id="color-picker-section">
