@@ -92,6 +92,7 @@ export class MifDb {
   private readonly insertEvent;
   private readonly selectEventsAfter;
   private readonly selectLastEventId;
+  private readonly healthQuery;
   private readonly appendTx;
   private readonly selectPalette;
   private readonly selectCanvasSize;
@@ -113,6 +114,7 @@ export class MifDb {
     );
     this.selectEventsAfter = db.prepare(`SELECT * FROM events WHERE id > ? ORDER BY id`);
     this.selectLastEventId = db.prepare(`SELECT COALESCE(MAX(id), 0) AS id FROM events`);
+    this.healthQuery = db.prepare('SELECT 1');
 
     // Both reads in one transaction, so lastEventId matches the pixels exactly.
     this.snapshotTx = db.transaction((): CanvasSnapshot => ({
@@ -125,6 +127,10 @@ export class MifDb {
       const result = this.insertEvent.run(event.user_id, event.color_id, event.position, now);
       return Number(result.lastInsertRowid);
     });
+  }
+
+  checkHealth(): void {
+    this.healthQuery.get();
   }
 
   // Appends an event to the log and returns its id.

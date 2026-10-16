@@ -20,6 +20,7 @@ export default tseslint.config(
         HTMLCanvasElement: 'readonly',
         CanvasRenderingContext2D: 'readonly',
         ImageData: 'readonly',
+        Event: 'readonly',
         MouseEvent: 'readonly',
         KeyboardEvent: 'readonly',
         PointerEvent: 'readonly',
@@ -37,6 +38,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**'],
+    ignores: ['dist/**', 'public/**', 'node_modules/**'],
   }
 );

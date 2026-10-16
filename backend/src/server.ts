@@ -1,6 +1,5 @@
 // https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Server-side/Node_server_without_framework
-import * as fs from 'node:fs';
-import * as http from 'node:http';
+import express, { type NextFunction, type Request, type Response } from 'express';
 import * as path from 'node:path';
 import { MifDb, getDbVersion, openDb, resolveDbPath } from './db.js';
 import { CanvasState, DEFAULT_BROTLI_QUALITY, type ContentEncoding } from './canvas-state.js';
@@ -8,6 +7,8 @@ import { InvalidPixelError, parsePixel, placePixel, type PixelLimits } from './p
 import { envInt, loadDotEnv } from './env.js';
 import { DEFAULT_LIVE_OPTIONS, LiveUpdates, type LiveUpdatesOptions } from './live-updates.js';
 import { logger, parseLogLevel, setLogLevel } from './log.js';
+
+const app = express();
 
 // Settings come from the environment, then from .env (see .env.example).
 loadDotEnv('.env');
@@ -80,14 +81,13 @@ try {
   throw e;
 }
 
-//Record<string, string> object with any string keys and string values
-// need so file.ext would work becasue it expects a string
-const MIME_TYPES: Record<string, string> = {
-  default: 'application/octet-stream',
-  html: 'text/html; charset=UTF-8',
-  js: 'text/javascript',
-  css: 'text/css',
-  png: 'image/png',
+type HealthResponse = {
+  status: 'ok' | 'down';
+  DB: {
+    status: 'ok' | 'down';
+    latencyMs?: string;
+  };
+  WS: Record<string, never>;
 };
 
 // There is no sign-in yet, every pixel is written as the dev user from migration 001.
@@ -99,64 +99,23 @@ const STATS_MS = 60_000;
 // Counters for the periodic summary, reset after every summary.
 const stats = { placed: 0, rejected: 0, clients: 0 };
 
-class BodyTooLargeError extends Error {}
+// Every request at debug level: drawing sends one request per pixel.
+app.use((req, res, next) => {
+  const started = performance.now();
+  res.on('finish', () =>
+    httpLog.debug(`${req.method} ${req.url}`, {
+      status: res.statusCode,
+      ms: Math.round(performance.now() - started),
+    })
+  );
+  next();
+});
 
-async function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of req) {
-    size += (chunk as Buffer).length;
-    if (size > MAX_BODY_BYTES) throw new BodyTooLargeError();
-    chunks.push(chunk as Buffer);
-  }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
-}
-
-function sendJson(res: http.ServerResponse, status: number, body: unknown): void {
-  res.statusCode = status;
+app.get('/api/palette', (_req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Cache-Control', 'no-store');
-  res.end(JSON.stringify(body));
-}
-
-// POST /api/pixel { position, color_id } -> 201 { id } with the id of the new event.
-// The pixel is in the database and in the canvas state, or in neither (see placePixel).
-async function handlePlacePixel(req: http.IncomingMessage, res: http.ServerResponse) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    sendJson(res, 405, { error: 'Use POST' });
-    return;
-  }
-  if (!req.headers['content-type']?.startsWith('application/json')) {
-    sendJson(res, 415, { error: 'Content-Type must be application/json' });
-    return;
-  }
-  try {
-    const pixel = parsePixel(await readJsonBody(req), pixelLimits);
-    const id = placePixel(mifDb, canvas, pixel, DEV_USER_ID);
-    live.publish({ id, ...pixel });
-    stats.placed++;
-    httpLog.debug('pixel placed', { id, position: pixel.position, color: pixel.color_id });
-    sendJson(res, 201, { id });
-  } catch (e) {
-    stats.rejected++;
-    if (e instanceof BodyTooLargeError) {
-      res.setHeader('Connection', 'close');
-      httpLog.warn('pixel rejected', { status: 413, reason: 'body is too large' });
-      sendJson(res, 413, { error: 'Body is too large' });
-    } else if (e instanceof InvalidPixelError) {
-      httpLog.warn('pixel rejected', { status: 400, reason: e.message });
-      sendJson(res, 400, { error: e.message });
-    } else if (e instanceof SyntaxError) {
-      httpLog.warn('pixel rejected', { status: 400, reason: 'body is not valid JSON' });
-      sendJson(res, 400, { error: 'Body is not valid JSON' });
-    } else {
-      // The database error stays in the log, the client only learns that it failed.
-      httpLog.error('pixel not saved', { status: 500 }, e);
-      sendJson(res, 500, { error: 'Could not save the pixel' });
-    }
-  }
-}
+  res.end(paletteJson);
+});
 
 // Brotli if the client takes it, then gzip, otherwise no compression. q-values are ignored:
 // browsers send both with the default q=1.
@@ -167,75 +126,116 @@ function pickEncoding(acceptEncoding: string | undefined): ContentEncoding {
   return 'identity';
 }
 
+// Binary body, the layout is described in CanvasState.
+app.get('/api/canvas', (req, res) => {
+  const encoding = pickEncoding(req.headers['accept-encoding']);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Vary', 'Accept-Encoding');
+  if (encoding !== 'identity') res.setHeader('Content-Encoding', encoding);
+  res.end(canvas.body(encoding));
+});
+
+// POST /api/pixel { position, color_id } -> 201 { id } with the id of the new event.
+// The pixel is in the database and in the canvas state, or in neither (see placePixel).
+app
+  .route('/api/pixel')
+  .post(
+    (req, res, next) => {
+      if (!req.headers['content-type']?.startsWith('application/json')) {
+        res.status(415).json({ error: 'Content-Type must be application/json' });
+        return;
+      }
+      next();
+    },
+    express.json({ limit: MAX_BODY_BYTES, strict: false }),
+    (req, res) => {
+      try {
+        const pixel = parsePixel(req.body, pixelLimits);
+        const id = placePixel(mifDb, canvas, pixel, DEV_USER_ID);
+        live.publish({ id, ...pixel });
+        stats.placed++;
+        httpLog.debug('pixel placed', { id, position: pixel.position, color: pixel.color_id });
+        res.status(201).json({ id });
+      } catch (e) {
+        stats.rejected++;
+        if (e instanceof InvalidPixelError) {
+          httpLog.warn('pixel rejected', { status: 400, reason: e.message });
+          res.status(400).json({ error: e.message });
+        } else {
+          // The database error stays in the log, the client only learns that it failed.
+          httpLog.error('pixel not saved', { status: 500 }, e);
+          res.status(500).json({ error: 'Could not save the pixel' });
+        }
+      }
+    }
+  )
+  .all((_req, res) => {
+    res.setHeader('Allow', 'POST');
+    res.status(405).json({ error: 'Use POST' });
+  });
+
+// Errors of the body parser: too large or not valid JSON.
+app.use('/api/pixel', (err: unknown, _req: Request, res: Response, next: NextFunction) => {
+  const type = (err as { type?: string } | null)?.type;
+  if (type === 'entity.too.large') {
+    stats.rejected++;
+    res.setHeader('Connection', 'close');
+    httpLog.warn('pixel rejected', { status: 413, reason: 'body is too large' });
+    res.status(413).json({ error: 'Body is too large' });
+  } else if (type === 'entity.parse.failed') {
+    stats.rejected++;
+    httpLog.warn('pixel rejected', { status: 400, reason: 'body is not valid JSON' });
+    res.status(400).json({ error: 'Body is not valid JSON' });
+  } else {
+    next(err);
+  }
+});
+
+app.get('/health', (_req, res) => {
+  try {
+    const start = performance.now();
+    mifDb.checkHealth();
+    const latencyMs = performance.now() - start;
+
+    const response: HealthResponse = {
+      status: 'ok',
+      DB: {
+        status: 'ok',
+        latencyMs: latencyMs.toFixed(2),
+      },
+      WS: {},
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Database health check failed:', error);
+
+    const response: HealthResponse = {
+      status: 'down',
+      DB: {
+        status: 'down',
+      },
+      WS: {},
+    };
+
+    res.status(503).json(response);
+  }
+});
+
 const STATIC_PATH = path.join(process.cwd(), '../frontend/dist');
+// Express serves static files (HTML, CSS, JS, etc.) from this directory.
+// It handles file lookup, Content-Type headers, and streaming automatically.
+app.use(express.static(STATIC_PATH));
 
-const toBool = [() => true, () => false];
+// Show our custom 404 page when no static file matches the request.
+app.use((_req, res) => {
+  res.status(404).sendFile(path.join(process.cwd(), '../frontend/public/404.html'));
+});
 
-const prepareFile = async (url: string) => {
-  const urlAsPath = decodeURI(url);
-  const paths = [STATIC_PATH, urlAsPath];
-  if (url.endsWith('/')) paths.push('index.html');
-  const filePath = path.join(...paths);
-
-  const pathTraversal = !filePath.startsWith(STATIC_PATH);
-  const exists = await fs.promises.access(filePath).then(...toBool);
-  //http://127.0.0.1:3000
-  const found = !pathTraversal && exists;
-  // the fix was if you dont have a 404.html file which it says
-  // about here then it will give you an error because cant open
-  // a file that is not finding.
-  const streamPath = found ? filePath : `${STATIC_PATH}/404.html`;
-  const ext = path.extname(streamPath).substring(1).toLowerCase();
-  const stream = fs.createReadStream(streamPath);
-  return { found, ext, stream };
-};
-
-const server = http.createServer(async (req, res) => {
-  // Every request at debug level: drawing sends one request per pixel.
-  const started = performance.now();
-  res.on('finish', () =>
-    httpLog.debug(`${req.method} ${req.url}`, {
-      status: res.statusCode,
-      ms: Math.round(performance.now() - started),
-    })
-  );
-
-  if (req.url === '/api/palette') {
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 'no-store');
-    res.end(paletteJson);
-    return;
-  }
-
-  if (req.url === '/api/pixel') {
-    await handlePlacePixel(req, res);
-    return;
-  }
-
-  // Binary body, the layout is described in CanvasState.
-  if (req.url === '/api/canvas') {
-    const encoding = pickEncoding(req.headers['accept-encoding']);
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Vary', 'Accept-Encoding');
-    if (encoding !== 'identity') res.setHeader('Content-Encoding', encoding);
-    res.end(canvas.body(encoding));
-    return;
-  }
-
-  // everyime a request is made it reads the file again
-  // fs.createReadStream from disk takes the file and makes it readable
-  // ?? checks if the left side is not null of undefined
-  // then return the left side.
-  const file = await prepareFile(req.url ?? '/');
-
-  const mimeType = MIME_TYPES[file.ext] || MIME_TYPES.default;
-  res.statusCode = file.found ? 200 : 404;
-  res.setHeader('Content-Type', mimeType);
-  // gives file content to res, by chunks 64KB, read one chunk
-  // then write to res then frees up then reads next chunk until
-  // file end res.end automatically called when file end
-  file.stream.pipe(res);
+// Start the Express HTTP server and keep a reference for shutdown.
+const server = app.listen(PORT, hostname, () => {
+  log.info('listening', { url: `http://${hostname}:${PORT}/` });
 });
 
 // WebSocket connections start as an HTTP upgrade request; only /api/ws accepts them.
@@ -246,10 +246,6 @@ server.on('upgrade', (req, socket, head) => {
     httpLog.warn('websocket upgrade on an unknown path', { url: req.url });
     socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
   }
-});
-
-server.listen(PORT, hostname, () => {
-  log.info('listening', { url: `http://${hostname}:${PORT}/` });
 });
 
 // A line per period with what happened, skipped while the server is idle.
