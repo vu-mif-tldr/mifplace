@@ -17,6 +17,10 @@ import {
   type LiveUpdatesOptions,
 } from './live-updates.js';
 import { loadMigrations, migrate } from './scripts/migrate.js';
+import { setLogLevel } from './log.js';
+
+// The code under test logs every connection and file, the test output does not need it.
+setLogLevel('error');
 
 const REAL_MIGRATIONS_DIR = fileURLToPath(new URL('../migrations/', import.meta.url));
 

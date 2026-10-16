@@ -1,5 +1,8 @@
 import * as zlib from 'node:zlib';
 import type { CanvasSize, Pixel } from './db.js';
+import { logger } from './log.js';
+
+const log = logger('canvas');
 
 export type ContentEncoding = 'br' | 'gzip' | 'identity';
 
@@ -74,6 +77,7 @@ export class CanvasState {
   body(encoding: ContentEncoding): Buffer {
     let body = this.bodies.get(encoding);
     if (body === undefined) {
+      const started = performance.now();
       if (encoding === 'br') {
         body = zlib.brotliCompressSync(this.bytes, {
           params: { [zlib.constants.BROTLI_PARAM_QUALITY]: this.brotliQuality },
@@ -84,6 +88,11 @@ export class CanvasState {
         body = Buffer.from(this.bytes);
       }
       this.bodies.set(encoding, body);
+      log.debug('body built', {
+        encoding,
+        bytes: body.length,
+        ms: Math.round(performance.now() - started),
+      });
     }
     return body;
   }

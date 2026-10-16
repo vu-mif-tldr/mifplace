@@ -1,4 +1,7 @@
 import { EMPTY_CELL, type CanvasSnapshot, type Color } from './api';
+import { logger } from './log';
+
+const log = logger('canvas');
 
 export const BACKGROUND_COLOR = '#FFFFFF';
 
@@ -70,7 +73,7 @@ export function drawSnapshot(
   const image = ctx.createImageData(snap.width, snap.height);
   const unknown = fillRgba(image.data, palette, snap.cells);
   if (unknown > 0) {
-    console.warn(`Canvas snapshot: ${unknown} cells have a color missing from the palette`);
+    log.warn('cells with a colour missing from the palette, drawn as background', { unknown });
   }
   ctx.putImageData(image, 0, 0);
   return ctx;

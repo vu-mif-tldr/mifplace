@@ -7,6 +7,10 @@ import {
   type LiveHandlers,
   type SocketLike,
 } from './live';
+import { setLogLevel } from './log';
+
+// LiveConnection logs every connect and drop, the test output does not need it.
+setLogLevel('error');
 
 // The layout written by encodeEvents on the backend.
 function eventsMessage(events: LiveEvent[]): ArrayBuffer {

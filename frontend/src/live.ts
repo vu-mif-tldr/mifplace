@@ -2,6 +2,10 @@
 // sends nothing. Must match backend/src/live-updates.ts.
 //   EVENTS: [type u8 = 1][count u32] + count x [id u32][position u32][color_id u8]
 //   RELOAD: [type u8 = 2], load the canvas again
+import { logger } from './log';
+
+const log = logger('ws');
+
 const MESSAGE_EVENTS = 1;
 const MESSAGE_RELOAD = 2;
 const EVENT_BYTES = 9;
@@ -91,10 +95,13 @@ export class LiveConnection {
   }
 
   private connect(): void {
-    const socket = this.createSocket(this.url(this.lastEventId()));
+    const after = this.lastEventId();
+    log.debug('connecting', { after, attempt: this.attempt });
+    const socket = this.createSocket(this.url(after));
     this.socket = socket;
     socket.binaryType = 'arraybuffer';
     socket.onopen = () => {
+      log.info('connected', { after, afterAttempts: this.attempt });
       this.attempt = 0;
       this.handlers.onConnectedChange(true);
     };
@@ -104,23 +111,36 @@ export class LiveConnection {
         message = decodeMessage(event.data as ArrayBuffer);
       } catch (e) {
         // A broken message cannot be skipped safely, the next connect catches up instead.
-        console.error(e);
+        log.error('broken message, reconnecting', {}, e);
         socket.close();
         return;
       }
       if (message.type === 'reload') {
+        log.info('server asked to reload the canvas', { after: this.lastEventId() });
         this.stop();
         this.handlers.onReload();
       } else {
-        this.handlers.onEvents(message.events);
+        const events = message.events;
+        log.debug('events received', {
+          count: events.length,
+          lastId: events.length > 0 ? events[events.length - 1].id : undefined,
+        });
+        this.handlers.onEvents(events);
       }
     };
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       if (this.socket !== socket || this.stopped) return;
       this.socket = null;
       this.handlers.onConnectedChange(false);
       this.attempt++;
-      this.timer = setTimeout(() => this.connect(), reconnectDelay(this.attempt));
+      const delay = reconnectDelay(this.attempt);
+      // The first drop is worth seeing, the following failed attempts only at debug.
+      (this.attempt === 1 ? log.info : log.debug)('disconnected, reconnecting', {
+        code: event?.code,
+        attempt: this.attempt,
+        inMs: delay,
+      });
+      this.timer = setTimeout(() => this.connect(), delay);
     };
   }
 }

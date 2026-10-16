@@ -4,6 +4,10 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, it } from 'node:test';
 import { envInt, loadDotEnv } from './env.js';
+import { setLogLevel } from './log.js';
+
+// The code under test logs every connection and file, the test output does not need it.
+setLogLevel('error');
 
 describe('loadDotEnv', () => {
   it('fills only unset variables and ignores a missing file', () => {

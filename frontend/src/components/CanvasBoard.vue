@@ -3,6 +3,9 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { postPixel, type CanvasSnapshot, type Color } from '../api';
 import { cellAt, cellFill, cellsOnLine, drawSnapshot, type Cell } from '../canvas';
 import { LiveConnection, type LiveEvent } from '../live';
+import { logger } from '../log';
+
+const log = logger('draw');
 
 // The canvas you draw on with the colour chosen in the palette: a click paints one cell,
 // dragging with the button held paints every cell under the cursor. Each cell is drawn at once
@@ -88,14 +91,21 @@ async function paint(cell: Cell): Promise<void> {
   const request = ++requestCount;
   saving.set(position, { colorId, request });
   fill(position, colorId);
+  const started = performance.now();
   try {
     const id = await postPixel(position, colorId);
+    log.debug('pixel saved', {
+      position,
+      color: colorId,
+      id,
+      ms: Math.round(performance.now() - started),
+    });
     // Usually the response comes before the event itself (it is sent in the next batch), so
     // the pixel is put into cells now. If the event or a later one has already arrived, cells
     // is up to date and must not be changed.
     if (id > lastEventId) cells[position] = colorId;
   } catch (e) {
-    console.error(e);
+    log.warn('pixel not saved, removed from the canvas', { position, color: colorId }, e);
     emit('status', 'Could not save a pixel, it was removed from the canvas.');
   }
   // A newer request for this cell is still running, it draws the cell when it finishes.

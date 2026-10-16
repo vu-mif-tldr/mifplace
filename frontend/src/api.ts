@@ -1,3 +1,7 @@
+import { logger } from './log';
+
+const log = logger('api');
+
 export interface Color {
   id: number;
   // "#RRGGBB"
@@ -48,16 +52,27 @@ export function parseCanvas(buffer: ArrayBuffer): CanvasSnapshot {
   const lastEventId = header.getUint32(9, true);
   const cells = new Uint8Array(buffer, CANVAS_HEADER_BYTES);
   if (cells.length !== width * height) {
-    throw new Error(`Canvas snapshot: ${cells.length} cells, expected ${width}x${height}`);
+    throw new Error(`Canvas snapshot: ${cells.length} cells, expected ${width}x${height}=${width * height}`);
   }
   return { width, height, lastEventId, cells };
 }
 
 // The browser undoes the Content-Encoding (br, gzip) itself.
 export async function fetchCanvas(): Promise<CanvasSnapshot> {
+  const started = performance.now();
   const response = await fetch('/api/canvas');
   if (!response.ok) throw new Error(`GET /api/canvas failed: ${response.status}`);
-  return parseCanvas(await response.arrayBuffer());
+  const buffer = await response.arrayBuffer();
+  const snapshot = parseCanvas(buffer);
+  log.info('canvas loaded', {
+    width: snapshot.width,
+    height: snapshot.height,
+    lastEventId: snapshot.lastEventId,
+    // After decompression, the transfer size is in the Network tab.
+    bytes: buffer.byteLength,
+    ms: Math.round(performance.now() - started),
+  });
+  return snapshot;
 }
 
 // Returns the id of the stored event.

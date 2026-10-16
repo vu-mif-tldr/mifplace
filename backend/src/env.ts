@@ -1,14 +1,17 @@
 import * as fs from 'node:fs';
+import { logger } from './log.js';
+
+const log = logger('env');
 
 // Loads KEY=value pairs from an env file into process.env. Variables that are
 // already set win, so Docker ENV, CI variables and the shell override the file.
 // A missing file is not an error. A relative path is resolved against the cwd.
 export function loadDotEnv(file: string): void {
   if (fs.existsSync(file)) {
-    console.log(`Loading env file: ${file}`);
+    log.info('loading env file', { file });
     process.loadEnvFile(file);
   } else {
-    console.warn(`Env file not found: ${file}`);
+    log.warn('env file not found', { file });
   }
 }
 

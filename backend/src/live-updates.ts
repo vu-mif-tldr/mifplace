@@ -2,6 +2,9 @@ import type * as http from 'node:http';
 import type * as stream from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';
 import type { EventRow, MifDb } from './db.js';
+import { logger } from './log.js';
+
+const log = logger('ws');
 
 // Server -> client messages of /api/ws, binary, little-endian. The client sends nothing.
 //   EVENTS: [type u8][count u32] + count x [id u32][position u32][color_id u8], ids ascending
@@ -57,7 +60,12 @@ export const DEFAULT_LIVE_OPTIONS: LiveUpdatesOptions = {
 export class LiveUpdates {
   private readonly options: LiveUpdatesOptions;
   private readonly wss: WebSocketServer;
-  private readonly alive = new WeakMap<WebSocket, boolean>();
+  // Per connection: a number for the log, when it connected and whether it answered the ping.
+  private readonly connections = new WeakMap<
+    WebSocket,
+    { id: number; since: number; alive: boolean }
+  >();
+  private connectionCount = 0;
   private readonly pingTimer: NodeJS.Timeout;
   private pending: LiveEvent[] = [];
   private flushTimer: NodeJS.Timeout | undefined;
@@ -89,6 +97,7 @@ export class LiveUpdates {
     const raw = new URL(req.url ?? '', 'http://localhost').searchParams.get('after') ?? '';
     const after = Number(raw);
     if (!/^\d+$/.test(raw) || !Number.isSafeInteger(after)) {
+      log.warn('connection rejected, bad after', { after: raw });
       socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n');
       return;
     }
@@ -108,23 +117,44 @@ export class LiveUpdates {
   }
 
   private connect(ws: WebSocket, after: number): void {
-    this.alive.set(ws, true);
-    ws.on('pong', () => this.alive.set(ws, true));
-    ws.on('error', () => ws.terminate());
+    const connection = { id: ++this.connectionCount, since: Date.now(), alive: true };
+    const { id } = connection;
+    this.connections.set(ws, connection);
+    ws.on('pong', () => (connection.alive = true));
+    ws.on('error', (e) => {
+      log.warn('socket error', { id, error: e.message });
+      ws.terminate();
+    });
+    ws.on('close', (code) =>
+      log.info('client disconnected', {
+        id,
+        code,
+        seconds: Math.round((Date.now() - connection.since) / 1000),
+        clients: this.clientCount,
+      })
+    );
 
     // An id from the future means the client saw another database (e.g. it was recreated).
     // Ids may have gaps, so the difference is an upper bound of the number of missed events.
     if (after > this.newestId() || this.lastSentId - after > this.options.maxCatchUp) {
+      log.info('client told to reload', {
+        id,
+        after,
+        lastEventId: this.newestId(),
+        reason: after > this.newestId() ? 'unknown id' : 'too far behind',
+      });
       this.send(ws, RELOAD);
       ws.close(1000, 'Reload the canvas');
       return;
     }
     // Events between lastSentId and after are pending, they come with the next broadcast
     // and the client skips them.
+    let missed: LiveEvent[] = [];
     if (after < this.lastSentId) {
-      const missed = this.mifDb.getEventsAfter(after).filter((e) => e.id <= this.lastSentId);
+      missed = this.mifDb.getEventsAfter(after).filter((e) => e.id <= this.lastSentId);
       this.send(ws, encodeEvents(missed));
     }
+    log.info('client connected', { id, after, missed: missed.length, clients: this.clientCount });
   }
 
   // The last event the server knows about, sent or pending.
@@ -136,6 +166,11 @@ export class LiveUpdates {
     this.flushTimer = undefined;
     if (this.pending.length === 0) return;
     const message = encodeEvents(this.pending);
+    log.debug('broadcast', {
+      events: this.pending.length,
+      bytes: message.length,
+      clients: this.clientCount,
+    });
     this.lastSentId = this.newestId();
     this.pending = [];
     for (const ws of this.wss.clients) this.send(ws, message);
@@ -144,6 +179,10 @@ export class LiveUpdates {
   private send(ws: WebSocket, message: Buffer): void {
     if (ws.readyState !== WebSocket.OPEN) return;
     if (ws.bufferedAmount > this.options.maxBufferedBytes) {
+      log.warn('slow client dropped', {
+        id: this.connections.get(ws)?.id,
+        buffered: ws.bufferedAmount,
+      });
       ws.terminate();
       return;
     }
@@ -152,11 +191,14 @@ export class LiveUpdates {
 
   private ping(): void {
     for (const ws of this.wss.clients) {
-      if (!this.alive.get(ws)) {
+      const connection = this.connections.get(ws);
+      if (!connection) continue;
+      if (!connection.alive) {
+        log.info('dead client dropped', { id: connection.id });
         ws.terminate();
         continue;
       }
-      this.alive.set(ws, false);
+      connection.alive = false;
       ws.ping();
     }
   }

@@ -7,9 +7,13 @@ import { CanvasState, DEFAULT_BROTLI_QUALITY, type ContentEncoding } from './can
 import { InvalidPixelError, parsePixel, placePixel, type PixelLimits } from './place-pixel.js';
 import { envInt, loadDotEnv } from './env.js';
 import { DEFAULT_LIVE_OPTIONS, LiveUpdates, type LiveUpdatesOptions } from './live-updates.js';
+import { logger, parseLogLevel, setLogLevel } from './log.js';
 
 // Settings come from the environment, then from .env (see .env.example).
 loadDotEnv('.env');
+setLogLevel(parseLogLevel(process.env.LOG_LEVEL));
+const log = logger('server');
+const httpLog = logger('http');
 
 const PORT = envInt('PORT', 3000, 0, 65535);
 const hostname: string = process.env.HOST ?? '127.0.0.1';
@@ -52,6 +56,7 @@ try {
       `color_id ${tooLarge.id} does not fit CanvasState (max ${CanvasState.MAX_COLOR_ID})`
     );
   }
+  const loadStarted = performance.now();
   const snapshot = mifDb.getCanvasSnapshot();
   canvas = new CanvasState(size, snapshot.pixels, snapshot.lastEventId, BROTLI_QUALITY);
   live = new LiveUpdates(mifDb, snapshot.lastEventId, LIVE_OPTIONS);
@@ -60,9 +65,16 @@ try {
     cellCount: size.width * size.height,
     colorIds: new Set(palette.map((c) => c.id)),
   };
-  console.log(
-    `DB: ${dbPath}, schema version ${getDbVersion(db)}, last event id: ${canvas.getLastEventId()}`
-  );
+  log.info('canvas loaded', {
+    db: dbPath,
+    schema: getDbVersion(db),
+    size: `${size.width}x${size.height}`,
+    colors: palette.length,
+    painted: snapshot.pixels.length,
+    lastEventId: snapshot.lastEventId,
+    ms: Math.round(performance.now() - loadStarted),
+  });
+  log.info('settings', { ...LIVE_OPTIONS, brotliQuality: BROTLI_QUALITY });
 } catch (e) {
   db.close();
   throw e;
@@ -81,6 +93,11 @@ const MIME_TYPES: Record<string, string> = {
 // There is no sign-in yet, every pixel is written as the dev user from migration 001.
 const DEV_USER_ID = 0;
 const MAX_BODY_BYTES = 1024;
+// How often the summary of the last period is logged, if anything happened.
+const STATS_MS = 60_000;
+
+// Counters for the periodic summary, reset after every summary.
+const stats = { placed: 0, rejected: 0, clients: 0 };
 
 class BodyTooLargeError extends Error {}
 
@@ -118,18 +135,24 @@ async function handlePlacePixel(req: http.IncomingMessage, res: http.ServerRespo
     const pixel = parsePixel(await readJsonBody(req), pixelLimits);
     const id = placePixel(mifDb, canvas, pixel, DEV_USER_ID);
     live.publish({ id, ...pixel });
+    stats.placed++;
+    httpLog.debug('pixel placed', { id, position: pixel.position, color: pixel.color_id });
     sendJson(res, 201, { id });
   } catch (e) {
+    stats.rejected++;
     if (e instanceof BodyTooLargeError) {
       res.setHeader('Connection', 'close');
+      httpLog.warn('pixel rejected', { status: 413, reason: 'body is too large' });
       sendJson(res, 413, { error: 'Body is too large' });
     } else if (e instanceof InvalidPixelError) {
+      httpLog.warn('pixel rejected', { status: 400, reason: e.message });
       sendJson(res, 400, { error: e.message });
     } else if (e instanceof SyntaxError) {
+      httpLog.warn('pixel rejected', { status: 400, reason: 'body is not valid JSON' });
       sendJson(res, 400, { error: 'Body is not valid JSON' });
     } else {
       // The database error stays in the log, the client only learns that it failed.
-      console.error('POST /api/pixel failed:', e);
+      httpLog.error('pixel not saved', { status: 500 }, e);
       sendJson(res, 500, { error: 'Could not save the pixel' });
     }
   }
@@ -168,6 +191,15 @@ const prepareFile = async (url: string) => {
 };
 
 const server = http.createServer(async (req, res) => {
+  // Every request at debug level: drawing sends one request per pixel.
+  const started = performance.now();
+  res.on('finish', () =>
+    httpLog.debug(`${req.method} ${req.url}`, {
+      status: res.statusCode,
+      ms: Math.round(performance.now() - started),
+    })
+  );
+
   if (req.url === '/api/palette') {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'no-store');
@@ -211,20 +243,42 @@ server.on('upgrade', (req, socket, head) => {
   if (new URL(req.url ?? '', 'http://localhost').pathname === '/api/ws') {
     live.handleUpgrade(req, socket, head);
   } else {
+    httpLog.warn('websocket upgrade on an unknown path', { url: req.url });
     socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
   }
 });
 
 server.listen(PORT, hostname, () => {
-  console.log(`Server running at http://${hostname}:${PORT}/`);
+  log.info('listening', { url: `http://${hostname}:${PORT}/` });
 });
+
+// A line per period with what happened, skipped while the server is idle.
+const statsTimer = setInterval(() => {
+  const clients = live.clientCount;
+  if (stats.placed === 0 && stats.rejected === 0 && clients === stats.clients) return;
+  log.info('summary', {
+    seconds: STATS_MS / 1000,
+    placed: stats.placed,
+    rejected: stats.rejected,
+    clients,
+    lastEventId: canvas.getLastEventId(),
+  });
+  stats.placed = 0;
+  stats.rejected = 0;
+  stats.clients = clients;
+}, STATS_MS);
 
 // Stop accepting connections, then close the database so the WAL is checkpointed.
 // The database is closed in the callback: it is not needed until open connections are done.
-const shutdown = () => {
+const shutdown = (signal: string) => {
+  log.info('shutting down', { signal, clients: live.clientCount });
+  clearInterval(statsTimer);
   // Upgraded connections are not tracked by server.close, they would keep the process alive.
   live.close();
-  server.close(() => mifDb.close());
+  server.close(() => {
+    mifDb.close();
+    log.info('stopped');
+  });
   // Idle keep-alive connections would keep server.close waiting.
   server.closeIdleConnections();
 };
