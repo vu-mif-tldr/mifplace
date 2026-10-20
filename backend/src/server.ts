@@ -1,18 +1,15 @@
-import express from 'express';
-import * as path from 'node:path';
 import { MifDb, getDbVersion, openDb, resolveDbPath } from './db.js';
 import { loadDotEnv } from './env.js';
-
-export const app = express();
+import { createApp } from './app.js';
 
 // Settings come from the environment, then from .env (see .env.example).
 loadDotEnv('.env');
 
-export const PORT: number = Number(process.env.PORT ?? 3000);
+const PORT: number = Number(process.env.PORT ?? 3000);
 if (!Number.isInteger(PORT) || PORT < 0 || PORT > 65535) {
   throw new Error(`Invalid PORT: ${process.env.PORT}`);
 }
-export const hostname: string = process.env.HOST ?? '127.0.0.1';
+const hostname: string = process.env.HOST ?? '127.0.0.1';
 
 // Fails loudly if DB_PATH is not set or the file does not exist (run db:setup first).
 const dbPath = resolveDbPath();
@@ -46,88 +43,23 @@ try {
   throw e;
 }
 
-type HealthResponse = {
-  status: 'ok' | 'down';
-  DB: {
-    status: 'ok' | 'down';
-    latencyMs?: string;
-  };
-  WS: Record<string, never>;
+const app = createApp({
+  gridWidth,
+  gridHeight,
+  paletteSize,
+  checkHealth: () => mifDb.checkHealth(),
+});
+
+const server = app.listen(PORT, hostname, () => {
+  console.log(`Server running at http://${hostname}:${PORT}/`);
+});
+
+// Stop accepting connections, then close the database so the WAL is checkpointed.
+// The database is closed in the callback: it is not needed until open connections are done.
+const shutdown = () => {
+  server.close(() => mifDb.close());
+  // Idle keep-alive connections would keep server.close waiting.
+  server.closeIdleConnections();
 };
-
-app.get('/health', (_req, res) => {
-  try {
-    const start = performance.now();
-    mifDb.checkHealth();
-    const latencyMs = performance.now() - start;
-
-    const response: HealthResponse = {
-      status: 'ok',
-      DB: {
-        status: 'ok',
-        latencyMs: latencyMs.toFixed(2),
-      },
-      WS: {},
-    };
-
-    res.status(200).json(response);
-  } catch (error) {
-    console.error('Database health check failed:', error);
-
-    const response: HealthResponse = {
-      status: 'down',
-      DB: {
-        status: 'down',
-      },
-      WS: {},
-    };
-
-    res.status(503).json(response);
-  }
-});
-
-// need this for req.body because can only hold json but without it gives string.
-// Which req.body doesnt accept
-
-app.use(express.json());
-app.post('/api/pixels', (req, res) => {
-  const { x, y, colorIndex } = req.body;
-
-  if (!Number.isInteger(x) || !Number.isInteger(y)) {
-    return res.status(400).json({ success: false, error: 'Coordinates are not a number' });
-  } else if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
-    return res.status(400).json({ success: false, error: ' Position not in canvas' });
-  } else if (colorIndex < 0 || colorIndex >= paletteSize) {
-    return res.status(400).json({ success: false, error: 'Color not in palette' });
-  } else {
-    return res.status(201).json({ success: true });
-  }
-});
-const STATIC_PATH = path.join(process.cwd(), '../frontend/dist');
-
-// Express serves static files (HTML, CSS, JS, etc.) from this directory.
-// It handles file lookup, Content-Type headers, and streaming automatically.
-app.use(express.static(STATIC_PATH));
-
-// Show our custom 404 page when no static file matches the request.
-app.use((_req, res) => {
-  res.status(404).sendFile(path.join(STATIC_PATH, '404.html'));
-});
-
-// Start the Express HTTP server and keep a reference for shutdown.
-// Needed so when running npm test would not start running the server
-if (process.argv[1]?.endsWith('server.js')) {
-  const server = app.listen(PORT, hostname, () => {
-    console.log(`Server running at http://${hostname}:${PORT}/`);
-  });
-
-  // Stop accepting connections, then close the database so the WAL is checkpointed.
-  // The database is closed in the callback: it is not needed until open connections are done.
-  const shutdown = () => {
-    server.close(() => mifDb.close());
-    // Idle keep-alive connections would keep server.close waiting.
-    server.closeIdleConnections();
-  };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
-}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
