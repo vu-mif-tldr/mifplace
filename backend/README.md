@@ -63,6 +63,40 @@ http://127.0.0.1:3000
 
 Migrations are described in [`migrations/README.md`](migrations/README.md).
 
+## API
+
+### GET /canvas
+
+Returns the current canvas state.
+
+Example response:
+
+```json
+{
+  "width": 128,
+  "height": 128,
+  "pixels": [
+    [5, 7],
+    [10, 4]
+  ]
+}
+```
+Each entry in `pixels` is a pair: `[position, color_id]`.
+
+- `position` — the pixel's position in the canvas.
+- `color_id` — the ID of the pixel's latest color.
+- Only the latest color for each position is returned.
+- Positions not included in `pixels` are considered blank (white).
+
+To convert a pixel's `position` into canvas coordinates:
+
+```ts
+const x = position % width;
+const y = Math.floor(position / width);
+```
+
+Coordinates start at `(0, 0)` in the top-left corner.
+
 ## Editor Setup
 
 ### Recommended VS Code Extensions

@@ -3,6 +3,7 @@ import express from 'express';
 import * as path from 'node:path';
 import { MifDb, getDbVersion, openDb, resolveDbPath } from './db.js';
 import { loadDotEnv } from './env.js';
+import { getCanvasState } from './canvas-state.js';
 
 const app = express();
 
@@ -71,6 +72,10 @@ app.get('/health', (_req, res) => {
 
     res.status(503).json(response);
   }
+});
+
+app.get('/canvas', (_req, res) => {
+  res.json(getCanvasState(mifDb));
 });
 
 const STATIC_PATH = path.join(process.cwd(), '../frontend/dist');
