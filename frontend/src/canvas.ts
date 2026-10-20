@@ -1,16 +1,46 @@
-// Vieno pikselio dydis: 800x600 canvas tampa 80x60 langelių
-export const PIXEL_SIZE = 10;
+import type { CanvasState } from './api';
+import { PALETTE } from './palette';
 
-// Nudažo langelį, ant kurio paspausta, nurodyta spalva
-export function paintPixel(canvas: HTMLCanvasElement, color: string, event: MouseEvent) {
+// Canvas size in cells (same as in the backend DB)
+export const CANVAS_WIDTH = 128;
+export const CANVAS_HEIGHT = 128;
+
+// Cell size on screen: 128 * 5 = 640x640 px
+export const PIXEL_SIZE = 5;
+
+// Color of cells nobody has painted yet
+const BACKGROUND_COLOR = '#ffffff';
+
+// Draw the whole canvas received from the server
+export function drawCanvas(canvas: HTMLCanvasElement, state: CanvasState) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  // Kuriame langelyje paspausta (offsetX/offsetY - vieta canvas viduje)
-  const column = Math.floor(event.offsetX / PIXEL_SIZE);
-  const row = Math.floor(event.offsetY / PIXEL_SIZE);
+  // Start from a blank canvas
+  ctx.fillStyle = BACKGROUND_COLOR;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Nudažom tą langelį pasirinkta spalva
+  // Turn each position into a column (x) and row (y)
+  for (const [position, colorId] of state.pixels) {
+    const x = position % state.width;
+    const y = Math.floor(position / state.width);
+    paintCell(canvas, x, y, PALETTE[colorId] ?? BACKGROUND_COLOR);
+  }
+}
+
+// Paint one cell (x = column, y = row)
+export function paintCell(canvas: HTMLCanvasElement, x: number, y: number, color: string) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
   ctx.fillStyle = color;
-  ctx.fillRect(column * PIXEL_SIZE, row * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+  ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+}
+
+// Which cell was clicked (offsetX/offsetY = position inside the canvas)
+export function getClickedCell(event: MouseEvent) {
+  return {
+    x: Math.floor(event.offsetX / PIXEL_SIZE),
+    y: Math.floor(event.offsetY / PIXEL_SIZE),
+  };
 }
