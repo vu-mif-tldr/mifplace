@@ -81,6 +81,7 @@ Example response:
   ]
 }
 ```
+
 Each entry in `pixels` is a pair: `[position, color_id]`.
 
 - `position` — the pixel's position in the canvas.
