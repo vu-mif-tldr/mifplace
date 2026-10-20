@@ -76,11 +76,6 @@ describe('openDb / MifDb', () => {
 
     const state = getCanvasState(mif);
 
-    assert.deepEqual(
-      state.pixels.find(([position]) => position === 5),
-      [5, 2]
-    );
-
     assert.deepEqual(state, {
       width: 128,
       height: 128,

@@ -95,7 +95,9 @@ export class MifDb {
   }
 
   getCanvasSize(): { width: number; height: number } {
-    return this.selectCanvasSize.get() as { width: number; height: number };
+    const wh = this.selectCanvasSize.get() as { width: number; height: number } | undefined;
+    if (!wh) throw new Error('getCanvasSize: canvas size is not set');
+    return wh;
   }
 
   // Appends an event to the log and returns its id.
