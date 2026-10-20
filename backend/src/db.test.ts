@@ -7,6 +7,7 @@ import { describe, it } from 'node:test';
 import Database from 'better-sqlite3';
 import { MifDb, openDb, resolveDbPath } from './db.js';
 import { loadMigrations, migrate } from './scripts/migrate.js';
+import { getCanvasState } from './canvas-state.js';
 
 // The real migrations of this project, found without the MIGRATIONS_DIR setting.
 const REAL_MIGRATIONS_DIR = fileURLToPath(new URL('../migrations/', import.meta.url));
@@ -61,11 +62,28 @@ describe('openDb / MifDb', () => {
 
     migrate(db, loadMigrations(REAL_MIGRATIONS_DIR));
     const mif = new MifDb(db);
+
+    assert.deepEqual(mif.getCanvasSize(), { width: 128, height: 128 });
     // using a fixed 256*256 position to avoid depending on the canvas size, which is not set in this test
     // at the time of writing, there is no upper limit on the position, only a lower limit of 0, so this is
     // safe as of now
     const id = mif.appendEvent({ user_id: 0, color_id: 7, position: 256 * 256 }, 1000);
     assert.equal(mif.getLastEventId(), id);
+
+    mif.appendEvent({ user_id: 0, color_id: 7, position: 5 }, 2000);
+    mif.appendEvent({ user_id: 0, color_id: 4, position: 10 }, 3000);
+    mif.appendEvent({ user_id: 0, color_id: 2, position: 5 }, 4000);
+
+    const state = getCanvasState(mif);
+
+    assert.deepEqual(state, {
+      width: 128,
+      height: 128,
+      pixels: [
+        [5, 2],
+        [10, 4],
+      ],
+    });
 
     assert.throws(() => mif.appendEvent({ user_id: -1, color_id: 7, position: 256 * 256 }, 1000));
     assert.throws(() => mif.appendEvent({ user_id: 0, color_id: -1, position: 256 * 256 }, 1000));

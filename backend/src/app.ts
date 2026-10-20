@@ -5,6 +5,11 @@ export interface AppConfig {
   gridWidth: number;
   gridHeight: number;
   paletteSize: number;
+  getCanvasState: () => {
+    width: number;
+    height: number;
+    pixels: [number, number][];
+  };
   // Throws if the database is not reachable. Injected so the app can be built without a database.
   checkHealth: () => void;
 }
@@ -20,8 +25,18 @@ type HealthResponse = {
 
 // Builds the Express app from plain values: it does not read .env or open the database,
 // so tests can create it without any setup. server.ts wires in the real values.
-export function createApp({ gridWidth, gridHeight, paletteSize, checkHealth }: AppConfig) {
+export function createApp({
+  gridWidth,
+  gridHeight,
+  paletteSize,
+  checkHealth,
+  getCanvasState,
+}: AppConfig) {
   const app = express();
+
+  app.get('/api/canvas', (_req, res) => {
+    res.json(getCanvasState());
+  });
 
   app.get('/health', (_req, res) => {
     try {

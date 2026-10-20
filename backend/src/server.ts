@@ -1,6 +1,7 @@
 import { MifDb, getDbVersion, openDb, resolveDbPath } from './db.js';
 import { loadDotEnv } from './env.js';
 import { createApp } from './app.js';
+import { getCanvasState } from './canvas-state.js';
 
 // Settings come from the environment, then from .env (see .env.example).
 loadDotEnv('.env');
@@ -48,6 +49,7 @@ const app = createApp({
   gridHeight,
   paletteSize,
   checkHealth: () => mifDb.checkHealth(),
+  getCanvasState: () => getCanvasState(mifDb),
 });
 
 const server = app.listen(PORT, hostname, () => {
