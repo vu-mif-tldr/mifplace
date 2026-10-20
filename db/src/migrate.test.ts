@@ -3,10 +3,10 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, it } from 'node:test';
-import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
-import { configureDb, getDbVersion } from '../db.js';
+import { configureDb, getDbVersion } from './db.js';
 import {
+  DEFAULT_MIGRATIONS_DIR,
   MigrationError,
   loadMigrations,
   migrate,
@@ -18,7 +18,7 @@ import {
 
 // The real migrations of this project. Tests find them by themselves and do not
 // depend on the MIGRATIONS_DIR setting.
-const REAL_MIGRATIONS_DIR = fileURLToPath(new URL('../../migrations/', import.meta.url));
+const REAL_MIGRATIONS_DIR = DEFAULT_MIGRATIONS_DIR;
 
 function tmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'mifplace-test-'));
@@ -211,7 +211,7 @@ describe('migrate: safety', () => {
 });
 
 describe('resolveMigrationsDir', () => {
-  it('returns MIGRATIONS_DIR as an absolute path and throws when it is not set', () => {
+  it('returns MIGRATIONS_DIR as an absolute path, the packaged migrations when it is not set', () => {
     const saved = process.env.MIGRATIONS_DIR;
     try {
       process.env.MIGRATIONS_DIR = '/x/migrations';
@@ -221,10 +221,11 @@ describe('resolveMigrationsDir', () => {
       assert.equal(resolveMigrationsDir(), path.resolve('rel/dir'));
 
       delete process.env.MIGRATIONS_DIR;
-      assert.throws(() => resolveMigrationsDir(), /MIGRATIONS_DIR must be set/);
+      assert.equal(resolveMigrationsDir(), DEFAULT_MIGRATIONS_DIR);
+      assert.ok(fs.existsSync(path.join(DEFAULT_MIGRATIONS_DIR, '001_initial_schema.sql')));
 
       process.env.MIGRATIONS_DIR = '';
-      assert.throws(() => resolveMigrationsDir(), /MIGRATIONS_DIR must be set/);
+      assert.equal(resolveMigrationsDir(), DEFAULT_MIGRATIONS_DIR);
     } finally {
       if (saved === undefined) delete process.env.MIGRATIONS_DIR;
       else process.env.MIGRATIONS_DIR = saved;

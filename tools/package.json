@@ -1,0 +1,15 @@
+{
+  "name": "@mifplace/tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@mifplace/db": "*",
+    "@mifplace/server-lib": "*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "seed-events": "tsx src/seed-events.ts",
+    "bench-canvas-format": "tsx src/bench-canvas-format.ts"
+  }
+}

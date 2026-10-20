@@ -1,7 +1,7 @@
 # Migrations
 
 Files `NNN_name.sql` (`NNN` is a gap-free sequence starting at 001, name is `[a-z0-9_]+`)
-are applied in order by `npm run db:setup`. Each file runs in its own transaction.
+are applied in order by `npm run db:setup:dev`. Each file runs in its own transaction.
 The applied state is kept in the database version (SQLite's `PRAGMA user_version`, see
 `getDbVersion`) and in the `schema_migrations`
 table (version, name, checksum).

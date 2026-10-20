@@ -1,4 +1,4 @@
-import type { MifDb, Pixel } from './db.js';
+import type { MifDb, Pixel } from '@mifplace/db';
 import type { CanvasState } from './canvas-state.js';
 
 export interface PixelLimits {

@@ -1,36 +1,16 @@
 import type * as http from 'node:http';
 import type * as stream from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';
-import type { EventRow, MifDb } from './db.js';
-import { logger } from './log.js';
+import type { EventRow, MifDb } from '@mifplace/db';
+import { logger } from '@mifplace/server-lib';
+import { encodeEvents, encodeReload } from '@mifplace/shared';
 
 const log = logger('ws');
 
-// Server -> client messages of /api/ws, binary, little-endian. The client sends nothing.
-//   EVENTS: [type u8][count u32] + count x [id u32][position u32][color_id u8], ids ascending
-//   RELOAD: [type u8], the client must load GET /api/canvas again and reconnect after its id
-// The client applies only events with an id above the last one it has: the snapshot may
-// already contain events of the next EVENTS message.
-export const MESSAGE_EVENTS = 1;
-export const MESSAGE_RELOAD = 2;
-const EVENT_BYTES = 9;
-
+// The messages are described in @mifplace/shared (live.ts).
 export type LiveEvent = Pick<EventRow, 'id' | 'position' | 'color_id'>;
 
-export function encodeEvents(events: LiveEvent[]): Buffer {
-  const buf = Buffer.alloc(5 + events.length * EVENT_BYTES);
-  buf.writeUInt8(MESSAGE_EVENTS, 0);
-  buf.writeUInt32LE(events.length, 1);
-  events.forEach((e, i) => {
-    const offset = 5 + i * EVENT_BYTES;
-    buf.writeUInt32LE(e.id, offset);
-    buf.writeUInt32LE(e.position, offset + 4);
-    buf.writeUInt8(e.color_id, offset + 8);
-  });
-  return buf;
-}
-
-const RELOAD = Buffer.from([MESSAGE_RELOAD]);
+const RELOAD = encodeReload();
 
 export interface LiveUpdatesOptions {
   // New events are collected and sent as one message at most this often.
@@ -176,7 +156,7 @@ export class LiveUpdates {
     for (const ws of this.wss.clients) this.send(ws, message);
   }
 
-  private send(ws: WebSocket, message: Buffer): void {
+  private send(ws: WebSocket, message: Uint8Array): void {
     if (ws.readyState !== WebSocket.OPEN) return;
     if (ws.bufferedAmount > this.options.maxBufferedBytes) {
       log.warn('slow client dropped', {

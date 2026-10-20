@@ -2,15 +2,13 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
 import Database from 'better-sqlite3';
 import { CanvasState } from './canvas-state.js';
-import { MifDb, configureDb } from './db.js';
+import { DEFAULT_MIGRATIONS_DIR, MifDb, configureDb, loadMigrations, migrate } from '@mifplace/db';
 import { InvalidPixelError, parsePixel, placePixel } from './place-pixel.js';
-import { loadMigrations, migrate } from './scripts/migrate.js';
 
-const REAL_MIGRATIONS_DIR = fileURLToPath(new URL('../migrations/', import.meta.url));
+const REAL_MIGRATIONS_DIR = DEFAULT_MIGRATIONS_DIR;
 
 describe('parsePixel', () => {
   const limits = { cellCount: 16, colorIds: new Set([0, 1, 2]) };

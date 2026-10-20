@@ -4,46 +4,23 @@ import * as http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterEach, describe, it } from 'node:test';
 import Database from 'better-sqlite3';
-import { MifDb, configureDb } from './db.js';
-import {
-  LiveUpdates,
-  MESSAGE_EVENTS,
-  MESSAGE_RELOAD,
-  encodeEvents,
-  type LiveEvent,
-  type LiveUpdatesOptions,
-} from './live-updates.js';
-import { loadMigrations, migrate } from './scripts/migrate.js';
-import { setLogLevel } from './log.js';
+import { DEFAULT_MIGRATIONS_DIR, MifDb, configureDb, loadMigrations, migrate } from '@mifplace/db';
+import { setLogLevel } from '@mifplace/server-lib';
+import { decodeMessage, type LiveMessage } from '@mifplace/shared';
+import { LiveUpdates, type LiveUpdatesOptions } from './live-updates.js';
 
 // The code under test logs every connection and file, the test output does not need it.
 setLogLevel('error');
 
-const REAL_MIGRATIONS_DIR = fileURLToPath(new URL('../migrations/', import.meta.url));
+const REAL_MIGRATIONS_DIR = DEFAULT_MIGRATIONS_DIR;
 
-type Message = { type: 'events'; events: LiveEvent[] } | { type: 'reload' };
+type Message = LiveMessage;
 
-// The client side of the protocol, kept here so the test does not depend on the frontend.
-function decode(data: ArrayBuffer): Message {
-  const view = new DataView(data);
-  const type = view.getUint8(0);
-  if (type === MESSAGE_RELOAD) return { type: 'reload' };
-  assert.equal(type, MESSAGE_EVENTS);
-  const count = view.getUint32(1, true);
-  const events: LiveEvent[] = [];
-  for (let i = 0; i < count; i++) {
-    const offset = 5 + i * 9;
-    events.push({
-      id: view.getUint32(offset, true),
-      position: view.getUint32(offset + 4, true),
-      color_id: view.getUint8(offset + 8),
-    });
-  }
-  return { type: 'events', events };
-}
+// The client side of the protocol is the one from @mifplace/shared, the layout itself is
+// pinned by the tests of that package.
+const decode = decodeMessage;
 
 // A browser-like client that records every message and the close code.
 class Client {
@@ -96,19 +73,6 @@ class Client {
     for (const w of waiters) w();
   }
 }
-
-describe('encodeEvents', () => {
-  it('writes the type, the count and 9 bytes per event', () => {
-    const events = [
-      { id: 70000, position: 5, color_id: 3 },
-      { id: 70002, position: 65536, color_id: 0 },
-    ];
-    const buf = encodeEvents(events);
-    assert.equal(buf.length, 5 + 2 * 9);
-    // Copy into a standalone ArrayBuffer, as the browser receives it.
-    assert.deepEqual(decode(new Uint8Array(buf).buffer), { type: 'events', events });
-  });
-});
 
 describe('LiveUpdates', () => {
   let cleanup: (() => Promise<void>)[] = [];

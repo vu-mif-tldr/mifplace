@@ -3,7 +3,7 @@
 // the current JSON (array of {position, color_id}), JSON with two parallel arrays
 // (position[], color_id[]), 1 byte per pixel and 5 bits per pixel, each raw, gzip and brotli.
 //
-// Usage: npx tsx src/scripts/bench-canvas-format.ts <pixil-frame-file.c>
+// Usage: npm run bench-canvas-format -w tools -- <pixil-frame-file.c>
 //
 // Scenarios:
 // - the sprite from the file as is (real data, but few colours and few pixels);

@@ -1,43 +1,11 @@
-// Live updates from /api/ws. The server sends binary little-endian messages, the client
-// sends nothing. Must match backend/src/live-updates.ts.
-//   EVENTS: [type u8 = 1][count u32] + count x [id u32][position u32][color_id u8]
-//   RELOAD: [type u8 = 2], load the canvas again
+// Live updates from /api/ws. The messages are described in @mifplace/shared (live.ts), the
+// client sends nothing.
+import { decodeMessage, type LiveEvent, type LiveMessage } from '@mifplace/shared';
 import { logger } from './log';
 
 const log = logger('ws');
 
-const MESSAGE_EVENTS = 1;
-const MESSAGE_RELOAD = 2;
-const EVENT_BYTES = 9;
-
-export interface LiveEvent {
-  id: number;
-  position: number;
-  color_id: number;
-}
-
-export type LiveMessage = { type: 'events'; events: LiveEvent[] } | { type: 'reload' };
-
-export function decodeMessage(data: ArrayBuffer): LiveMessage {
-  const view = new DataView(data);
-  const type = view.getUint8(0);
-  if (type === MESSAGE_RELOAD) return { type: 'reload' };
-  if (type !== MESSAGE_EVENTS) throw new Error(`Live update: unknown message type ${type}`);
-  const count = view.getUint32(1, true);
-  if (data.byteLength !== 5 + count * EVENT_BYTES) {
-    throw new Error(`Live update: ${data.byteLength} bytes for ${count} events`);
-  }
-  const events: LiveEvent[] = [];
-  for (let i = 0; i < count; i++) {
-    const offset = 5 + i * EVENT_BYTES;
-    events.push({
-      id: view.getUint32(offset, true),
-      position: view.getUint32(offset + 4, true),
-      color_id: view.getUint8(offset + 8),
-    });
-  }
-  return { type: 'events', events };
-}
+export { decodeMessage, type LiveEvent, type LiveMessage };
 
 const RECONNECT_MIN_MS = 500;
 const RECONNECT_MAX_MS = 30_000;

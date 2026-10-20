@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import type { Color } from '@mifplace/shared';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -17,11 +18,7 @@ export interface EventRow {
   timestamp: number;
 }
 
-export interface Color {
-  id: number;
-  // "#RRGGBB"
-  rgb: string;
-}
+export type { Color };
 
 export interface CanvasSize {
   width: number;

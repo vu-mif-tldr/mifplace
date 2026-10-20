@@ -2,8 +2,9 @@
 //   2026-10-13T10:00:00.123Z INFO  [ws] client connected id=3 after=2924 clients=2
 // The level comes from LOG_LEVEL (see .env.example); messages below it are dropped.
 
-export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
-export type LogLevel = (typeof LOG_LEVELS)[number];
+import { LOG_LEVELS, type LogLevel } from '@mifplace/shared';
+
+export { LOG_LEVELS, type LogLevel };
 
 export type LogFields = Record<string, string | number | boolean | undefined>;
 

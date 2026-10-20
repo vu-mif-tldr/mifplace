@@ -1,0 +1,8 @@
+dist/
+node_modules/
+package-lock.json
+frontend/public/
+release/
+docs/
+scripts/
+README.md

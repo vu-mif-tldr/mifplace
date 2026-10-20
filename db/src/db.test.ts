@@ -2,14 +2,13 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
 import Database from 'better-sqlite3';
 import { MifDb, openDb, resolveDbPath } from './db.js';
-import { loadMigrations, migrate } from './scripts/migrate.js';
+import { DEFAULT_MIGRATIONS_DIR, loadMigrations, migrate } from './migrate.js';
 
 // The real migrations of this project, found without the MIGRATIONS_DIR setting.
-const REAL_MIGRATIONS_DIR = fileURLToPath(new URL('../migrations/', import.meta.url));
+const REAL_MIGRATIONS_DIR = DEFAULT_MIGRATIONS_DIR;
 
 function tmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'mifplace-test-'));

@@ -20,10 +20,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            backend/package-lock.json
-            frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Check that the tag matches the version in package.json
         run: |
@@ -33,7 +30,7 @@ jobs:
             exit 1
           fi
 
-      - run: npm run install:all
+      - run: npm ci
 
       - name: Check
         run: npm run check

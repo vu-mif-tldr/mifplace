@@ -1,11 +1,12 @@
+#!/usr/bin/env node
 // Creates the SQLite file (if missing), applies settings and runs pending migrations.
-// Usage: npm run db:setup:prod (or db:setup:dev). Settings (DB_PATH, MIGRATIONS_DIR)
-// come from the environment, then from .env, see .env.example.
+// Usage: npm run db:setup:prod (or db:setup:dev) in backend/. DB_PATH (required) and
+// MIGRATIONS_DIR (optional) come from the environment, then from .env, see backend/.env.example.
 import Database from 'better-sqlite3';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { configureDb, getDbVersion, resolveDbPath } from '../db.js';
-import { loadDotEnv } from '../env.js';
+import { configureDb, getDbVersion, resolveDbPath } from './db.js';
+import { loadDotEnv } from '@mifplace/server-lib';
 import { MigrationError, loadMigrations, migrate, resolveMigrationsDir } from './migrate.js';
 
 loadDotEnv('.env');

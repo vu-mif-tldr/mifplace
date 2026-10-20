@@ -8,7 +8,7 @@
 //
 // Fills the events table with the pixels of a sprite exported as a C array
 // (Piskel/Pixil "uint32_t data[1][W*H]", values 0xAABBGGRR, row by row).
-// Usage: npm run db:seed:dev -- <pixil-frame-file.c> [offsetX] [offsetY]
+// Usage (from backend/, where .env is): npm run db:seed:dev -- <pixil-frame-file.c> [offsetX] [offsetY]
 // Settings (DB_PATH) come from the environment, then from .env, see .env.example.
 //
 // What it does:
@@ -32,8 +32,8 @@
 // - Re-running: events is append-only, so a second run inserts duplicates.
 //   Recreate the database before running the script again.
 import * as fs from 'node:fs';
-import { MifDb, openDb, resolveDbPath } from '../db.js';
-import { loadDotEnv } from '../env.js';
+import { MifDb, openDb, resolveDbPath } from '@mifplace/db';
+import { loadDotEnv } from '@mifplace/server-lib';
 
 const SPRITE_WIDTH = 128;
 const SPRITE_HEIGHT = 128;

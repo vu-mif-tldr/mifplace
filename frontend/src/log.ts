@@ -3,8 +3,9 @@
 //   localStorage['mifplace.log'] = 'debug'   then reload the page
 // debug adds a line per saved pixel and per received batch.
 
-export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
-export type LogLevel = (typeof LOG_LEVELS)[number];
+import { LOG_LEVELS, type LogLevel } from '@mifplace/shared';
+
+export { LOG_LEVELS, type LogLevel };
 export type LogFields = Record<string, unknown>;
 
 const STORAGE_KEY = 'mifplace.log';
