@@ -1,11 +1,13 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert';
-import { app } from './server.js';
+import { createApp } from './app.js';
 import { Server } from 'node:http';
 
 const TEST_PORT = 3001;
 const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
 let testServer: Server;
+
+const app = createApp({ gridWidth: 100, gridHeight: 100, paletteSize: 16, checkHealth: () => {} });
 
 before(async () => {
   testServer = app.listen(TEST_PORT, '127.0.0.1', () => {
