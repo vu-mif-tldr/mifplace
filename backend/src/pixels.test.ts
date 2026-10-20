@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert';
-import { app, db } from './server.js';
+import { app } from './server.js';
 import { Server } from 'node:http';
 
 const TEST_PORT = 3001;
@@ -8,8 +8,6 @@ const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
 let testServer: Server;
 
 before(async () => {
-  db.exec('DELETE FROM events');
-
   testServer = app.listen(TEST_PORT, '127.0.0.1', () => {
     console.log(`Test server running at ${BASE_URL}`);
   });
@@ -18,6 +16,7 @@ before(async () => {
 after(() => {
   return new Promise<void>((resolve) => {
     testServer.close(() => {
+      console.log('Test server closed');
       resolve();
     });
   });

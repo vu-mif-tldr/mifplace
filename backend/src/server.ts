@@ -16,7 +16,7 @@ export const hostname: string = process.env.HOST ?? '127.0.0.1';
 
 // Fails loudly if DB_PATH is not set or the file does not exist (run db:setup first).
 const dbPath = resolveDbPath();
-export const db = openDb(dbPath);
+const db = openDb(dbPath);
 let paletteSize: number;
 let gridHeight: number;
 let gridWidth: number;
@@ -115,7 +115,7 @@ app.use((_req, res) => {
 });
 
 // Start the Express HTTP server and keep a reference for shutdown.
-// its so when running npm test would not start running the server
+// Needed so when running npm test would not start running the server
 if (process.argv[1]?.endsWith('server.js')) {
   const server = app.listen(PORT, hostname, () => {
     console.log(`Server running at http://${hostname}:${PORT}/`);
