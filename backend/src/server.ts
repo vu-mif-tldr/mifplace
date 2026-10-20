@@ -16,13 +16,27 @@ export const hostname: string = process.env.HOST ?? '127.0.0.1';
 
 // Fails loudly if DB_PATH is not set or the file does not exist (run db:setup first).
 const dbPath = resolveDbPath();
-const db = openDb(dbPath);
+export const db = openDb(dbPath);
+let paletteSize: number;
+let gridHeight: number;
+let gridWidth: number;
 let mifDb: MifDb;
+
 try {
   // Version 0 means a file without any applied migration, MifDb cannot work with it.
   if (getDbVersion(db) === 0) {
     throw new Error(`Database ${dbPath} has no schema, run "npm run db:setup:dev" first`);
   }
+  // get on initialization the pallete size, height, width only once. and then reuse.
+  const { n } = db.prepare('SELECT COUNT(*) AS n FROM palette').get() as { n: number };
+  paletteSize = n;
+
+  const size = db.prepare('SELECT width, height FROM canvas').get() as
+    { width: number; height: number } | undefined;
+  // can be undefined so need to check if it becomes unefined
+  if (!size) throw new Error('canvas table missing row');
+  gridWidth = size.width;
+  gridHeight = size.height;
   mifDb = new MifDb(db);
   console.log(
     `DB: ${dbPath}, schema version ${getDbVersion(db)}, last event id: ${mifDb.getLastEventId()}`
@@ -77,18 +91,14 @@ app.get('/health', (_req, res) => {
 
 app.use(express.json());
 app.post('/api/pixels', (req, res) => {
-  const { x, y, color } = req.body;
-  // returns a color id if exits if the hex exits in the sql database | undefined says to typescript that this variable can be undefined.
-  const palette = db
-    .prepare('SELECT color_id FROM palette WHERE text = ?')
-    .get(color.toUpperCase()) as { color_id: number } | undefined;
+  const { x, y, colorIndex } = req.body;
 
   if (!Number.isInteger(x) || !Number.isInteger(y)) {
     return res.status(400).json({ success: false, error: 'Coordinates are not a number' });
-  } else if (x < 0 || x > 127 || y < 0 || y > 127) {
+  } else if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
     return res.status(400).json({ success: false, error: ' Position not in canvas' });
-  } else if (!palette) {
-    return res.status(400).json({ success: false, error: 'Color  not in palette' });
+  } else if (colorIndex < 0 || colorIndex >= paletteSize) {
+    return res.status(400).json({ success: false, error: 'Color not in palette' });
   } else {
     return res.status(201).json({ success: true });
   }
@@ -105,16 +115,19 @@ app.use((_req, res) => {
 });
 
 // Start the Express HTTP server and keep a reference for shutdown.
-export const server = app.listen(PORT, hostname, async () => {
-  console.log(`Server running at http://${hostname}:${PORT}/`);
-});
+// its so when running npm test would not start running the server
+if (process.argv[1]?.endsWith('server.js')) {
+  const server = app.listen(PORT, hostname, () => {
+    console.log(`Server running at http://${hostname}:${PORT}/`);
+  });
 
-// Stop accepting connections, then close the database so the WAL is checkpointed.
-// The database is closed in the callback: it is not needed until open connections are done.
-const shutdown = () => {
-  server.close(() => mifDb.close());
-  // Idle keep-alive connections would keep server.close waiting.
-  server.closeIdleConnections();
-};
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+  // Stop accepting connections, then close the database so the WAL is checkpointed.
+  // The database is closed in the callback: it is not needed until open connections are done.
+  const shutdown = () => {
+    server.close(() => mifDb.close());
+    // Idle keep-alive connections would keep server.close waiting.
+    server.closeIdleConnections();
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}
