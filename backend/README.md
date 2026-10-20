@@ -65,7 +65,7 @@ Migrations are described in [`migrations/README.md`](migrations/README.md).
 
 ## API
 
-### GET /canvas
+### GET /api/canvas
 
 Returns the current canvas state.
 
