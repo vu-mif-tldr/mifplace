@@ -50,6 +50,7 @@ const app = createApp({
   paletteSize,
   checkHealth: () => mifDb.checkHealth(),
   getCanvasState: () => getCanvasState(mifDb),
+  appendEvent: (eventObject) => mifDb.appendEvent(eventObject),
 });
 
 const server = app.listen(PORT, hostname, () => {

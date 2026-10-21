@@ -10,8 +10,10 @@ export interface AppConfig {
     height: number;
     pixels: [number, number][];
   };
+
   // Throws if the database is not reachable. Injected so the app can be built without a database.
   checkHealth: () => void;
+  appendEvent: (event: { user_id: number; color_id: number; position: number }) => number;
 }
 
 type HealthResponse = {
@@ -31,6 +33,7 @@ export function createApp({
   paletteSize,
   checkHealth,
   getCanvasState,
+  appendEvent,
 }: AppConfig) {
   const app = express();
 
@@ -82,7 +85,18 @@ export function createApp({
     } else if (colorIndex < 0 || colorIndex >= paletteSize) {
       return res.status(400).json({ success: false, error: 'Color not in palette' });
     } else {
-      return res.status(201).json({ success: true });
+      try {
+        const eventId = appendEvent({
+          user_id: 0, // dev user
+          color_id: colorIndex,
+          position: y * gridWidth + x,
+        });
+
+        return res.status(201).json({ success: true, eventId });
+      } catch (error) {
+        console.error('Insert failed:', error);
+        return res.status(500).json({ success: false, error: 'Insert failed' });
+      }
     }
   });
 

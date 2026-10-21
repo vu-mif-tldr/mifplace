@@ -13,6 +13,7 @@ const app = createApp({
   paletteSize: 16,
   checkHealth: () => {},
   getCanvasState: () => ({ width: 100, height: 100, pixels: [] }),
+  appendEvent: () => 42,
 });
 
 before(async () => {
@@ -46,6 +47,7 @@ test('POST /api/pixels - valid input returns 201', async () => {
   assert.strictEqual(response.status, 201);
   const data = (await response.json()) as PixelResponse;
   assert.strictEqual(data.success, true);
+  assert.strictEqual(data.eventId, 42);
 });
 
 test('POST /api/pixels - invalid x returns 400', async () => {
