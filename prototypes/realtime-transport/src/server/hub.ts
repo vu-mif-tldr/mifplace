@@ -53,7 +53,7 @@ function encode(message: ServerMessage): string {
  */
 export class Hub {
   /** Id of the last event sent out. Later events wait in the log for the next batch. */
-  flushedId = 0;
+  flushedId: number;
   /** Since the start, for the load tests. The transports and the app add to them too. */
   readonly counters = {
     batches: 0,
@@ -75,6 +75,9 @@ export class Hub {
   constructor(log: EventLog, options: HubOptions) {
     this.log = log;
     this.options = options;
+    // Events read back from a file after a restart count as sent: clients that miss some of them
+    // catch up from their cursor. Starting from 0 made the first batch the whole log, for everyone.
+    this.flushedId = log.lastId;
   }
 
   start(): void {

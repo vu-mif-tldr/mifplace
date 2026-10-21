@@ -157,6 +157,31 @@ describe('Hub.flush', () => {
   });
 });
 
+describe('Hub after a restart with a kept log', () => {
+  it('sends only new events, and the old ones only to clients that miss them', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'hub-restart-'));
+    const file = path.join(dir, 'events.jsonl');
+    const before = new EventLog(file);
+    for (let i = 0; i < 5; i++) before.place({ x: i, y: 0, color: 1 });
+
+    const log = new EventLog(file);
+    const hub = new Hub(log, OPTIONS);
+    const [current, behind] = [recorder(), recorder()];
+    hub.connect(current, { id: 5, ts: log.tsOf(5) ?? 0 });
+    hub.connect(behind, { id: 3, ts: log.tsOf(3) ?? 0 });
+    log.place({ x: 9, y: 9, color: 2 });
+    hub.flush();
+    assert.deepEqual(
+      current.received.map(({ message }) => ids(message)),
+      [[6]]
+    );
+    assert.deepEqual(
+      behind.received.map(({ message }) => ids(message)),
+      [[4, 5], [6]]
+    );
+  });
+});
+
 describe('Hub.dropRandom', () => {
   it('closes the given number of connections and forgets them', () => {
     const { hub } = setup();
