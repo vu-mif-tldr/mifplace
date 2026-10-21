@@ -466,8 +466,9 @@ function judge(report: Omit<LoadReport, 'verdict'>, p95: number): LoadReport['ve
         'caught up without reloading the snapshot': viewers.stats.resyncs === 0,
         'all connected again': allOpenAtEnd,
       };
-      // Short polling holds no connection the server could drop.
-      if (applied === 0) result = 'not applicable';
+      // Short polling holds no connection the server could drop. (Drops counted there hit some
+      // other client, such as a browser tab left open on the same server.)
+      if (options.transport === 'poll' || applied === 0) result = 'not applicable';
       break;
     }
     case 't4': {

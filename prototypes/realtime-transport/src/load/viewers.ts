@@ -76,10 +76,11 @@ port.on('message', (message: ToViewers) => {
 });
 
 async function finish(targetId: number, drainMs: number): Promise<void> {
+  // Wait for the last events, and for viewers that lost their connection at the very end (T3) to
+  // be back: one that already had every event would otherwise count as not connected.
   const deadline = Date.now() + drainMs;
-  while (Date.now() < deadline && viewers.some((viewer) => viewer.lastEventId < targetId)) {
-    await sleep(50);
-  }
+  const settled = (viewer: LiveCanvas) => viewer.lastEventId >= targetId && viewer.state === 'open';
+  while (Date.now() < deadline && !viewers.every(settled)) await sleep(50);
   const { p99, max } = sampler.sample().eventLoopMs;
   const stats = totalStats();
   addStats(stats, baseline, -1);

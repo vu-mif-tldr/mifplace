@@ -15,10 +15,11 @@ export interface HistogramSummary {
   max: number;
 }
 
-const MAX_MS = 60_000;
+// Long enough for the slow viewers of T5, who fall minutes behind.
+const MAX_MS = 300_000;
 
 /**
- * Latencies in 1 ms buckets up to 60 s. Unlike the perf_hooks histograms it is plain data: worker
+ * Latencies in 1 ms buckets up to 5 minutes. Unlike the perf_hooks histograms it is plain data: worker
  * threads send theirs to the main thread, which adds them up before taking percentiles.
  */
 export class Histogram implements HistogramData {

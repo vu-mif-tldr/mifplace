@@ -48,27 +48,45 @@ the tests check:
 
 - two clients exchange one pixel (the acceptance criterion of MP-34);
 - a client catches up after a lost connection, with no gaps;
-- a client reloads the snapshot after a server restart that lost the log.
+- a client reloads the snapshot after a server restart that lost the log;
+- a client reloads the snapshot even when the new log has already issued its ids again (see
+  "Cursors" below).
+
+Further tests run miniature versions of every load scenario (T1, T3, T4, T5).
 
 ## How it works
 
 The rules are the same for every transport. Only the delivery channel differs.
 
-1. The client loads the canvas over HTTP: `GET /api/canvas` returns the cells and `lastEventId`
-   (see ADR-0001: the event log is the source of truth).
-2. It opens the transport with `after=<lastEventId>`. The server sends what the client missed and
-   then every new batch. For SSE the browser itself sends `Last-Event-ID` on its own reconnects.
+1. The client loads the canvas over HTTP: `GET /api/canvas` returns the cells, `lastEventId` and
+   `lastEventTs` (see ADR-0001: the event log is the source of truth).
+2. It opens the transport with `after=<cursor>`, where the cursor is `<id>:<ts>` of its last
+   event. The server sends what the client missed and then every new batch. For SSE the cursor is
+   the `id:` field, so the browser sends it back as `Last-Event-ID` on its own reconnects.
 3. The server collects new events for `batchMs` and serialises each batch **once** for all clients
    ([src/server/hub.ts](src/server/hub.ts)).
 4. The client applies events strictly in id order: it skips ids it already has (after a snapshot
    or a reconnect), and on a gap or a `reset` from the server it reloads the snapshot
-   ([src/client/live-canvas.ts](src/client/live-canvas.ts)). `reset` happens when the client's id
-   is unknown to the server (the server restarted; the log here is in memory) or when the client
-   missed more than `maxBacklog` events.
+   ([src/client/live-canvas.ts](src/client/live-canvas.ts)). `reset` happens when the cursor does
+   not match the server's log (see below) or when the client missed more than `maxBacklog`
+   events.
 5. Push transports get a heartbeat every 15 s. A client that hears nothing for 40 s reconnects,
    with exponential backoff and jitter.
 6. A client that reads too slowly (over `maxBufferedBytes` of unsent data) is disconnected instead
    of being buffered without limit. It reconnects and catches up like after any other drop.
+
+### Cursors: why the id alone is not enough
+
+T4 found a silent failure. The server restarted and lost its log (here: kept in memory), so it
+issued ids from 1 again. An SSE client waited up to 5 s (`retry:`) before reconnecting, and by
+then the new log was longer than the old one. Its old id existed again, the server took it for a
+valid position and sent the continuation of the new log. The client got no gap and no reset, and
+showed old pixels mixed with part of the new log.
+
+The same happens in production whenever ids are issued twice: after restoring SQLite from a backup,
+or after losing the database. So the client sends the time of its last event too, and the server
+answers `reset` when its event with that id has another time. One test reproduces the failure
+for every transport; it fails without the check.
 
 The page shows the client's counters (applied, duplicates, gaps, resyncs, reconnects), delivery
 latency (client receive time minus server event time, so only meaningful on one machine) and the
@@ -79,7 +97,7 @@ simulate network failures.
 
 | Route                  | Purpose                                                   |
 | ---------------------- | --------------------------------------------------------- |
-| `GET /api/canvas`      | Snapshot: cells and `lastEventId`                         |
+| `GET /api/canvas`      | Snapshot: cells, `lastEventId`, `lastEventTs`             |
 | `POST /api/place`      | `{x, y, color}`, validated; returns `{ok, id}`            |
 | `GET /ws?after=`       | WebSocket                                                 |
 | `GET /api/sse?after=`  | Server-Sent Events                                        |
@@ -87,7 +105,8 @@ simulate network failures.
 | `GET /api/poll?after=` | Short poll: answers at once                               |
 | `GET /api/stats`       | Connections per transport, request counters, server RSS   |
 | `GET /api/metrics`     | For the load tool: CPU and event loop since the last call |
-| `POST /api/debug/drop` | Drops every connection                                    |
+| `POST /api/debug/drop` | Drops every connection, or `?count=N` random ones (T3)    |
+| `POST /api/debug/exit` | Ends the process (T4); only with `--allow-exit 1`         |
 
 ## What building them showed
 
@@ -125,7 +144,8 @@ happens.
 
 ## Not in the prototypes, on purpose
 
-- **No SQLite**: the event log is in memory, so a restart also exercises the `reset` path.
+- **No SQLite.** The event log is in memory, so a restart also exercises the `reset` path. With
+  `--log-file` it is kept in a file (one JSON line per event), to restart the way production will.
 - **No login, no cooldown, no per-user connection limit.** Every transport starts with an ordinary
   HTTP request (the WebSocket handshake too), so cookies and limits work the same way for all of
   them. This still has to be confirmed when the real login exists.
@@ -149,14 +169,27 @@ only a few pixels per second.
   - Delivery latency: viewer receive time minus the server's event time, collected in 1 ms
     histograms and added up across threads.
   - Lost events: gaps, and viewers that never got the last event.
-  - Reconnects and resyncs.
+  - Reconnects, resyncs, and outages: how long each viewer was without an open connection.
   - The server's CPU, event loop delay and memory, polled every second from `/api/metrics`.
   - The load tool's own CPU and event loop. When the tool itself is too busy (event loop p99 over
     50 ms), the report says so, because its latencies are then not trustworthy.
 
-The report ends with the verdict for T1 from the ADR (p95 at most 1 s, hard limit 5 s, no lost
-events, everyone connected) and is saved as JSON in `results/`. The reports quoted in the ADR are
-committed there, with the conditions of each run in [results/README.md](results/README.md).
+The report ends with a verdict against the pass conditions of the ADR for the scenario that ran,
+and is saved as JSON in `results/`. The reports quoted in the ADR are committed there, with the
+conditions of each run in [results/README.md](results/README.md).
+
+### Scenarios
+
+| Test   | Flags                           | What happens                                                                                                                                          |
+| ------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1, T2 | `--viewers 500` / `2000`        | Steady state                                                                                                                                          |
+| T3     | `--drop-per-second 10`          | The server drops 10 random connections every second, as a network or proxy would. Each transport reconnects its own way (SSE: the browser's `retry:`) |
+| T4     | `--restart-at 20`               | At second 20 the server process exits and Docker starts it again. With `LOG_FILE=data/events.jsonl` the log survives; without, it is lost             |
+| T5     | `--slow 10 --slow-read-bps 200` | 10 extra viewers read through a proxy at 200 bytes per second. They load the snapshot directly: T5 is about how the server buffers the stream         |
+
+T5 is slow to show anything at our traffic. A viewer gets about 1.2 KB per second, and the kernel
+buffers about 200 KB of it before the server's own buffer (`maxBufferedBytes`, 256 KB) grows at
+all. Run it also with `--rate 300` to see the limit kick in within minutes.
 
 ### In Docker, the way the numbers are meant to be taken
 
@@ -168,21 +201,26 @@ Docker VM with the remaining CPUs. This has two reasons:
 
 ```sh
 scripts/load-matrix.sh --viewers 500 --duration 60   # every transport, each on a fresh server
+LOG_FILE=data/events.jsonl scripts/load-matrix.sh --restart-at 20    # T4 with a kept log
+TRANSPORTS="ws sse" scripts/load-matrix.sh --slow 10 --rate 300      # only some transports
 
 docker compose up -d --build server                   # or one run at a time
-docker compose run --rm load --transport sse --viewers 2000
+docker compose run --rm --no-deps load --transport sse --viewers 2000
 BATCH_MS=200 docker compose up -d --force-recreate server   # another batch interval
 ```
 
+Use `--no-deps` with `docker compose run`: otherwise Compose may recreate the server with
+different settings first (it did, when `LOG_FILE` was set for `up` but not for `run`).
+
 Flags: `--transport`, `--viewers` (500), `--rate` (30), `--ramp` (new connections per second,
-100), `--warmup` (10 s), `--duration` (60 s), `--workers` (auto), `--drain-ms` (5000), `--url`.
+100), `--warmup` (10 s), `--duration` (60 s), `--workers` (auto), `--drain-ms` (5000), `--url`,
+`--drop-per-second`, `--restart-at`, `--slow`, `--slow-read-bps` (1000).
 
 Without Docker, against `npm start`: `npm run load -- --transport ws --viewers 200`. This is fine
 for trying things out, but then the server has the whole Mac to itself, and the numbers are not
 comparable with the Docker runs.
 
-Not covered yet: T3 (killing single connections), T4 (restarting the server under load), T5 (slow
-clients), T6 (Caddy and TLS) and T7 (real browsers).
+Not covered yet: T6 (Caddy and TLS) and T7 (real browsers).
 
 ## Layout
 
@@ -191,13 +229,14 @@ public/index.html           the page
 src/shared/protocol.ts      messages shared by server and client
 src/server/main.ts          CLI entry point (flags -> AppOptions)
 src/server/app.ts           HTTP routes, static files, bot, shutdown
-src/server/event-log.ts     in-memory append-only log and canvas
+src/server/event-log.ts     append-only log (in memory or in a file) and canvas
 src/server/hub.ts           batching, catch-up and fan-out, the same for all transports
 src/server/transports/      websocket.ts, sse.ts, polling.ts (long and short)
 src/client/transports.ts    client side of the four transports, no DOM
 src/client/live-canvas.ts   ordering, de-duplication and resync, no DOM
 src/client/main.ts          the page's UI
-src/load/                   the load tool: main.ts (CLI), run.ts, viewers.ts (worker thread)
+src/load/                   the load tool: main.ts (CLI), run.ts, viewers.ts (worker thread),
+                            throttle-proxy.ts (T5)
 scripts/load-matrix.sh      the load test for every transport, each on a fresh server container
 compose.yaml, Dockerfile    server with 1 CPU and 1 GB, load tool next to it
 test/                       unit tests, end-to-end tests for every transport, load tool tests

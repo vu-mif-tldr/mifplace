@@ -1,4 +1,5 @@
 import { connect, createServer, type AddressInfo, type Socket } from 'node:net';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 export interface ThrottleProxy {
   url: string;
@@ -23,22 +24,25 @@ export async function startThrottleProxy(
     for (const socket of [client, upstream]) {
       sockets.add(socket);
       socket.on('close', () => sockets.delete(socket));
-      // A reset on one side is normal here; the 'close' handlers clean up.
-      socket.on('error', () => {});
     }
-    client.on('close', () => upstream.destroy());
-    upstream.on('close', () => client.destroy());
     client.pipe(upstream);
+    client.on('close', () => upstream.destroy());
+    client.on('error', () => upstream.destroy());
+    upstream.on('error', () => client.destroy());
+
+    let delivered = Promise.resolve();
     upstream.on('data', (chunk: Buffer) => {
       upstream.pause();
-      setTimeout(
-        () => {
+      delivered = delivered
+        .then(() => sleep((chunk.length / bytesPerSecond) * 1_000))
+        .then(() => {
           if (!client.destroyed) client.write(chunk);
           upstream.resume();
-        },
-        (chunk.length / bytesPerSecond) * 1_000
-      );
+        });
     });
+    // On a real slow link the server's FIN arrives after its data, so the client still gets
+    // everything the server sent before it closed (a keep-alive timeout, a dropped client).
+    upstream.on('end', () => void delivered.then(() => client.end()));
   });
 
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
