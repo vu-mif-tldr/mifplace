@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import pluginVue from 'eslint-plugin-vue';
 import tseslint from 'typescript-eslint';
+import { ignores, rules } from '../eslint.shared.mjs';
 
 export default tseslint.config(
   js.configs.recommended,
@@ -26,12 +27,9 @@ export default tseslint.config(
         MouseEvent: 'readonly',
       },
     },
-    rules: {
-      '@typescript-eslint/no-unused-vars': 'warn',
-      '@typescript-eslint/no-explicit-any': 'warn',
-    },
+    rules,
   },
   {
-    ignores: ['dist/**', 'public/**', 'node_modules/**'],
+    ignores: [...ignores, 'public/**'],
   }
 );
