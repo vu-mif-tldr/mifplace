@@ -1,0 +1,39 @@
+# The server gets one CPU and 1 GB, roughly a small VM. The load tool runs in the same Docker VM,
+# so that traffic does not go through Docker Desktop's port forwarding and both share one clock.
+#
+#   docker compose up -d --build server
+#   docker compose run --rm load --transport ws --viewers 500
+#
+# scripts/load-matrix.sh runs every transport, each against a fresh server.
+#
+# Both services use one image, built by `server`: a separate `load` image would not be rebuilt by
+# `docker compose build` (its profile is inactive) and would silently run old code.
+
+services:
+  server:
+    build: .
+    image: realtime-transport-prototype
+    command: ['src/server/main.ts', '--host', '0.0.0.0', '--batch-ms', '${BATCH_MS:-100}']
+    ports:
+      - '3100:3100'
+    cpus: 1
+    mem_limit: 1g
+    ulimits:
+      nofile: { soft: 65535, hard: 65535 }
+
+  load:
+    image: realtime-transport-prototype
+    pull_policy: never
+    profiles: [load]
+    depends_on: [server]
+    entrypoint:
+      - node
+      - --experimental-eventsource
+      - --disable-warning=UNDICI-ES
+      - src/load/main.ts
+      - --url
+      - http://server:3100
+    volumes:
+      - ./results:/app/results
+    ulimits:
+      nofile: { soft: 65535, hard: 65535 }

@@ -59,11 +59,13 @@ export class WebSocketTransport {
     ws.on('error', () => ws.terminate());
 
     const { maxBufferedBytes } = this.options;
+    const hub = this.hub;
     const client: PushClient = {
       kind: 'ws',
       send(payload) {
         // Do not buffer without limit for a slow client: drop it, it catches up after reconnecting.
         if (ws.bufferedAmount > maxBufferedBytes) {
+          hub.counters.slowClientsDropped++;
           ws.terminate();
           return;
         }

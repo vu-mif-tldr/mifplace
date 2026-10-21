@@ -38,6 +38,8 @@ export interface LiveCanvasOptions extends Partial<Omit<TransportOptions, 'baseU
   transport: TransportName;
   onChange?: () => void;
   onLog?: (line: string) => void;
+  /** Called for every applied event with its delivery latency in ms. */
+  onApplied?: (latencyMs: number) => void;
 }
 
 /**
@@ -60,6 +62,7 @@ export class LiveCanvas {
   private readonly baseUrl: string;
   private readonly onChange: () => void;
   private readonly onLog: (line: string) => void;
+  private readonly onApplied: (latencyMs: number) => void;
   private readonly transport: Transport;
   private opens = 0;
   private resyncing = false;
@@ -69,6 +72,7 @@ export class LiveCanvas {
     this.baseUrl = options.baseUrl;
     this.onChange = options.onChange ?? (() => {});
     this.onLog = options.onLog ?? (() => {});
+    this.onApplied = options.onApplied ?? (() => {});
     this.transport = createTransport(
       options.transport,
       { ...DEFAULT_TRANSPORT_OPTIONS, ...options },
@@ -119,7 +123,9 @@ export class LiveCanvas {
       this.cells[event.y * CANVAS_WIDTH + event.x] = event.color;
       this.lastEventId = event.id;
       this.stats.applied++;
-      this.latencies.push(Date.now() - event.ts);
+      const latency = Date.now() - event.ts;
+      this.latencies.push(latency);
+      this.onApplied(latency);
     }
     if (this.latencies.length > LATENCY_WINDOW) {
       this.latencies.splice(0, this.latencies.length - LATENCY_WINDOW);

@@ -6,6 +6,7 @@ import { CANVAS_HEIGHT, CANVAS_WIDTH, PALETTE } from '../shared/protocol.ts';
 import { EventLog } from './event-log.ts';
 import { readJson, sendJson } from './http-util.ts';
 import { Hub } from './hub.ts';
+import { ProcessSampler, type ProcessSample } from './process-metrics.ts';
 import { handleLongPoll, handleShortPoll } from './transports/polling.ts';
 import { handleSse } from './transports/sse.ts';
 import { WebSocketTransport } from './transports/websocket.ts';
@@ -39,6 +40,14 @@ export const DEFAULT_OPTIONS: AppOptions = {
   botRate: 0,
 };
 
+/** GET /api/metrics. Counters are totals since the start; ProcessSample fields are per interval. */
+export interface ServerMetrics extends ProcessSample {
+  lastEventId: number;
+  connections: { ws: number; sse: number; lp: number };
+  requests: { place: number; lp: number; poll: number };
+  counters: { batches: number; messages: number; slowClientsDropped: number };
+}
+
 export interface App {
   url: string;
   log: EventLog;
@@ -64,6 +73,7 @@ export async function startApp(overrides: Partial<AppOptions> = {}): Promise<App
     maxBufferedBytes: options.maxBufferedBytes,
   });
   const requests = { place: 0, lp: 0, poll: 0 };
+  const sampler = new ProcessSampler();
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -99,6 +109,17 @@ export async function startApp(overrides: Partial<AppOptions> = {}): Promise<App
             rssMb: Math.round(process.memoryUsage().rss / 1e6),
           })
         );
+      // For the load tool only: process values cover the time since the previous call.
+      case 'GET /api/metrics': {
+        const metrics: ServerMetrics = {
+          ...sampler.sample(),
+          lastEventId: log.lastId,
+          connections: hub.counts(),
+          requests,
+          counters: hub.counters,
+        };
+        return sendJson(res, 200, JSON.stringify(metrics));
+      }
       case 'POST /api/debug/drop':
         hub.dropAll();
         res.writeHead(204).end();
@@ -136,6 +157,7 @@ export async function startApp(overrides: Partial<AppOptions> = {}): Promise<App
     hub,
     async close() {
       clearInterval(bot);
+      sampler.stop();
       hub.close();
       ws.close();
       const closed = new Promise<void>((resolve) => server.close(() => resolve()));

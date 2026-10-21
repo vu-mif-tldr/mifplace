@@ -12,8 +12,10 @@
     "start": "npm run build:web && node src/server/main.ts",
     "dev": "npm run build:web && node --watch-path=src/server --watch-path=src/shared src/server/main.ts",
     "watch:web": "tsc -p tsconfig.web.json --watch",
+    "load": "node --experimental-eventsource --disable-warning=UNDICI-ES src/load/main.ts",
+    "load:matrix": "sh scripts/load-matrix.sh",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.web.json --noEmit",
-    "test": "node --experimental-eventsource --test \"test/**/*.test.ts\"",
+    "test": "node --experimental-eventsource --disable-warning=UNDICI-ES --test \"test/**/*.test.ts\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run typecheck && npm run format:check && npm test"

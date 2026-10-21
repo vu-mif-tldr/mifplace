@@ -43,6 +43,7 @@ export function handleSse(
     send(payload, lastId) {
       // Do not buffer without limit for a slow client: drop it, it catches up after reconnecting.
       if (res.writableLength > maxBufferedBytes) {
+        hub.counters.slowClientsDropped++;
         res.destroy();
         return;
       }

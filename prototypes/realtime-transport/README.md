@@ -77,16 +77,17 @@ simulate network failures.
 
 ### Endpoints
 
-| Route                  | Purpose                                                 |
-| ---------------------- | ------------------------------------------------------- |
-| `GET /api/canvas`      | Snapshot: cells and `lastEventId`                       |
-| `POST /api/place`      | `{x, y, color}`, validated; returns `{ok, id}`          |
-| `GET /ws?after=`       | WebSocket                                               |
-| `GET /api/sse?after=`  | Server-Sent Events                                      |
-| `GET /api/lp?after=`   | Long poll: answers on the next batch or after 25 s      |
-| `GET /api/poll?after=` | Short poll: answers at once                             |
-| `GET /api/stats`       | Connections per transport, request counters, server RSS |
-| `POST /api/debug/drop` | Drops every connection                                  |
+| Route                  | Purpose                                                   |
+| ---------------------- | --------------------------------------------------------- |
+| `GET /api/canvas`      | Snapshot: cells and `lastEventId`                         |
+| `POST /api/place`      | `{x, y, color}`, validated; returns `{ok, id}`            |
+| `GET /ws?after=`       | WebSocket                                                 |
+| `GET /api/sse?after=`  | Server-Sent Events                                        |
+| `GET /api/lp?after=`   | Long poll: answers on the next batch or after 25 s        |
+| `GET /api/poll?after=` | Short poll: answers at once                               |
+| `GET /api/stats`       | Connections per transport, request counters, server RSS   |
+| `GET /api/metrics`     | For the load tool: CPU and event loop since the last call |
+| `POST /api/debug/drop` | Drops every connection                                    |
 
 ## What building them showed
 
@@ -133,10 +134,54 @@ happens.
   per host, and every SSE tab holds one of them. HTTP/2 and the reverse proxy are test T6 (behind
   Caddy) in step 3.
 
-## Next: step 3
+## Load tests (step 3)
 
-Measurements T1–T7 from the ADR. The load generator can reuse `src/client/transports.ts` as it
-is, because it already runs in Node.
+The load tool ([src/load](src/load)) models how the canvas is really used: hundreds of viewers and
+only a few pixels per second.
+
+- **Viewers** only receive. Each one is a `LiveCanvas` with the same client code the browser runs,
+  so reconnecting, catch-up and de-duplication behave the same under load. They read and parse
+  every message but draw nothing. A viewer that stopped reading would be a slow client and test
+  T5 instead of T1. They run in worker threads, one per 100 viewers by default.
+- **The writer** is one more client that places `--rate` pixels per second through the real write
+  path: the socket for WebSocket, `POST /api/place` for the others.
+- **Metrics.**
+  - Delivery latency: viewer receive time minus the server's event time, collected in 1 ms
+    histograms and added up across threads.
+  - Lost events: gaps, and viewers that never got the last event.
+  - Reconnects and resyncs.
+  - The server's CPU, event loop delay and memory, polled every second from `/api/metrics`.
+  - The load tool's own CPU and event loop. When the tool itself is too busy (event loop p99 over
+    50 ms), the report says so, because its latencies are then not trustworthy.
+
+The report ends with the verdict for T1 from the ADR (p95 at most 1 s, hard limit 5 s, no lost
+events, everyone connected) and is saved as JSON in `results/` (not in git).
+
+### In Docker, the way the numbers are meant to be taken
+
+The server container gets **one CPU and 1 GB**, roughly a small VM. The load tool runs in the same
+Docker VM with the remaining CPUs. This has two reasons:
+
+- the traffic does not go through Docker Desktop's port forwarding, which would add its own cost;
+- both containers read the same clock, which the latency calculation needs.
+
+```sh
+scripts/load-matrix.sh --viewers 500 --duration 60   # every transport, each on a fresh server
+
+docker compose up -d --build server                   # or one run at a time
+docker compose run --rm load --transport sse --viewers 2000
+BATCH_MS=200 docker compose up -d --force-recreate server   # another batch interval
+```
+
+Flags: `--transport`, `--viewers` (500), `--rate` (30), `--ramp` (new connections per second,
+100), `--warmup` (10 s), `--duration` (60 s), `--workers` (auto), `--drain-ms` (5000), `--url`.
+
+Without Docker, against `npm start`: `npm run load -- --transport ws --viewers 200`. This is fine
+for trying things out, but then the server has the whole Mac to itself, and the numbers are not
+comparable with the Docker runs.
+
+Not covered yet: T3 (killing single connections), T4 (restarting the server under load), T5 (slow
+clients), T6 (Caddy and TLS) and T7 (real browsers).
 
 ## Layout
 
@@ -151,5 +196,8 @@ src/server/transports/      websocket.ts, sse.ts, polling.ts (long and short)
 src/client/transports.ts    client side of the four transports, no DOM
 src/client/live-canvas.ts   ordering, de-duplication and resync, no DOM
 src/client/main.ts          the page's UI
-test/                       hub unit tests and end-to-end tests for every transport
+src/load/                   the load tool: main.ts (CLI), run.ts, viewers.ts (worker thread)
+scripts/load-matrix.sh      the load test for every transport, each on a fresh server container
+compose.yaml, Dockerfile    server with 1 CPU and 1 GB, load tool next to it
+test/                       unit tests, end-to-end tests for every transport, load tool tests
 ```

@@ -48,6 +48,8 @@ function encode(message: ServerMessage): string {
 export class Hub {
   /** Id of the last event sent out. Later events wait in the log for the next batch. */
   flushedId = 0;
+  /** Since the start, for the load tests. */
+  readonly counters = { batches: 0, messages: 0, slowClientsDropped: 0 };
   private readonly log: EventLog;
   private readonly options: HubOptions;
   private readonly clients = new Set<PushClient>();
@@ -118,6 +120,8 @@ export class Hub {
     const waiters = [...this.waiters];
     this.waiters.clear();
     for (const waiter of waiters) waiter.wake();
+    this.counters.batches++;
+    this.counters.messages += this.clients.size + waiters.length;
   }
 
   /** Simulates a network failure for everyone: every client has to reconnect. */
@@ -136,5 +140,6 @@ export class Hub {
 
   private heartbeat(): void {
     for (const client of this.clients) client.send(HEARTBEAT);
+    this.counters.messages += this.clients.size;
   }
 }
