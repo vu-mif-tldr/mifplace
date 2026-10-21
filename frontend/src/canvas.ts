@@ -17,7 +17,7 @@ export async function paintPixel(canvas: HTMLCanvasElement, color: string, event
 
   // used for getting data from browser so the post method in server.ts could validate and upload to database.
   try {
-    const response = await fetch(`${'http://127.0.0.1:3000'}/api/pixels`, {
+    const response = await fetch('/api/pixels', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
 
