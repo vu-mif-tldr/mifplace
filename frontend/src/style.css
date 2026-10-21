@@ -1,0 +1,63 @@
+#palette {
+  display: grid;
+  grid-template-columns: repeat(4, 32px);
+  gap: 6px;
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  border: 2px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.swatch.selected {
+  border: 3px solid #000;
+  outline: 2px solid #fff;
+  box-shadow: 0 0 0 4px #1a73e8;
+}
+
+canvas {
+  border: 1px solid #000;
+  background: #fff;
+  display: block;
+  margin: 0 auto;
+  cursor: crosshair;
+}
+
+#canvas-section {
+  text-align: center;
+}
+
+main {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-areas:
+    'left   canvas  right'
+    'pixel  pixel   pixel';
+  align-items: start;
+  gap: 24px;
+  padding: 16px;
+}
+
+#canvas-section {
+  grid-area: canvas;
+}
+#pixel-info-section {
+  grid-area: pixel;
+  text-align: center;
+}
+
+#color-picker-section,
+#current-color-section {
+  grid-column: 1;
+}
+
+#current-color-swatch {
+  width: 64px;
+  height: 64px;
+  border: 2px solid #000;
+  border-radius: 4px;
+}
