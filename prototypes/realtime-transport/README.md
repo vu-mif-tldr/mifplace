@@ -150,9 +150,9 @@ happens.
   HTTP request (the WebSocket handshake too), so cookies and limits work the same way for all of
   them. This still has to be confirmed when the real login exists.
 - **JSON only**, no binary frames and no compression, so that all transports carry the same bytes.
-- **HTTP/1.1 without TLS.** HTTP/2 matters for SSE: browsers allow about 6 HTTP/1.1 connections
-  per host, and every SSE tab holds one of them. HTTP/2 and the reverse proxy are test T6 (behind
-  Caddy) in step 3.
+- **No TLS in Node.** The server speaks plain HTTP/1.1, as it will behind the proxy in
+  production. TLS, HTTP/2 and HTTP/3 come from Caddy in T6. HTTP/2 matters for SSE: browsers allow
+  about 6 HTTP/1.1 connections per host, and every SSE tab holds one of them (risk R1 in the ADR).
 
 ## Load tests (step 3)
 
@@ -186,10 +186,37 @@ conditions of each run in [results/README.md](results/README.md).
 | T3     | `--drop-per-second 10`          | The server drops 10 random connections every second, as a network or proxy would. Each transport reconnects its own way (SSE: the browser's `retry:`) |
 | T4     | `--restart-at 20`               | At second 20 the server process exits and Docker starts it again. With `LOG_FILE=data/events.jsonl` the log survives; without, it is lost             |
 | T5     | `--slow 10 --slow-read-bps 200` | 10 extra viewers read through a proxy at 200 bytes per second. They load the snapshot directly: T5 is about how the server buffers the stream         |
+| T6     | `PROXY=caddy` (matrix script)   | T1 through Caddy with TLS, as in production. The report adds Caddy's own CPU and memory                                                               |
 
 T5 is slow to show anything at our traffic. A viewer gets about 1.2 KB per second, and the kernel
-buffers about 200 KB of it before the server's own buffer (`maxBufferedBytes`, 256 KB) grows at
-all. Run it also with `--rate 300` to see the limit kick in within minutes.
+buffers a lot of it (over 1 MB per connection in our runs) before the server's own buffer
+(`maxBufferedBytes`, 256 KB) grows at all. Run it also with `--rate 300`.
+
+### T6: through Caddy
+
+[Caddyfile](Caddyfile) puts Caddy 2.11 in front of the server: TLS from Caddy's local CA, HTTP/1.1,
+HTTP/2 and HTTP/3 on port 8443, no compression unless `CADDY_ENCODE` is set. The load tool trusts
+the local root certificate through `NODE_EXTRA_CA_CERTS`; the matrix script does that for you.
+
+```sh
+PROXY=caddy scripts/load-matrix.sh --viewers 500
+PROXY=caddy TRANSPORTS="sse lp" CADDY_ENCODE="encode zstd gzip" \
+  scripts/load-matrix.sh --viewers 500 --label encode    # does compression buffer the stream?
+```
+
+The load tool speaks HTTP/1.1 to Caddy, one connection per viewer, like many different users.
+Whether HTTP/2 works the way risk R1 needs it is checked separately: one HTTP/2 connection, 10 SSE
+streams on it, plus the `Alt-Svc` header that offers HTTP/3 to browsers.
+
+```sh
+docker compose --profile tls up -d server caddy
+docker compose run --rm --no-deps \
+  -e NODE_EXTRA_CA_CERTS=/caddy-data/caddy/pki/authorities/local/root.crt \
+  --entrypoint node load src/load/http2-check.ts https://caddy:8443 10
+```
+
+A browser on the host can use `https://localhost:8443` once it trusts the root certificate:
+`docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt .`
 
 ### In Docker, the way the numbers are meant to be taken
 
@@ -214,13 +241,14 @@ different settings first (it did, when `LOG_FILE` was set for `up` but not for `
 
 Flags: `--transport`, `--viewers` (500), `--rate` (30), `--ramp` (new connections per second,
 100), `--warmup` (10 s), `--duration` (60 s), `--workers` (auto), `--drain-ms` (5000), `--url`,
-`--drop-per-second`, `--restart-at`, `--slow`, `--slow-read-bps` (1000).
+`--drop-per-second`, `--restart-at`, `--slow`, `--slow-read-bps` (1000), `--proxy-metrics-url`,
+`--label` (added to the report's file name).
 
 Without Docker, against `npm start`: `npm run load -- --transport ws --viewers 200`. This is fine
 for trying things out, but then the server has the whole Mac to itself, and the numbers are not
 comparable with the Docker runs.
 
-Not covered yet: T6 (Caddy and TLS) and T7 (real browsers).
+Not covered yet: T7 (real browsers).
 
 ## Layout
 
@@ -236,8 +264,9 @@ src/client/transports.ts    client side of the four transports, no DOM
 src/client/live-canvas.ts   ordering, de-duplication and resync, no DOM
 src/client/main.ts          the page's UI
 src/load/                   the load tool: main.ts (CLI), run.ts, viewers.ts (worker thread),
-                            throttle-proxy.ts (T5)
+                            throttle-proxy.ts (T5), proxy-metrics.ts and http2-check.ts (T6)
 scripts/load-matrix.sh      the load test for every transport, each on a fresh server container
-compose.yaml, Dockerfile    server with 1 CPU and 1 GB, load tool next to it
+compose.yaml, Dockerfile    server with 1 CPU and 1 GB, Caddy (T6), load tool next to them
+Caddyfile                   Caddy with TLS from its local CA, for T6
 test/                       unit tests, end-to-end tests for every transport, load tool tests
 ```

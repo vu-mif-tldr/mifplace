@@ -20,6 +20,9 @@ const { values } = parseArgs({
     'restart-at': { type: 'string' },
     slow: { type: 'string' },
     'slow-read-bps': { type: 'string' },
+    'proxy-metrics-url': { type: 'string' },
+    /** Added to the report's file name, to tell variants apart (e.g. "encode"). */
+    label: { type: 'string' },
     out: { type: 'string', default: 'results' },
   },
 });
@@ -50,6 +53,7 @@ const options: LoadOptions = {
   restartAtS: number(values['restart-at'], defaults.restartAtS),
   slowViewers: number(values.slow, defaults.slowViewers),
   slowReadBytesPerSecond: number(values['slow-read-bps'], defaults.slowReadBytesPerSecond),
+  proxyMetricsUrl: values['proxy-metrics-url'] ?? defaults.proxyMetricsUrl,
 };
 
 const log = (line: string) => console.log(`[${new Date().toISOString().slice(11, 19)}] ${line}`);
@@ -60,8 +64,9 @@ const stamp = report.startedAt.replace(/[:.]/g, '-').slice(0, 19);
 // T4 runs once with the event log in a file and once in memory: the name tells them apart.
 const variant =
   report.scenario === 't4' ? (report.environment.server.persistentLog ? '-file' : '-memory') : '';
+const label = values.label === undefined ? '' : `-${values.label}`;
 const name =
-  `${stamp}-${report.scenario}${variant}-${transport}-` +
+  `${stamp}-${report.scenario}${variant}${label}-${transport}-` +
   `${options.viewers}v-${options.rate}r.json`;
 await mkdir(values.out, { recursive: true });
 await writeFile(path.join(values.out, name), `${JSON.stringify(report, null, 2)}\n`);
@@ -118,6 +123,12 @@ function summarize(r: LoadReport): string {
       `slow         ${r.slow.viewers} viewers at ${r.slow.readBytesPerSecond} B/s: ` +
         `${ms(r.slow.delivery)}, gaps ${r.slow.stats.gaps}, resyncs ${r.slow.stats.resyncs}, ` +
         `reconnects ${r.slow.stats.reconnects}, behind at end ${r.slow.behind}`
+    );
+  }
+  if (r.proxy !== undefined) {
+    lines.push(
+      `proxy        cpu avg ${r.proxy.cpuPercent.avg}% max ${r.proxy.cpuPercent.max}%  ` +
+        `rss max ${r.proxy.rssMbMax} MB  (${o.url})`
     );
   }
   const checks = Object.entries(r.verdict.checks)

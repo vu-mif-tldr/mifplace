@@ -15,6 +15,7 @@ import {
   type ViewerPoolReport,
 } from './common.ts';
 import { Histogram, type HistogramSummary } from './histogram.ts';
+import { ProxySampler, type ProxySample } from './proxy-metrics.ts';
 import { startThrottleProxy } from './throttle-proxy.ts';
 
 export interface LoadOptions {
@@ -42,6 +43,8 @@ export interface LoadOptions {
   slowViewers: number;
   /** T5: how fast the slow viewers read, in bytes per second. */
   slowReadBytesPerSecond: number;
+  /** T6: Prometheus endpoint of the reverse proxy, for its CPU and memory. '' = none. */
+  proxyMetricsUrl: string;
 }
 
 export const DEFAULT_LOAD_OPTIONS: LoadOptions = {
@@ -60,6 +63,7 @@ export const DEFAULT_LOAD_OPTIONS: LoadOptions = {
   restartAtS: 0,
   slowViewers: 0,
   slowReadBytesPerSecond: 1_000,
+  proxyMetricsUrl: '',
 };
 
 export interface LoadHooks {
@@ -67,8 +71,8 @@ export interface LoadHooks {
   restartServer(url: string): Promise<void>;
 }
 
-/** T2 is T1 with more viewers, so it has no scenario of its own. */
-export type Scenario = 't1' | 't3' | 't4' | 't5';
+/** T2 is T1 with more viewers, so it has no scenario of its own. T6 is T1 through a TLS proxy. */
+export type Scenario = 't1' | 't3' | 't4' | 't5' | 't6';
 
 // Thresholds from ADR-0003.
 const TARGET_P95_MS = 1_000;
@@ -143,6 +147,8 @@ export interface LoadReport {
   restart?: { downS: number | null; allCaughtUpS: number | null; targetId: number | null };
   /** T5 */
   slow?: ViewerGroup & { readBytesPerSecond: number };
+  /** T6: the reverse proxy's own use, per second over the window. */
+  proxy?: { cpuPercent: { avg: number; max: number }; rssMbMax: number; samples: ProxySample[] };
   verdict: {
     scenario: Scenario;
     result: 'pass' | 'fail' | 'inconclusive' | 'not applicable';
@@ -227,7 +233,9 @@ export async function runLoad(
     ...options.client,
   });
   await writer.start();
-  if (!(await until(() => writer.state === 'open', 10_000))) {
+  // A long poll counts as open when its headers arrive, which a proxy may hold back until the
+  // body (Caddy with `encode`), so allow as long as for the viewers.
+  if (!(await until(() => writer.state === 'open', options.connectTimeoutS * 1_000))) {
     throw new Error('the writer did not connect');
   }
   let measuring = false;
@@ -263,6 +271,10 @@ export async function runLoad(
   const drops = { requested: 0, applied: 0 };
   let dropsOwed = 0;
   let missedSamples = 0;
+  const proxySampler =
+    options.proxyMetricsUrl === '' ? null : new ProxySampler(options.proxyMetricsUrl);
+  const proxySamples: ProxySample[] = [];
+  await proxySampler?.sample();
   let restartWatch: Promise<NonNullable<LoadReport['restart']>> | null = null;
 
   /** T4: restart the server, then time how long until it answers and everyone caught up. */
@@ -313,6 +325,8 @@ export async function runLoad(
     } catch {
       missedSamples++;
     }
+    const proxySample = await proxySampler?.sample().catch(() => null);
+    if (proxySample) proxySamples.push(proxySample);
     generatorSamples.push(generator.sample());
     const sample = samples.at(-1);
     if (second % 10 === 0 && sample !== undefined) {
@@ -436,6 +450,18 @@ export async function runLoad(
     ...(scenario === 't5'
       ? { slow: { ...slow.group, readBytesPerSecond: options.slowReadBytesPerSecond } }
       : {}),
+    ...(proxySampler === null
+      ? {}
+      : {
+          proxy: {
+            cpuPercent: {
+              avg: avg(proxySamples.map((s) => s.cpuPercent)),
+              max: max(proxySamples.map((s) => s.cpuPercent)),
+            },
+            rssMbMax: max(proxySamples.map((s) => s.rssMb)),
+            samples: proxySamples,
+          },
+        }),
     warnings,
   };
   return { ...report, verdict: judge(report, viewers.p95) };
@@ -451,7 +477,9 @@ function judge(report: Omit<LoadReport, 'verdict'>, p95: number): LoadReport['ve
   let result: LoadReport['verdict']['result'] | null = null;
 
   switch (report.scenario) {
+    // T6 has the conditions of T1: the proxy must not change the result.
     case 't1':
+    case 't6':
       checks = {
         'p95 at most 1 s': withinTarget,
         'no lost events': noLostEvents,
@@ -519,7 +547,8 @@ function scenarioOf(options: LoadOptions): Scenario {
   if (options.restartAtS > options.durationS) {
     throw new Error('the restart must happen inside the measurement window');
   }
-  return chosen[0] ?? 't1';
+  // Over HTTPS the load can only go through the TLS proxy: the server itself speaks plain HTTP.
+  return chosen[0] ?? (new URL(options.url).protocol === 'https:' ? 't6' : 't1');
 }
 
 /** Adds up the reports of several worker threads. */

@@ -4,7 +4,8 @@
 #   docker compose up -d --build server
 #   docker compose run --rm --no-deps load --transport ws --viewers 500
 #
-# scripts/load-matrix.sh runs every transport, each against a fresh server.
+# scripts/load-matrix.sh runs every transport, each against a fresh server; with PROXY=caddy it
+# goes through Caddy with TLS (T6).
 #
 # Both services use one image, built by `server`: a separate `load` image would not be rebuilt by
 # `docker compose build` (its profile is inactive) and would silently run old code.
@@ -13,6 +14,7 @@
 #   BATCH_MS            batch interval (100)
 #   MAX_BUFFERED_BYTES  unsent data per client before it counts as slow and is dropped (262144)
 #   LOG_FILE            e.g. data/events.jsonl: keep the event log across a restart (T4)
+#   CADDY_ENCODE        e.g. "encode zstd gzip": compression in Caddy (T6)
 
 services:
   server:
@@ -34,6 +36,28 @@ services:
     ulimits:
       nofile: { soft: 65535, hard: 65535 }
 
+  # T6: TLS, HTTP/2 and HTTP/3 in front of the server, as in production. https://localhost:8443
+  # from the host; the browser has to trust Caddy's local root certificate first.
+  caddy:
+    image: caddy:2.11.7-alpine
+    profiles: [tls]
+    depends_on: [server]
+    environment:
+      CADDY_ENCODE: ${CADDY_ENCODE:-}
+    ports:
+      - '8443:8443/tcp'
+      - '8443:8443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    # Production shares one small VM between Caddy and Node; here each gets one CPU, and the load
+    # tool reports Caddy's use separately.
+    cpus: 1
+    # Generous on purpose: T6 measures how much Caddy needs (about 250 KB per proxied stream).
+    mem_limit: 1g
+    ulimits:
+      nofile: { soft: 65535, hard: 65535 }
+
   load:
     image: realtime-transport-prototype
     pull_policy: never
@@ -48,5 +72,10 @@ services:
       - http://server:3100
     volumes:
       - ./results:/app/results
+      # Caddy's local CA, for NODE_EXTRA_CA_CERTS in T6 runs.
+      - caddy-data:/caddy-data:ro
     ulimits:
       nofile: { soft: 65535, hard: 65535 }
+
+volumes:
+  caddy-data:
