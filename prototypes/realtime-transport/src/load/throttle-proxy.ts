@@ -30,15 +30,20 @@ export async function startThrottleProxy(
     client.on('error', () => upstream.destroy());
     upstream.on('error', () => client.destroy());
 
+    // 100 ms worth of bytes at a time: a large chunk (a catch-up response) trickles out as on a
+    // slow link. Delaying it whole would hold back even its headers for minutes.
+    const slice = Math.max(1, Math.floor(bytesPerSecond / 10));
     let delivered = Promise.resolve();
     upstream.on('data', (chunk: Buffer) => {
       upstream.pause();
-      delivered = delivered
-        .then(() => sleep((chunk.length / bytesPerSecond) * 1_000))
-        .then(() => {
-          if (!client.destroyed) client.write(chunk);
-          upstream.resume();
-        });
+      delivered = delivered.then(async () => {
+        for (let offset = 0; offset < chunk.length && !client.destroyed; offset += slice) {
+          const part = chunk.subarray(offset, offset + slice);
+          await sleep((part.length / bytesPerSecond) * 1_000);
+          client.write(part);
+        }
+        upstream.resume();
+      });
     });
     // On a real slow link the server's FIN arrives after its data, so the client still gets
     // everything the server sent before it closed (a keep-alive timeout, a dropped client).
