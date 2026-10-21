@@ -44,7 +44,6 @@ function onMouseDown(event: MouseEvent) {
 function onMouseMove(event: MouseEvent) {
   if (!dragging) return;
 
-  // moving less than 4px still counts as a click, not a drag
   if (Math.hypot(event.clientX - startX, event.clientY - startY) > 4) moved = true;
   if (!moved) return;
 
