@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-10-21T21:50:29.801Z",
+  "startedAt": "2026-10-21T22:43:42.600Z",
   "scenario": "t4",
   "options": {
     "url": "http://server:3100",
@@ -40,7 +40,7 @@
     "failed": 0,
     "behind": 0,
     "stats": {
-      "applied": 882500,
+      "applied": 884339,
       "duplicates": 0,
       "gaps": 0,
       "resyncs": 0,
@@ -48,52 +48,52 @@
       "snapshotFailures": 0
     },
     "delivery": {
-      "count": 882500,
-      "mean": 81,
-      "p50": 64,
-      "p95": 127,
-      "p99": 577,
-      "max": 8871
+      "count": 884339,
+      "mean": 75,
+      "p50": 63,
+      "p95": 119,
+      "p99": 426,
+      "max": 9607
     },
     "outages": {
       "count": 500,
-      "mean": 1740,
-      "p50": 1517,
-      "p95": 3778,
-      "p99": 4603,
-      "max": 8745
+      "mean": 1481,
+      "p50": 1289,
+      "p95": 2591,
+      "p99": 4125,
+      "max": 9509
     },
-    "eventsInWindow": 2657
+    "eventsInWindow": 2660
   },
   "placements": {
-    "sent": 1789,
-    "failed": 26,
+    "sent": 1791,
+    "failed": 24,
     "perSecond": 29.8,
     "rttMs": {
-      "count": 1763,
-      "mean": 7,
+      "count": 1767,
+      "mean": 13,
       "p50": 2,
-      "p95": 20,
-      "p99": 57,
-      "max": 1016
+      "p95": 25,
+      "p99": 126,
+      "max": 1316
     }
   },
   "server": {
     "cpuPercent": {
-      "avg": 55.9,
-      "max": 80.8
+      "avg": 60.3,
+      "max": 113.6
     },
-    "eventLoopWorstSecondP99Ms": 65.7,
+    "eventLoopWorstSecondP99Ms": 246.2,
     "rssMb": {
-      "atStart": 148,
-      "max": 149.1
+      "atStart": 154,
+      "max": 156
     },
-    "heapUsedMbMax": 33.1,
+    "heapUsedMbMax": 37.1,
     "perSecond": {
-      "messages": 4650.3,
-      "batches": 9.8,
+      "messages": 4668.9,
+      "batches": 9.7,
       "placeRequests": 29.4,
-      "lp": 4800.4,
+      "lp": 4778.3,
       "poll": 0
     },
     "totals": {
@@ -106,35 +106,35 @@
     "samples": [
       {
         "t": 1,
-        "cpuPercent": 56.3,
+        "cpuPercent": 59.6,
         "eventLoopMs": {
-          "p50": 0.2,
-          "p99": 19.6,
-          "max": 29.4
+          "p50": 0.9,
+          "p99": 18.5,
+          "max": 27.5
         },
-        "rssMb": 148.4,
-        "heapUsedMb": 27.1,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 154.4,
+        "heapUsedMb": 20.4,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 328,
+        "lastEventId": 329,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 500
+          "lp": 370
         },
         "requests": {
-          "place": 328,
-          "lp": 53901,
+          "place": 329,
+          "lp": 54923,
           "poll": 0
         },
         "counters": {
-          "batches": 108,
-          "messages": 51764,
+          "batches": 109,
+          "messages": 54306,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -142,35 +142,35 @@
       },
       {
         "t": 2,
-        "cpuPercent": 70.4,
+        "cpuPercent": 67,
         "eventLoopMs": {
-          "p50": 0.6,
-          "p99": 25.1,
-          "max": 29
+          "p50": 1,
+          "p99": 39.7,
+          "max": 40.8
         },
-        "rssMb": 148,
-        "heapUsedMb": 14.4,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 154.3,
+        "heapUsedMb": 30.2,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 358,
+        "lastEventId": 359,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 501
+          "lp": 492
         },
         "requests": {
-          "place": 358,
-          "lp": 58912,
+          "place": 359,
+          "lp": 60055,
           "poll": 0
         },
         "counters": {
-          "batches": 118,
-          "messages": 56772,
+          "batches": 119,
+          "messages": 59318,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -178,35 +178,35 @@
       },
       {
         "t": 3,
-        "cpuPercent": 61.5,
+        "cpuPercent": 55.6,
         "eventLoopMs": {
-          "p50": 0.6,
-          "p99": 27.8,
-          "max": 45.4
+          "p50": 0.7,
+          "p99": 30.5,
+          "max": 34.7
         },
-        "rssMb": 147.7,
-        "heapUsedMb": 21.1,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 154.6,
+        "heapUsedMb": 27.7,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 388,
+        "lastEventId": 389,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 501
+          "lp": 53
         },
         "requests": {
-          "place": 388,
-          "lp": 63922,
+          "place": 389,
+          "lp": 64626,
           "poll": 0
         },
         "counters": {
-          "batches": 128,
-          "messages": 61783,
+          "batches": 129,
+          "messages": 64328,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -214,15 +214,15 @@
       },
       {
         "t": 4,
-        "cpuPercent": 60.2,
+        "cpuPercent": 59.9,
         "eventLoopMs": {
-          "p50": 0.5,
-          "p99": 21.4,
-          "max": 22.3
+          "p50": 0.9,
+          "p99": 35.4,
+          "max": 35.9
         },
-        "rssMb": 148,
-        "heapUsedMb": 20.6,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 154.6,
+        "heapUsedMb": 22.4,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
@@ -237,12 +237,12 @@
         },
         "requests": {
           "place": 418,
-          "lp": 68932,
+          "lp": 69583,
           "poll": 0
         },
         "counters": {
           "batches": 138,
-          "messages": 66795,
+          "messages": 68840,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -250,15 +250,15 @@
       },
       {
         "t": 5,
-        "cpuPercent": 62.6,
+        "cpuPercent": 57.1,
         "eventLoopMs": {
-          "p50": 0.6,
-          "p99": 27.7,
-          "max": 31.3
+          "p50": 1,
+          "p99": 34.5,
+          "max": 36.1
         },
-        "rssMb": 148.3,
-        "heapUsedMb": 25.8,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 154.3,
+        "heapUsedMb": 22.7,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
@@ -267,18 +267,18 @@
         },
         "lastEventId": 448,
         "connections": {
-          "ws": 0,
+          "ws": 1,
           "sse": 0,
-          "lp": 384
+          "lp": 501
         },
         "requests": {
           "place": 448,
-          "lp": 73825,
+          "lp": 74593,
           "poll": 0
         },
         "counters": {
           "batches": 148,
-          "messages": 71807,
+          "messages": 73851,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -286,35 +286,35 @@
       },
       {
         "t": 6,
-        "cpuPercent": 65,
+        "cpuPercent": 54.3,
         "eventLoopMs": {
           "p50": 0.8,
-          "p99": 38,
-          "max": 45.2
+          "p99": 27.2,
+          "max": 37.5
         },
-        "rssMb": 148.5,
-        "heapUsedMb": 20.2,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 154.4,
+        "heapUsedMb": 24.3,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 476,
+        "lastEventId": 478,
         "connections": {
           "ws": 0,
           "sse": 0,
           "lp": 501
         },
         "requests": {
-          "place": 476,
-          "lp": 78952,
+          "place": 478,
+          "lp": 79603,
           "poll": 0
         },
         "counters": {
           "batches": 158,
-          "messages": 76679,
+          "messages": 78861,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -322,35 +322,35 @@
       },
       {
         "t": 7,
-        "cpuPercent": 66.6,
+        "cpuPercent": 63.1,
         "eventLoopMs": {
-          "p50": 0.6,
-          "p99": 29.5,
-          "max": 98.1
+          "p50": 0.9,
+          "p99": 35.4,
+          "max": 38
         },
-        "rssMb": 148.1,
-        "heapUsedMb": 24.6,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 154.6,
+        "heapUsedMb": 25.7,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 505,
+        "lastEventId": 508,
         "connections": {
-          "ws": 1,
+          "ws": 0,
           "sse": 0,
-          "lp": 367
+          "lp": 501
         },
         "requests": {
-          "place": 505,
-          "lp": 83792,
+          "place": 508,
+          "lp": 84613,
           "poll": 0
         },
         "counters": {
           "batches": 168,
-          "messages": 80804,
+          "messages": 83872,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -358,35 +358,35 @@
       },
       {
         "t": 8,
-        "cpuPercent": 72,
+        "cpuPercent": 52.7,
         "eventLoopMs": {
-          "p50": 0.8,
-          "p99": 39.9,
-          "max": 45.1
+          "p50": 1,
+          "p99": 23.8,
+          "max": 24.4
         },
-        "rssMb": 148.2,
-        "heapUsedMb": 26.9,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 154.7,
+        "heapUsedMb": 33.5,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 534,
+        "lastEventId": 538,
         "connections": {
           "ws": 0,
           "sse": 0,
           "lp": 501
         },
         "requests": {
-          "place": 534,
-          "lp": 88337,
+          "place": 538,
+          "lp": 89623,
           "poll": 0
         },
         "counters": {
-          "batches": 177,
-          "messages": 84469,
+          "batches": 178,
+          "messages": 88882,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -394,35 +394,35 @@
       },
       {
         "t": 9,
-        "cpuPercent": 57.5,
+        "cpuPercent": 63.8,
         "eventLoopMs": {
-          "p50": 0.7,
-          "p99": 21.8,
-          "max": 31.5
+          "p50": 0.8,
+          "p99": 27,
+          "max": 27.2
         },
-        "rssMb": 148.2,
-        "heapUsedMb": 20.9,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 154.4,
+        "heapUsedMb": 25.9,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 564,
+        "lastEventId": 568,
         "connections": {
           "ws": 0,
           "sse": 0,
           "lp": 501
         },
         "requests": {
-          "place": 564,
-          "lp": 93347,
+          "place": 568,
+          "lp": 94633,
           "poll": 0
         },
         "counters": {
-          "batches": 187,
-          "messages": 89396,
+          "batches": 188,
+          "messages": 93893,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -430,35 +430,35 @@
       },
       {
         "t": 10,
-        "cpuPercent": 61.7,
+        "cpuPercent": 58.9,
         "eventLoopMs": {
-          "p50": 0.5,
-          "p99": 48,
-          "max": 93.4
+          "p50": 1.1,
+          "p99": 29.9,
+          "max": 35
         },
-        "rssMb": 148.4,
-        "heapUsedMb": 26.2,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 155.9,
+        "heapUsedMb": 24.9,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 594,
+        "lastEventId": 598,
         "connections": {
           "ws": 0,
           "sse": 0,
           "lp": 501
         },
         "requests": {
-          "place": 594,
-          "lp": 98357,
+          "place": 598,
+          "lp": 99643,
           "poll": 0
         },
         "counters": {
-          "batches": 197,
-          "messages": 94386,
+          "batches": 198,
+          "messages": 98903,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -466,35 +466,35 @@
       },
       {
         "t": 11,
-        "cpuPercent": 48.2,
+        "cpuPercent": 58.1,
         "eventLoopMs": {
-          "p50": 0.4,
-          "p99": 23.7,
-          "max": 30.9
+          "p50": 1,
+          "p99": 30.1,
+          "max": 37
         },
-        "rssMb": 148.7,
-        "heapUsedMb": 29.3,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 155.7,
+        "heapUsedMb": 24.8,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 624,
+        "lastEventId": 627,
         "connections": {
           "ws": 0,
           "sse": 0,
           "lp": 501
         },
         "requests": {
-          "place": 624,
-          "lp": 103367,
+          "place": 627,
+          "lp": 104653,
           "poll": 0
         },
         "counters": {
-          "batches": 207,
-          "messages": 99398,
+          "batches": 208,
+          "messages": 103914,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -502,35 +502,35 @@
       },
       {
         "t": 12,
-        "cpuPercent": 48.6,
+        "cpuPercent": 54.7,
         "eventLoopMs": {
-          "p50": 0.5,
-          "p99": 18.5,
-          "max": 20.8
+          "p50": 0.9,
+          "p99": 28.6,
+          "max": 30.5
         },
-        "rssMb": 148.3,
-        "heapUsedMb": 21,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 156,
+        "heapUsedMb": 24.6,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 654,
+        "lastEventId": 657,
         "connections": {
           "ws": 0,
           "sse": 0,
           "lp": 501
         },
         "requests": {
-          "place": 654,
-          "lp": 108377,
+          "place": 657,
+          "lp": 109663,
           "poll": 0
         },
         "counters": {
-          "batches": 217,
-          "messages": 104408,
+          "batches": 218,
+          "messages": 108924,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -538,35 +538,35 @@
       },
       {
         "t": 13,
-        "cpuPercent": 42,
+        "cpuPercent": 59.8,
         "eventLoopMs": {
-          "p50": 0.4,
-          "p99": 18.2,
-          "max": 21
+          "p50": 0.9,
+          "p99": 37,
+          "max": 40.3
         },
-        "rssMb": 148.3,
-        "heapUsedMb": 21.7,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 155.6,
+        "heapUsedMb": 23.8,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 684,
+        "lastEventId": 687,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 501
+          "lp": 480
         },
         "requests": {
-          "place": 684,
-          "lp": 113387,
+          "place": 687,
+          "lp": 114652,
           "poll": 0
         },
         "counters": {
-          "batches": 227,
-          "messages": 109419,
+          "batches": 228,
+          "messages": 113934,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -574,35 +574,35 @@
       },
       {
         "t": 14,
-        "cpuPercent": 50.2,
+        "cpuPercent": 62.4,
         "eventLoopMs": {
-          "p50": 0.6,
-          "p99": 19.6,
-          "max": 50.8
+          "p50": 1,
+          "p99": 38.6,
+          "max": 40
         },
-        "rssMb": 148.2,
-        "heapUsedMb": 25,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 155.8,
+        "heapUsedMb": 24.5,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 714,
+        "lastEventId": 717,
         "connections": {
-          "ws": 1,
+          "ws": 0,
           "sse": 0,
-          "lp": 468
+          "lp": 501
         },
         "requests": {
-          "place": 714,
-          "lp": 118364,
+          "place": 717,
+          "lp": 119683,
           "poll": 0
         },
         "counters": {
-          "batches": 237,
-          "messages": 114430,
+          "batches": 238,
+          "messages": 118945,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -610,35 +610,35 @@
       },
       {
         "t": 15,
-        "cpuPercent": 53.3,
+        "cpuPercent": 93.6,
         "eventLoopMs": {
-          "p50": 0.4,
-          "p99": 18.9,
-          "max": 29.1
+          "p50": 5.9,
+          "p99": 246.2,
+          "max": 246.2
         },
-        "rssMb": 147.9,
-        "heapUsedMb": 23.1,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 155.6,
+        "heapUsedMb": 28,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 744,
+        "lastEventId": 773,
         "connections": {
           "ws": 1,
           "sse": 0,
-          "lp": 501
+          "lp": 455
         },
         "requests": {
-          "place": 744,
-          "lp": 123407,
+          "place": 773,
+          "lp": 126698,
           "poll": 0
         },
         "counters": {
-          "batches": 247,
-          "messages": 119441,
+          "batches": 254,
+          "messages": 123767,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -646,35 +646,35 @@
       },
       {
         "t": 16,
-        "cpuPercent": 51.8,
+        "cpuPercent": 113.6,
         "eventLoopMs": {
-          "p50": 0.3,
-          "p99": 23.4,
-          "max": 28.9
+          "p50": 0,
+          "p99": 0,
+          "max": 0
         },
-        "rssMb": 148.4,
-        "heapUsedMb": 25.7,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 155.5,
+        "heapUsedMb": 20.6,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 774,
+        "lastEventId": 778,
         "connections": {
           "ws": 1,
           "sse": 0,
-          "lp": 450
+          "lp": 10
         },
         "requests": {
-          "place": 774,
-          "lp": 128366,
+          "place": 778,
+          "lp": 126736,
           "poll": 0
         },
         "counters": {
-          "batches": 257,
-          "messages": 124454,
+          "batches": 255,
+          "messages": 124225,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -682,15 +682,15 @@
       },
       {
         "t": 17,
-        "cpuPercent": 49,
+        "cpuPercent": 78.6,
         "eventLoopMs": {
-          "p50": 0.4,
-          "p99": 22,
-          "max": 22.4
+          "p50": 0.8,
+          "p99": 67.7,
+          "max": 67.7
         },
-        "rssMb": 148.3,
-        "heapUsedMb": 25.7,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 155.9,
+        "heapUsedMb": 22.1,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
@@ -701,16 +701,16 @@
         "connections": {
           "ws": 1,
           "sse": 0,
-          "lp": 501
+          "lp": 386
         },
         "requests": {
           "place": 804,
-          "lp": 133427,
+          "lp": 130963,
           "poll": 0
         },
         "counters": {
-          "batches": 267,
-          "messages": 129465,
+          "batches": 263,
+          "messages": 127868,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -718,15 +718,15 @@
       },
       {
         "t": 18,
-        "cpuPercent": 48.8,
+        "cpuPercent": 60.6,
         "eventLoopMs": {
-          "p50": 0.4,
-          "p99": 19.6,
-          "max": 24.9
+          "p50": 0.8,
+          "p99": 26.8,
+          "max": 27.6
         },
-        "rssMb": 148.2,
-        "heapUsedMb": 19.4,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 155.7,
+        "heapUsedMb": 22.4,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
@@ -735,18 +735,18 @@
         },
         "lastEventId": 834,
         "connections": {
-          "ws": 1,
+          "ws": 0,
           "sse": 0,
           "lp": 501
         },
         "requests": {
           "place": 834,
-          "lp": 138437,
+          "lp": 136116,
           "poll": 0
         },
         "counters": {
-          "batches": 277,
-          "messages": 134478,
+          "batches": 273,
+          "messages": 132779,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -754,15 +754,15 @@
       },
       {
         "t": 19,
-        "cpuPercent": 43,
+        "cpuPercent": 64.3,
         "eventLoopMs": {
-          "p50": 0.4,
-          "p99": 17.5,
-          "max": 19.7
+          "p50": 0.8,
+          "p99": 45.8,
+          "max": 65.5
         },
-        "rssMb": 148.3,
-        "heapUsedMb": 22.3,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 155.6,
+        "heapUsedMb": 26.9,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
@@ -773,16 +773,16 @@
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 491
+          "lp": 57
         },
         "requests": {
           "place": 864,
-          "lp": 143437,
+          "lp": 140682,
           "poll": 0
         },
         "counters": {
-          "batches": 287,
-          "messages": 139489,
+          "batches": 283,
+          "messages": 137791,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -790,35 +790,35 @@
       },
       {
         "t": 20,
-        "cpuPercent": 43.1,
+        "cpuPercent": 69.9,
         "eventLoopMs": {
-          "p50": 0.3,
-          "p99": 17.1,
-          "max": 21
+          "p50": 1,
+          "p99": 41.2,
+          "max": 44.8
         },
-        "rssMb": 148.4,
-        "heapUsedMb": 24.7,
-        "startedAt": "2026-10-21T21:50:29.095Z",
+        "rssMb": 155.7,
+        "heapUsedMb": 24.1,
+        "startedAt": "2026-10-21T22:43:41.876Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 894,
+        "lastEventId": 893,
         "connections": {
-          "ws": 1,
+          "ws": 0,
           "sse": 0,
-          "lp": 133
+          "lp": 16
         },
         "requests": {
-          "place": 894,
-          "lp": 148089,
+          "place": 893,
+          "lp": 145651,
           "poll": 0
         },
         "counters": {
-          "batches": 297,
-          "messages": 144499,
+          "batches": 293,
+          "messages": 142630,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -826,35 +826,35 @@
       },
       {
         "t": 21,
-        "cpuPercent": 40.3,
+        "cpuPercent": 96.4,
         "eventLoopMs": {
-          "p50": 0.7,
-          "p99": 4.3,
-          "max": 4.3
+          "p50": 0.8,
+          "p99": 10.9,
+          "max": 10.9
         },
-        "rssMb": 95.2,
-        "heapUsedMb": 14.3,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 94.9,
+        "heapUsedMb": 14.1,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 896,
+        "lastEventId": 898,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 51
+          "lp": 112
         },
         "requests": {
-          "place": 2,
-          "lp": 51,
+          "place": 4,
+          "lp": 304,
           "poll": 0
         },
         "counters": {
-          "batches": 0,
-          "messages": 0,
+          "batches": 1,
+          "messages": 78,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -862,35 +862,35 @@
       },
       {
         "t": 22,
-        "cpuPercent": 69.2,
+        "cpuPercent": 72.5,
         "eventLoopMs": {
-          "p50": 0.3,
-          "p99": 21.6,
-          "max": 25.4
+          "p50": 0.7,
+          "p99": 20.1,
+          "max": 25.3
         },
-        "rssMb": 118.7,
-        "heapUsedMb": 18.2,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 122.8,
+        "heapUsedMb": 29.7,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 928,
+        "lastEventId": 929,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 323
+          "lp": 391
         },
         "requests": {
-          "place": 34,
-          "lp": 2639,
+          "place": 35,
+          "lp": 3560,
           "poll": 0
         },
         "counters": {
-          "batches": 10,
-          "messages": 2051,
+          "batches": 11,
+          "messages": 2775,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -898,35 +898,35 @@
       },
       {
         "t": 23,
-        "cpuPercent": 62.9,
+        "cpuPercent": 72.6,
         "eventLoopMs": {
-          "p50": 0.3,
-          "p99": 26.1,
-          "max": 28.4
+          "p50": 0.8,
+          "p99": 32,
+          "max": 33.5
         },
-        "rssMb": 142.9,
-        "heapUsedMb": 18.5,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 142.6,
+        "heapUsedMb": 29.3,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 958,
+        "lastEventId": 959,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 452
+          "lp": 479
         },
         "requests": {
-          "place": 64,
-          "lp": 6914,
+          "place": 65,
+          "lp": 8265,
           "poll": 0
         },
         "counters": {
-          "batches": 20,
-          "messages": 6067,
+          "batches": 21,
+          "messages": 7305,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -934,35 +934,35 @@
       },
       {
         "t": 24,
-        "cpuPercent": 71.6,
+        "cpuPercent": 82.7,
         "eventLoopMs": {
-          "p50": 0.6,
-          "p99": 40.3,
-          "max": 85.2
+          "p50": 1.1,
+          "p99": 80.8,
+          "max": 80.8
         },
-        "rssMb": 145.3,
-        "heapUsedMb": 27.9,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 144.8,
+        "heapUsedMb": 23.2,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 988,
+        "lastEventId": 989,
         "connections": {
-          "ws": 0,
+          "ws": 1,
           "sse": 0,
-          "lp": 479
+          "lp": 491
         },
         "requests": {
-          "place": 94,
-          "lp": 11616,
+          "place": 95,
+          "lp": 13153,
           "poll": 0
         },
         "counters": {
-          "batches": 30,
-          "messages": 10715,
+          "batches": 31,
+          "messages": 12164,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -970,35 +970,35 @@
       },
       {
         "t": 25,
-        "cpuPercent": 58,
+        "cpuPercent": 61.7,
         "eventLoopMs": {
-          "p50": 0.5,
-          "p99": 25.3,
-          "max": 28.2
+          "p50": 0.7,
+          "p99": 25.7,
+          "max": 28.9
         },
-        "rssMb": 142.5,
-        "heapUsedMb": 21.9,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 140.8,
+        "heapUsedMb": 18.8,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1018,
+        "lastEventId": 1019,
         "connections": {
-          "ws": 0,
+          "ws": 1,
           "sse": 0,
-          "lp": 405
+          "lp": 323
         },
         "requests": {
-          "place": 124,
-          "lp": 16451,
+          "place": 125,
+          "lp": 17970,
           "poll": 0
         },
         "counters": {
-          "batches": 40,
-          "messages": 15564,
+          "batches": 41,
+          "messages": 17142,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1006,15 +1006,15 @@
       },
       {
         "t": 26,
-        "cpuPercent": 58.5,
+        "cpuPercent": 53.2,
         "eventLoopMs": {
-          "p50": 0.6,
-          "p99": 18.5,
-          "max": 55.6
+          "p50": 0.7,
+          "p99": 17.2,
+          "max": 19.3
         },
-        "rssMb": 143.4,
-        "heapUsedMb": 26.5,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 141.3,
+        "heapUsedMb": 22.1,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
@@ -1023,18 +1023,18 @@
         },
         "lastEventId": 1048,
         "connections": {
-          "ws": 0,
+          "ws": 1,
           "sse": 0,
-          "lp": 497
+          "lp": 500
         },
         "requests": {
           "place": 154,
-          "lp": 21517,
+          "lp": 23147,
           "poll": 0
         },
         "counters": {
-          "batches": 50,
-          "messages": 20498,
+          "batches": 51,
+          "messages": 22142,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1042,35 +1042,35 @@
       },
       {
         "t": 27,
-        "cpuPercent": 80.8,
+        "cpuPercent": 53.9,
         "eventLoopMs": {
-          "p50": 1,
-          "p99": 57.6,
-          "max": 71.6
+          "p50": 0.4,
+          "p99": 18,
+          "max": 19.6
         },
-        "rssMb": 143.7,
-        "heapUsedMb": 17.8,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 142.4,
+        "heapUsedMb": 32.8,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1075,
+        "lastEventId": 1079,
         "connections": {
-          "ws": 1,
+          "ws": 0,
           "sse": 0,
-          "lp": 498
+          "lp": 169
         },
         "requests": {
-          "place": 181,
-          "lp": 25733,
+          "place": 185,
+          "lp": 27816,
           "poll": 0
         },
         "counters": {
-          "batches": 60,
-          "messages": 23506,
+          "batches": 61,
+          "messages": 27143,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1078,35 +1078,35 @@
       },
       {
         "t": 28,
-        "cpuPercent": 68.8,
+        "cpuPercent": 53.6,
         "eventLoopMs": {
           "p50": 0.5,
-          "p99": 48.4,
-          "max": 52.4
+          "p99": 16.8,
+          "max": 20.8
         },
-        "rssMb": 144,
-        "heapUsedMb": 22.2,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 143.6,
+        "heapUsedMb": 25.3,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1105,
+        "lastEventId": 1108,
         "connections": {
-          "ws": 0,
+          "ws": 1,
           "sse": 0,
-          "lp": 86
+          "lp": 378
         },
         "requests": {
-          "place": 211,
-          "lp": 30295,
+          "place": 214,
+          "lp": 33025,
           "poll": 0
         },
         "counters": {
-          "batches": 70,
-          "messages": 28225,
+          "batches": 71,
+          "messages": 32143,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1114,35 +1114,35 @@
       },
       {
         "t": 29,
-        "cpuPercent": 56.9,
+        "cpuPercent": 53.1,
         "eventLoopMs": {
-          "p50": 0.2,
-          "p99": 25.4,
-          "max": 33
+          "p50": 0.3,
+          "p99": 16.7,
+          "max": 22
         },
-        "rssMb": 145.8,
-        "heapUsedMb": 26.3,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 143.8,
+        "heapUsedMb": 13.5,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1135,
+        "lastEventId": 1138,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 70
+          "lp": 500
         },
         "requests": {
-          "place": 241,
-          "lp": 35270,
+          "place": 244,
+          "lp": 38147,
           "poll": 0
         },
         "counters": {
-          "batches": 80,
-          "messages": 33214,
+          "batches": 81,
+          "messages": 37122,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1150,35 +1150,35 @@
       },
       {
         "t": 30,
-        "cpuPercent": 51.8,
+        "cpuPercent": 46.4,
         "eventLoopMs": {
-          "p50": 0.2,
-          "p99": 20,
-          "max": 23.8
+          "p50": 0.4,
+          "p99": 17.7,
+          "max": 19.6
         },
-        "rssMb": 146.1,
-        "heapUsedMb": 29.2,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 144.4,
+        "heapUsedMb": 25.6,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1165,
+        "lastEventId": 1169,
         "connections": {
-          "ws": 0,
+          "ws": 1,
           "sse": 0,
-          "lp": 7
+          "lp": 501
         },
         "requests": {
-          "place": 271,
-          "lp": 40217,
+          "place": 275,
+          "lp": 43153,
           "poll": 0
         },
         "counters": {
-          "batches": 90,
-          "messages": 38224,
+          "batches": 91,
+          "messages": 42127,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1186,35 +1186,35 @@
       },
       {
         "t": 31,
-        "cpuPercent": 48.5,
+        "cpuPercent": 55.4,
         "eventLoopMs": {
-          "p50": 0.3,
-          "p99": 13.6,
-          "max": 18
+          "p50": 0.7,
+          "p99": 23,
+          "max": 24.4
         },
-        "rssMb": 146.5,
-        "heapUsedMb": 22.8,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 144.7,
+        "heapUsedMb": 25.3,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1195,
+        "lastEventId": 1198,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 1
+          "lp": 501
         },
         "requests": {
-          "place": 301,
-          "lp": 45221,
+          "place": 304,
+          "lp": 48163,
           "poll": 0
         },
         "counters": {
-          "batches": 100,
-          "messages": 43236,
+          "batches": 101,
+          "messages": 47138,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1222,35 +1222,35 @@
       },
       {
         "t": 32,
-        "cpuPercent": 44.7,
+        "cpuPercent": 65,
         "eventLoopMs": {
-          "p50": 0.3,
-          "p99": 14.5,
-          "max": 17.3
+          "p50": 0.4,
+          "p99": 19.3,
+          "max": 22.8
         },
-        "rssMb": 146.5,
-        "heapUsedMb": 22.4,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 147,
+        "heapUsedMb": 25,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1225,
+        "lastEventId": 1228,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 501
+          "lp": 42
         },
         "requests": {
-          "place": 331,
-          "lp": 50230,
+          "place": 334,
+          "lp": 52627,
           "poll": 0
         },
         "counters": {
-          "batches": 109,
-          "messages": 47745,
+          "batches": 111,
+          "messages": 51869,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1258,35 +1258,35 @@
       },
       {
         "t": 33,
-        "cpuPercent": 54.3,
+        "cpuPercent": 53.1,
         "eventLoopMs": {
-          "p50": 0.5,
-          "p99": 22,
-          "max": 38.6
+          "p50": 0.4,
+          "p99": 24.8,
+          "max": 25.7
         },
-        "rssMb": 146.2,
-        "heapUsedMb": 24.6,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 147.4,
+        "heapUsedMb": 29,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1253,
+        "lastEventId": 1258,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 240
+          "lp": 196
         },
         "requests": {
-          "place": 359,
-          "lp": 54979,
+          "place": 364,
+          "lp": 57744,
           "poll": 0
         },
         "counters": {
-          "batches": 119,
-          "messages": 52757,
+          "batches": 121,
+          "messages": 56681,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1294,35 +1294,35 @@
       },
       {
         "t": 34,
-        "cpuPercent": 58.5,
+        "cpuPercent": 49.2,
         "eventLoopMs": {
-          "p50": 0.6,
-          "p99": 19.9,
-          "max": 27.2
+          "p50": 0.4,
+          "p99": 24.7,
+          "max": 29
         },
-        "rssMb": 146.6,
-        "heapUsedMb": 27,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 147.5,
+        "heapUsedMb": 17.5,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1283,
+        "lastEventId": 1288,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 501
+          "lp": 210
         },
         "requests": {
-          "place": 389,
-          "lp": 60250,
+          "place": 394,
+          "lp": 62768,
           "poll": 0
         },
         "counters": {
-          "batches": 129,
-          "messages": 57504,
+          "batches": 131,
+          "messages": 61693,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1330,35 +1330,35 @@
       },
       {
         "t": 35,
-        "cpuPercent": 77.9,
+        "cpuPercent": 44.2,
         "eventLoopMs": {
-          "p50": 0.7,
-          "p99": 33.8,
-          "max": 36.6
+          "p50": 0.4,
+          "p99": 23.5,
+          "max": 25.8
         },
-        "rssMb": 146.8,
-        "heapUsedMb": 12.7,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 147.5,
+        "heapUsedMb": 17.8,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1313,
+        "lastEventId": 1318,
         "connections": {
           "ws": 1,
           "sse": 0,
-          "lp": 53
+          "lp": 126
         },
         "requests": {
-          "place": 419,
-          "lp": 64766,
+          "place": 424,
+          "lp": 67694,
           "poll": 0
         },
         "counters": {
-          "batches": 139,
-          "messages": 61487,
+          "batches": 141,
+          "messages": 66706,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1366,35 +1366,35 @@
       },
       {
         "t": 36,
-        "cpuPercent": 69.8,
+        "cpuPercent": 50.6,
         "eventLoopMs": {
-          "p50": 1.2,
-          "p99": 65.7,
-          "max": 72.8
+          "p50": 0.5,
+          "p99": 19.7,
+          "max": 19.7
         },
-        "rssMb": 147.2,
-        "heapUsedMb": 24.3,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 147.4,
+        "heapUsedMb": 17.4,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1342,
+        "lastEventId": 1348,
         "connections": {
-          "ws": 1,
+          "ws": 0,
           "sse": 0,
-          "lp": 117
+          "lp": 3
         },
         "requests": {
-          "place": 448,
-          "lp": 69306,
+          "place": 454,
+          "lp": 72581,
           "poll": 0
         },
         "counters": {
-          "batches": 149,
-          "messages": 63164,
+          "batches": 151,
+          "messages": 71616,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1402,35 +1402,35 @@
       },
       {
         "t": 37,
-        "cpuPercent": 68.3,
+        "cpuPercent": 50.6,
         "eventLoopMs": {
-          "p50": 0.6,
-          "p99": 28.2,
-          "max": 60
+          "p50": 0.3,
+          "p99": 17.4,
+          "max": 21.3
         },
-        "rssMb": 147.3,
-        "heapUsedMb": 25.8,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 147.4,
+        "heapUsedMb": 15.8,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1372,
+        "lastEventId": 1378,
         "connections": {
-          "ws": 1,
+          "ws": 0,
           "sse": 0,
-          "lp": 383
+          "lp": 501
         },
         "requests": {
-          "place": 478,
-          "lp": 74493,
+          "place": 484,
+          "lp": 77588,
           "poll": 0
         },
         "counters": {
-          "batches": 159,
-          "messages": 67986,
+          "batches": 160,
+          "messages": 76128,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1438,35 +1438,35 @@
       },
       {
         "t": 38,
-        "cpuPercent": 66.3,
+        "cpuPercent": 50.2,
         "eventLoopMs": {
-          "p50": 0.8,
-          "p99": 56.2,
-          "max": 58.6
+          "p50": 0.3,
+          "p99": 18.1,
+          "max": 21.2
         },
-        "rssMb": 148.6,
-        "heapUsedMb": 29.5,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 148,
+        "heapUsedMb": 16.9,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1402,
+        "lastEventId": 1408,
         "connections": {
-          "ws": 1,
+          "ws": 0,
           "sse": 0,
-          "lp": 101
+          "lp": 501
         },
         "requests": {
-          "place": 508,
-          "lp": 79101,
+          "place": 514,
+          "lp": 82598,
           "poll": 0
         },
         "counters": {
-          "batches": 169,
-          "messages": 72770,
+          "batches": 170,
+          "messages": 81141,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1474,35 +1474,35 @@
       },
       {
         "t": 39,
-        "cpuPercent": 65,
+        "cpuPercent": 47.2,
         "eventLoopMs": {
-          "p50": 0.6,
-          "p99": 31.2,
-          "max": 39.6
+          "p50": 0.5,
+          "p99": 18.7,
+          "max": 19
         },
-        "rssMb": 148.8,
-        "heapUsedMb": 31.7,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 147.7,
+        "heapUsedMb": 20.5,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1432,
+        "lastEventId": 1438,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 468
+          "lp": 501
         },
         "requests": {
-          "place": 538,
-          "lp": 84598,
+          "place": 544,
+          "lp": 87608,
           "poll": 0
         },
         "counters": {
-          "batches": 179,
-          "messages": 77726,
+          "batches": 180,
+          "messages": 86151,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1510,35 +1510,35 @@
       },
       {
         "t": 40,
-        "cpuPercent": 59.8,
+        "cpuPercent": 49.7,
         "eventLoopMs": {
-          "p50": 0.4,
-          "p99": 24.7,
-          "max": 35.8
+          "p50": 0.6,
+          "p99": 19.9,
+          "max": 21.4
         },
-        "rssMb": 148.9,
-        "heapUsedMb": 20.5,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 147.6,
+        "heapUsedMb": 24.2,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1462,
+        "lastEventId": 1468,
         "connections": {
-          "ws": 1,
+          "ws": 0,
           "sse": 0,
           "lp": 501
         },
         "requests": {
-          "place": 568,
-          "lp": 89641,
+          "place": 574,
+          "lp": 92618,
           "poll": 0
         },
         "counters": {
-          "batches": 189,
-          "messages": 82713,
+          "batches": 190,
+          "messages": 91164,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1546,35 +1546,35 @@
       },
       {
         "t": 41,
-        "cpuPercent": 52,
+        "cpuPercent": 58.6,
         "eventLoopMs": {
-          "p50": 0.4,
-          "p99": 33.8,
-          "max": 44.4
+          "p50": 0.6,
+          "p99": 15.6,
+          "max": 17.8
         },
-        "rssMb": 148.7,
-        "heapUsedMb": 19.3,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 148.3,
+        "heapUsedMb": 14.1,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1493,
+        "lastEventId": 1498,
         "connections": {
-          "ws": 1,
+          "ws": 0,
           "sse": 0,
-          "lp": 501
+          "lp": 402
         },
         "requests": {
-          "place": 599,
-          "lp": 94651,
+          "place": 604,
+          "lp": 97529,
           "poll": 0
         },
         "counters": {
-          "batches": 199,
-          "messages": 87725,
+          "batches": 200,
+          "messages": 96174,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1582,35 +1582,35 @@
       },
       {
         "t": 42,
-        "cpuPercent": 50,
+        "cpuPercent": 53.7,
         "eventLoopMs": {
           "p50": 0.4,
-          "p99": 20.9,
-          "max": 21.7
+          "p99": 20.3,
+          "max": 37.8
         },
-        "rssMb": 148.8,
-        "heapUsedMb": 26.7,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 148.2,
+        "heapUsedMb": 26.6,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1522,
+        "lastEventId": 1528,
         "connections": {
-          "ws": 1,
+          "ws": 0,
           "sse": 0,
-          "lp": 233
+          "lp": 501
         },
         "requests": {
-          "place": 628,
-          "lp": 99393,
+          "place": 634,
+          "lp": 102624,
           "poll": 0
         },
         "counters": {
-          "batches": 209,
-          "messages": 92736,
+          "batches": 210,
+          "messages": 101071,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1618,35 +1618,35 @@
       },
       {
         "t": 43,
-        "cpuPercent": 61.6,
+        "cpuPercent": 53.7,
         "eventLoopMs": {
-          "p50": 0.6,
-          "p99": 27.2,
-          "max": 35.9
+          "p50": 0.5,
+          "p99": 17.3,
+          "max": 27.2
         },
-        "rssMb": 148.5,
-        "heapUsedMb": 29.1,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 148.7,
+        "heapUsedMb": 20.8,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1552,
+        "lastEventId": 1558,
         "connections": {
           "ws": 1,
           "sse": 0,
-          "lp": 327
+          "lp": 501
         },
         "requests": {
-          "place": 658,
-          "lp": 104480,
+          "place": 664,
+          "lp": 107634,
           "poll": 0
         },
         "counters": {
-          "batches": 219,
-          "messages": 97522,
+          "batches": 220,
+          "messages": 106081,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1654,35 +1654,35 @@
       },
       {
         "t": 44,
-        "cpuPercent": 59.9,
+        "cpuPercent": 55.9,
         "eventLoopMs": {
           "p50": 0.5,
-          "p99": 26,
-          "max": 26.2
+          "p99": 19.7,
+          "max": 26
         },
-        "rssMb": 148.8,
-        "heapUsedMb": 25.6,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 148.7,
+        "heapUsedMb": 22.2,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1582,
+        "lastEventId": 1588,
         "connections": {
-          "ws": 1,
+          "ws": 0,
           "sse": 0,
-          "lp": 442
+          "lp": 501
         },
         "requests": {
-          "place": 688,
-          "lp": 109605,
+          "place": 694,
+          "lp": 112644,
           "poll": 0
         },
         "counters": {
-          "batches": 229,
-          "messages": 102533,
+          "batches": 230,
+          "messages": 111091,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1690,35 +1690,35 @@
       },
       {
         "t": 45,
-        "cpuPercent": 48.4,
+        "cpuPercent": 67.5,
         "eventLoopMs": {
-          "p50": 0.3,
-          "p99": 24.5,
-          "max": 26.5
+          "p50": 0.7,
+          "p99": 37.8,
+          "max": 45.3
         },
-        "rssMb": 148.9,
-        "heapUsedMb": 23.7,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.1,
+        "heapUsedMb": 24,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1612,
+        "lastEventId": 1617,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 196
+          "lp": 401
         },
         "requests": {
-          "place": 718,
-          "lp": 114369,
+          "place": 723,
+          "lp": 116909,
           "poll": 0
         },
         "counters": {
-          "batches": 239,
-          "messages": 107544,
+          "batches": 240,
+          "messages": 114576,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1726,35 +1726,35 @@
       },
       {
         "t": 46,
-        "cpuPercent": 46.6,
+        "cpuPercent": 62.9,
         "eventLoopMs": {
-          "p50": 0.4,
-          "p99": 23.8,
-          "max": 24.2
+          "p50": 0.7,
+          "p99": 30.3,
+          "max": 54.8
         },
-        "rssMb": 149,
-        "heapUsedMb": 27.2,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 148.9,
+        "heapUsedMb": 20.7,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1642,
+        "lastEventId": 1647,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 387
+          "lp": 296
         },
         "requests": {
-          "place": 748,
-          "lp": 119570,
+          "place": 753,
+          "lp": 121829,
           "poll": 0
         },
         "counters": {
-          "batches": 249,
-          "messages": 112555,
+          "batches": 250,
+          "messages": 119587,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1762,35 +1762,35 @@
       },
       {
         "t": 47,
-        "cpuPercent": 45.1,
+        "cpuPercent": 63.1,
         "eventLoopMs": {
-          "p50": 0.4,
-          "p99": 17.4,
-          "max": 23.3
+          "p50": 0.3,
+          "p99": 21.9,
+          "max": 23.9
         },
         "rssMb": 149.1,
-        "heapUsedMb": 30.1,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "heapUsedMb": 22.7,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1672,
+        "lastEventId": 1677,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 211
+          "lp": 501
         },
         "requests": {
-          "place": 778,
-          "lp": 124404,
+          "place": 783,
+          "lp": 127044,
           "poll": 0
         },
         "counters": {
-          "batches": 259,
-          "messages": 117566,
+          "batches": 260,
+          "messages": 124508,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1798,35 +1798,35 @@
       },
       {
         "t": 48,
-        "cpuPercent": 46.1,
+        "cpuPercent": 55.1,
         "eventLoopMs": {
           "p50": 0.4,
-          "p99": 22.6,
-          "max": 27.5
+          "p99": 19.6,
+          "max": 31.7
         },
-        "rssMb": 149.1,
-        "heapUsedMb": 33.1,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.3,
+        "heapUsedMb": 31.9,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1702,
+        "lastEventId": 1707,
         "connections": {
-          "ws": 0,
+          "ws": 1,
           "sse": 0,
-          "lp": 173
+          "lp": 34
         },
         "requests": {
-          "place": 808,
-          "lp": 129376,
+          "place": 813,
+          "lp": 131587,
           "poll": 0
         },
         "counters": {
-          "batches": 269,
-          "messages": 122576,
+          "batches": 270,
+          "messages": 129520,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1834,35 +1834,35 @@
       },
       {
         "t": 49,
-        "cpuPercent": 51.2,
+        "cpuPercent": 73.1,
         "eventLoopMs": {
-          "p50": 0.4,
-          "p99": 23.8,
-          "max": 41.2
+          "p50": 0.7,
+          "p99": 24.2,
+          "max": 47.2
         },
-        "rssMb": 148.9,
-        "heapUsedMb": 22.8,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.3,
+        "heapUsedMb": 17.5,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1732,
+        "lastEventId": 1736,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 76
+          "lp": 368
         },
         "requests": {
-          "place": 838,
-          "lp": 134289,
+          "place": 842,
+          "lp": 136695,
           "poll": 0
         },
         "counters": {
-          "batches": 279,
-          "messages": 127586,
+          "batches": 280,
+          "messages": 133679,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1870,35 +1870,35 @@
       },
       {
         "t": 50,
-        "cpuPercent": 51.7,
+        "cpuPercent": 56.2,
         "eventLoopMs": {
           "p50": 0.4,
-          "p99": 22.4,
-          "max": 29.8
+          "p99": 24.8,
+          "max": 29.7
         },
-        "rssMb": 148.8,
-        "heapUsedMb": 24.2,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.2,
+        "heapUsedMb": 25.6,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1762,
+        "lastEventId": 1766,
         "connections": {
-          "ws": 0,
+          "ws": 1,
           "sse": 0,
-          "lp": 0
+          "lp": 364
         },
         "requests": {
-          "place": 868,
-          "lp": 139223,
+          "place": 872,
+          "lp": 141801,
           "poll": 0
         },
         "counters": {
-          "batches": 289,
-          "messages": 132570,
+          "batches": 290,
+          "messages": 138589,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1906,35 +1906,35 @@
       },
       {
         "t": 51,
-        "cpuPercent": 50.1,
+        "cpuPercent": 58.6,
         "eventLoopMs": {
-          "p50": 0.3,
-          "p99": 20,
-          "max": 20.9
+          "p50": 0.5,
+          "p99": 19.8,
+          "max": 24.4
         },
-        "rssMb": 148.7,
-        "heapUsedMb": 24.7,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.2,
+        "heapUsedMb": 26.6,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1792,
+        "lastEventId": 1796,
         "connections": {
-          "ws": 0,
+          "ws": 1,
           "sse": 0,
-          "lp": 0
+          "lp": 501
         },
         "requests": {
-          "place": 898,
-          "lp": 144233,
+          "place": 902,
+          "lp": 146948,
           "poll": 0
         },
         "counters": {
-          "batches": 299,
-          "messages": 137564,
+          "batches": 300,
+          "messages": 143553,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1942,35 +1942,35 @@
       },
       {
         "t": 52,
-        "cpuPercent": 54.6,
+        "cpuPercent": 56.6,
         "eventLoopMs": {
-          "p50": 0.3,
-          "p99": 25.9,
-          "max": 33.1
+          "p50": 0.6,
+          "p99": 19.8,
+          "max": 34
         },
-        "rssMb": 148.8,
-        "heapUsedMb": 26.8,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.4,
+        "heapUsedMb": 27.4,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1821,
+        "lastEventId": 1826,
         "connections": {
           "ws": 0,
           "sse": 0,
           "lp": 501
         },
         "requests": {
-          "place": 927,
-          "lp": 149243,
+          "place": 932,
+          "lp": 151958,
           "poll": 0
         },
         "counters": {
-          "batches": 308,
-          "messages": 142056,
+          "batches": 310,
+          "messages": 148467,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -1978,35 +1978,35 @@
       },
       {
         "t": 53,
-        "cpuPercent": 55.4,
+        "cpuPercent": 49.5,
         "eventLoopMs": {
-          "p50": 0.3,
-          "p99": 19,
-          "max": 22.6
+          "p50": 0.5,
+          "p99": 26,
+          "max": 27.3
         },
-        "rssMb": 148.6,
-        "heapUsedMb": 27.8,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.4,
+        "heapUsedMb": 31.4,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1851,
+        "lastEventId": 1856,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 501
+          "lp": 488
         },
         "requests": {
-          "place": 957,
-          "lp": 154121,
+          "place": 962,
+          "lp": 156955,
           "poll": 0
         },
         "counters": {
-          "batches": 318,
-          "messages": 146622,
+          "batches": 320,
+          "messages": 153479,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -2014,35 +2014,35 @@
       },
       {
         "t": 54,
-        "cpuPercent": 43.2,
+        "cpuPercent": 54.3,
         "eventLoopMs": {
           "p50": 0.3,
-          "p99": 22,
-          "max": 23
+          "p99": 27.1,
+          "max": 27.7
         },
-        "rssMb": 148.9,
-        "heapUsedMb": 30.4,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.4,
+        "heapUsedMb": 34,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1881,
+        "lastEventId": 1886,
         "connections": {
-          "ws": 0,
+          "ws": 1,
           "sse": 0,
           "lp": 501
         },
         "requests": {
-          "place": 987,
-          "lp": 159131,
+          "place": 992,
+          "lp": 161978,
           "poll": 0
         },
         "counters": {
-          "batches": 328,
-          "messages": 151633,
+          "batches": 330,
+          "messages": 158490,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -2050,35 +2050,35 @@
       },
       {
         "t": 55,
-        "cpuPercent": 44.2,
+        "cpuPercent": 53.3,
         "eventLoopMs": {
-          "p50": 0.3,
-          "p99": 14.9,
-          "max": 17.6
+          "p50": 0.4,
+          "p99": 24.6,
+          "max": 25.3
         },
-        "rssMb": 148.5,
-        "heapUsedMb": 21.1,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.1,
+        "heapUsedMb": 37.1,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1911,
+        "lastEventId": 1916,
         "connections": {
           "ws": 0,
           "sse": 0,
           "lp": 501
         },
         "requests": {
-          "place": 1017,
-          "lp": 164141,
+          "place": 1022,
+          "lp": 166939,
           "poll": 0
         },
         "counters": {
-          "batches": 338,
-          "messages": 156643,
+          "batches": 340,
+          "messages": 163283,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -2086,35 +2086,35 @@
       },
       {
         "t": 56,
-        "cpuPercent": 47.5,
+        "cpuPercent": 55.4,
         "eventLoopMs": {
-          "p50": 0.2,
-          "p99": 22.6,
-          "max": 29.3
+          "p50": 0.5,
+          "p99": 20.1,
+          "max": 22.9
         },
-        "rssMb": 148.7,
-        "heapUsedMb": 21.3,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.4,
+        "heapUsedMb": 19.1,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1942,
+        "lastEventId": 1946,
         "connections": {
-          "ws": 1,
+          "ws": 0,
           "sse": 0,
-          "lp": 501
+          "lp": 343
         },
         "requests": {
-          "place": 1048,
-          "lp": 169151,
+          "place": 1052,
+          "lp": 171791,
           "poll": 0
         },
         "counters": {
-          "batches": 348,
-          "messages": 161644,
+          "batches": 350,
+          "messages": 168295,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -2122,35 +2122,35 @@
       },
       {
         "t": 57,
-        "cpuPercent": 47,
+        "cpuPercent": 52.7,
         "eventLoopMs": {
-          "p50": 0.6,
-          "p99": 21.2,
-          "max": 26.5
+          "p50": 0.4,
+          "p99": 23.6,
+          "max": 27.6
         },
-        "rssMb": 148.6,
-        "heapUsedMb": 25.9,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.4,
+        "heapUsedMb": 17.1,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 1972,
+        "lastEventId": 1976,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 501
+          "lp": 82
         },
         "requests": {
-          "place": 1078,
-          "lp": 174161,
+          "place": 1082,
+          "lp": 176540,
           "poll": 0
         },
         "counters": {
-          "batches": 358,
-          "messages": 166655,
+          "batches": 360,
+          "messages": 173305,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -2158,35 +2158,35 @@
       },
       {
         "t": 58,
-        "cpuPercent": 47.3,
+        "cpuPercent": 51.1,
         "eventLoopMs": {
           "p50": 0.4,
-          "p99": 19.9,
-          "max": 20.3
+          "p99": 14.4,
+          "max": 18.8
         },
-        "rssMb": 149,
-        "heapUsedMb": 30.7,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.1,
+        "heapUsedMb": 26.1,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 2002,
+        "lastEventId": 2006,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 501
+          "lp": 1
         },
         "requests": {
-          "place": 1108,
-          "lp": 179171,
+          "place": 1112,
+          "lp": 181009,
           "poll": 0
         },
         "counters": {
-          "batches": 368,
-          "messages": 171666,
+          "batches": 370,
+          "messages": 177847,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -2194,35 +2194,35 @@
       },
       {
         "t": 59,
-        "cpuPercent": 47.8,
+        "cpuPercent": 58.9,
         "eventLoopMs": {
-          "p50": 0.3,
-          "p99": 15.3,
-          "max": 17.7
+          "p50": 0.7,
+          "p99": 22.1,
+          "max": 25.2
         },
-        "rssMb": 149,
-        "heapUsedMb": 21.7,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.6,
+        "heapUsedMb": 24.9,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 2032,
+        "lastEventId": 2036,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 501
+          "lp": 91
         },
         "requests": {
-          "place": 1138,
-          "lp": 184181,
+          "place": 1142,
+          "lp": 185918,
           "poll": 0
         },
         "counters": {
-          "batches": 378,
-          "messages": 176677,
+          "batches": 380,
+          "messages": 181841,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -2230,35 +2230,35 @@
       },
       {
         "t": 60,
-        "cpuPercent": 59.1,
+        "cpuPercent": 59.9,
         "eventLoopMs": {
-          "p50": 0.6,
-          "p99": 27.5,
-          "max": 95.5
+          "p50": 0.3,
+          "p99": 24.2,
+          "max": 27.1
         },
-        "rssMb": 149.1,
-        "heapUsedMb": 17.2,
-        "startedAt": "2026-10-21T21:51:06.319Z",
+        "rssMb": 149.6,
+        "heapUsedMb": 25.8,
+        "startedAt": "2026-10-21T22:44:18.966Z",
         "node": "v24.22.1",
         "settings": {
           "batchMs": 100,
           "maxBufferedBytes": 262144,
           "persistentLog": true
         },
-        "lastEventId": 2061,
+        "lastEventId": 2066,
         "connections": {
           "ws": 0,
           "sse": 0,
-          "lp": 185
+          "lp": 5
         },
         "requests": {
-          "place": 1167,
-          "lp": 188875,
+          "place": 1172,
+          "lp": 190842,
           "poll": 0
         },
         "counters": {
-          "batches": 388,
-          "messages": 181340,
+          "batches": 390,
+          "messages": 186852,
           "slowClientsDropped": 0,
           "pingTimeouts": 0,
           "errors": 0
@@ -2269,23 +2269,23 @@
   "generator": {
     "threads": 5,
     "cpuPercent": {
-      "avg": 259.3,
-      "max": 487.2
+      "avg": 266.4,
+      "max": 670.3
     },
     "mainEventLoopMs": {
       "p50": 0.3,
-      "p99": 5.4,
-      "max": 92.8
+      "p99": 3.2,
+      "max": 40.9
     },
     "viewerEventLoopMs": {
-      "p99": 40,
-      "max": 369.1
+      "p99": 29.6,
+      "max": 399.2
     }
   },
   "restart": {
-    "downS": 1,
-    "allCaughtUpS": 9,
-    "targetId": 895
+    "downS": 1.3,
+    "allCaughtUpS": 9.8,
+    "targetId": 908
   },
   "warnings": [],
   "verdict": {
@@ -2298,7 +2298,7 @@
       "no lost events": true,
       "all connected again": true
     },
-    "deliveryP95Ms": 127,
+    "deliveryP95Ms": 119,
     "deliveryP95WithinHardLimit": true
   }
 }
