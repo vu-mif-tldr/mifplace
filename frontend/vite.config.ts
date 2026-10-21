@@ -11,5 +11,9 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    coverage: {
+      include: ['src/**/*.{ts,vue}'],
+      exclude: ['src/**/*.test.ts'],
+    },
   },
 });
