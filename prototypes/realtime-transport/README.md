@@ -155,7 +155,8 @@ only a few pixels per second.
     50 ms), the report says so, because its latencies are then not trustworthy.
 
 The report ends with the verdict for T1 from the ADR (p95 at most 1 s, hard limit 5 s, no lost
-events, everyone connected) and is saved as JSON in `results/` (not in git).
+events, everyone connected) and is saved as JSON in `results/`. The reports quoted in the ADR are
+committed there, with the conditions of each run in [results/README.md](results/README.md).
 
 ### In Docker, the way the numbers are meant to be taken
 
