@@ -2,18 +2,31 @@
 # so that traffic does not go through Docker Desktop's port forwarding and both share one clock.
 #
 #   docker compose up -d --build server
-#   docker compose run --rm load --transport ws --viewers 500
+#   docker compose run --rm --no-deps load --transport ws --viewers 500
 #
 # scripts/load-matrix.sh runs every transport, each against a fresh server.
 #
 # Both services use one image, built by `server`: a separate `load` image would not be rebuilt by
 # `docker compose build` (its profile is inactive) and would silently run old code.
+#
+# Server settings from the environment:
+#   BATCH_MS            batch interval (100)
+#   MAX_BUFFERED_BYTES  unsent data per client before it counts as slow and is dropped (262144)
+#   LOG_FILE            e.g. data/events.jsonl: keep the event log across a restart (T4)
 
 services:
   server:
     build: .
     image: realtime-transport-prototype
-    command: ['src/server/main.ts', '--host', '0.0.0.0', '--batch-ms', '${BATCH_MS:-100}']
+    command:
+      - src/server/main.ts
+      - --host=0.0.0.0
+      - --batch-ms=${BATCH_MS:-100}
+      - --max-buffered-bytes=${MAX_BUFFERED_BYTES:-262144}
+      - --log-file=${LOG_FILE:-}
+      # T4 ends the process through /api/debug/exit; Docker starts it again.
+      - --allow-exit=1
+    restart: unless-stopped
     ports:
       - '3100:3100'
     cpus: 1

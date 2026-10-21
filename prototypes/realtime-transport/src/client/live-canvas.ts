@@ -2,6 +2,7 @@ import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
   EMPTY_CELL,
+  formatCursor,
   fromWire,
   type CanvasSnapshot,
   type PlaceResult,
@@ -31,6 +32,8 @@ export interface LiveCanvasStats {
   resyncs: number;
   /** Times the transport became open again after the first time. */
   reconnects: number;
+  /** Failed attempts to load the snapshot during a resync, for example while the server restarts. */
+  snapshotFailures: number;
 }
 
 export interface LiveCanvasOptions extends Partial<Omit<TransportOptions, 'baseUrl'>> {
@@ -40,6 +43,11 @@ export interface LiveCanvasOptions extends Partial<Omit<TransportOptions, 'baseU
   onLog?: (line: string) => void;
   /** Called for every applied event with its delivery latency in ms. */
   onApplied?: (latencyMs: number) => void;
+  /**
+   * Where to load the snapshot from, if not `baseUrl`. The load tool's slow viewers (T5) load it
+   * directly and only stream through the throttling proxy.
+   */
+  snapshotUrl?: string;
 }
 
 /**
@@ -49,6 +57,8 @@ export interface LiveCanvasOptions extends Partial<Omit<TransportOptions, 'baseU
 export class LiveCanvas {
   cells = new Uint8Array(CANVAS_WIDTH * CANVAS_HEIGHT).fill(EMPTY_CELL);
   lastEventId = 0;
+  /** Server time of the last event; with the id it makes the cursor the client continues from. */
+  lastEventTs = 0;
   state: TransportState = 'stopped';
   readonly stats: LiveCanvasStats = {
     applied: 0,
@@ -56,10 +66,11 @@ export class LiveCanvas {
     gaps: 0,
     resyncs: 0,
     reconnects: 0,
+    snapshotFailures: 0,
   };
   /** Delivery latency of the last events in ms: client receive time minus server event time. */
   readonly latencies: number[] = [];
-  private readonly baseUrl: string;
+  private readonly snapshotUrl: string;
   private readonly onChange: () => void;
   private readonly onLog: (line: string) => void;
   private readonly onApplied: (latencyMs: number) => void;
@@ -69,7 +80,7 @@ export class LiveCanvas {
   private stopped = false;
 
   constructor(options: LiveCanvasOptions) {
-    this.baseUrl = options.baseUrl;
+    this.snapshotUrl = options.snapshotUrl ?? options.baseUrl;
     this.onChange = options.onChange ?? (() => {});
     this.onLog = options.onLog ?? (() => {});
     this.onApplied = options.onApplied ?? (() => {});
@@ -77,7 +88,7 @@ export class LiveCanvas {
       options.transport,
       { ...DEFAULT_TRANSPORT_OPTIONS, ...options },
       {
-        lastEventId: () => this.lastEventId,
+        cursor: () => formatCursor({ id: this.lastEventId, ts: this.lastEventTs }),
         onMessage: (message) => this.receive(message),
         onState: (state, detail) => this.setState(state, detail),
       }
@@ -122,6 +133,7 @@ export class LiveCanvas {
       }
       this.cells[event.y * CANVAS_WIDTH + event.x] = event.color;
       this.lastEventId = event.id;
+      this.lastEventTs = event.ts;
       this.stats.applied++;
       const latency = Date.now() - event.ts;
       this.latencies.push(latency);
@@ -145,6 +157,7 @@ export class LiveCanvas {
         await this.loadSnapshot();
         break;
       } catch (error) {
+        this.stats.snapshotFailures++;
         this.onLog(`snapshot failed: ${describe(error)}`);
         await sleep(delay);
       }
@@ -154,11 +167,12 @@ export class LiveCanvas {
   }
 
   private async loadSnapshot(): Promise<void> {
-    const response = await fetch(new URL('/api/canvas', this.baseUrl));
+    const response = await fetch(new URL('/api/canvas', this.snapshotUrl));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const snapshot = (await response.json()) as CanvasSnapshot;
     this.cells = Uint8Array.from(snapshot.cells);
     this.lastEventId = snapshot.lastEventId;
+    this.lastEventTs = snapshot.lastEventTs;
     this.onLog(`snapshot loaded, last event ${snapshot.lastEventId}`);
     this.onChange();
   }

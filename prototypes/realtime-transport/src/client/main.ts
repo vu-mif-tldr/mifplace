@@ -98,6 +98,7 @@ function render(): void {
     `gaps         ${stats.gaps}`,
     `resyncs      ${stats.resyncs}`,
     `reconnects   ${stats.reconnects}`,
+    `snapshot failures ${stats.snapshotFailures}`,
     `latency ms   p50 ${ms(50)}  p95 ${ms(95)}  max ${ms(100)}  (last ${latencies.length})`,
   ].join('\n');
 }

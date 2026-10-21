@@ -1,9 +1,13 @@
 import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type RawData, type WebSocket } from 'ws';
-import type { ClientMessage, ServerMessage } from '../../shared/protocol.ts';
+import {
+  parseCursor,
+  type ClientMessage,
+  type Cursor,
+  type ServerMessage,
+} from '../../shared/protocol.ts';
 import type { EventLog } from '../event-log.ts';
-import { parseEventId } from '../http-util.ts';
 import type { Hub, PushClient } from '../hub.ts';
 
 export interface WebSocketOptions {
@@ -13,7 +17,7 @@ export interface WebSocketOptions {
   maxBufferedBytes: number;
 }
 
-/** GET /ws?after=<id>: batches from the server, placements from the client, one connection. */
+/** GET /ws?after=<cursor>: batches from the server, placements from the client, one connection. */
 export class WebSocketTransport {
   private readonly wss = new WebSocketServer({
     noServer: true,
@@ -41,7 +45,7 @@ export class WebSocketTransport {
       socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
       return;
     }
-    const after = parseEventId(
+    const after = parseCursor(
       new URL(req.url ?? '/', 'http://localhost').searchParams.get('after')
     );
     this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnection(ws, after));
@@ -53,7 +57,7 @@ export class WebSocketTransport {
     this.wss.close();
   }
 
-  private onConnection(ws: WebSocket, after: number): void {
+  private onConnection(ws: WebSocket, after: Cursor | null): void {
     this.alive.add(ws);
     ws.on('pong', () => this.alive.add(ws));
     ws.on('error', () => ws.terminate());
@@ -94,6 +98,7 @@ export class WebSocketTransport {
   private ping(): void {
     for (const ws of this.wss.clients) {
       if (!this.alive.has(ws)) {
+        this.hub.counters.pingTimeouts++;
         ws.terminate();
         continue;
       }

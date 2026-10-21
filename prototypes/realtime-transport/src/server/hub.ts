@@ -1,4 +1,10 @@
-import { toWire, type PixelEvent, type ServerMessage } from '../shared/protocol.ts';
+import {
+  formatCursor,
+  toWire,
+  type Cursor,
+  type PixelEvent,
+  type ServerMessage,
+} from '../shared/protocol.ts';
 import type { EventLog } from './event-log.ts';
 
 export interface HubOptions {
@@ -13,8 +19,8 @@ export interface HubOptions {
 /** A long-lived push connection: a WebSocket or an SSE stream. */
 export interface PushClient {
   readonly kind: 'ws' | 'sse';
-  /** `lastId` is the id of the last event in `payload` when it carries events. */
-  send(payload: string, lastId?: number): void;
+  /** `cursor` is the cursor of the last event in `payload` when it carries events. */
+  send(payload: string, cursor?: string): void;
   /** Drops the connection; the client reconnects and catches up by itself. */
   close(): void;
 }
@@ -26,7 +32,7 @@ export interface Waiter {
 }
 
 /** Flushed events a client is missing, `null` if none, 'reset' if it must reload the snapshot. */
-export type CatchUp = { payload: string; toId: number } | 'reset' | null;
+export type CatchUp = { payload: string; cursor: string } | 'reset' | null;
 
 export const RESET = encode({ t: 'reset' });
 export const HEARTBEAT = encode({ t: 'hb' });
@@ -48,8 +54,17 @@ function encode(message: ServerMessage): string {
 export class Hub {
   /** Id of the last event sent out. Later events wait in the log for the next batch. */
   flushedId = 0;
-  /** Since the start, for the load tests. */
-  readonly counters = { batches: 0, messages: 0, slowClientsDropped: 0 };
+  /** Since the start, for the load tests. The transports and the app add to them too. */
+  readonly counters = {
+    batches: 0,
+    messages: 0,
+    /** Disconnected because too much unsent data piled up for them. */
+    slowClientsDropped: 0,
+    /** WebSockets terminated because they did not answer a ping. */
+    pingTimeouts: 0,
+    /** Requests that failed with a 500. */
+    errors: 0,
+  };
   private readonly log: EventLog;
   private readonly options: HubOptions;
   private readonly clients = new Set<PushClient>();
@@ -74,25 +89,28 @@ export class Hub {
     this.dropAll();
   }
 
-  /** What a client that has every event up to `afterId` is missing right now. */
-  catchUp(afterId: number): CatchUp {
-    // An id this server never issued: it restarted and lost its in-memory log.
-    if (afterId < 0 || afterId > this.log.lastId) return 'reset';
+  /** What a client at `cursor` is missing right now. `null` = a malformed cursor. */
+  catchUp(cursor: Cursor | null): CatchUp {
+    if (cursor === null || cursor.id > this.log.lastId) return 'reset';
+    // The id exists here, but for another event: the log was lost or restored since the client
+    // got it. Continuing would silently mix two logs.
+    if (this.log.tsOf(cursor.id) !== cursor.ts) return 'reset';
     // Up to date, or ahead of the last batch (its snapshot is newer): the next batch covers it.
-    if (afterId >= this.flushedId) return null;
-    if (this.flushedId - afterId > this.options.maxBacklog) return 'reset';
+    if (cursor.id >= this.flushedId) return null;
+    if (this.flushedId - cursor.id > this.options.maxBacklog) return 'reset';
+    const toCursor = this.cursorAt(this.flushedId);
     // The common case for long polling: the client got the previous batch and waits for this one.
-    if (this.lastBatch?.afterId === afterId) {
-      return { payload: this.lastBatch.payload, toId: this.flushedId };
+    if (this.lastBatch?.afterId === cursor.id) {
+      return { payload: this.lastBatch.payload, cursor: toCursor };
     }
-    return { payload: encodeBatch(this.log.range(afterId, this.flushedId)), toId: this.flushedId };
+    return { payload: encodeBatch(this.log.range(cursor.id, this.flushedId)), cursor: toCursor };
   }
 
   /** Sends the client what it missed, then every following batch. */
-  connect(client: PushClient, afterId: number): void {
-    const missed = this.catchUp(afterId);
+  connect(client: PushClient, cursor: Cursor | null): void {
+    const missed = this.catchUp(cursor);
     if (missed === 'reset') client.send(RESET);
-    else if (missed !== null) client.send(missed.payload, missed.toId);
+    else if (missed !== null) client.send(missed.payload, missed.cursor);
     this.clients.add(client);
   }
 
@@ -116,7 +134,8 @@ export class Hub {
     this.flushedId = toId;
     this.lastBatch = { afterId, payload };
 
-    for (const client of this.clients) client.send(payload, toId);
+    const cursor = this.cursorAt(toId);
+    for (const client of this.clients) client.send(payload, cursor);
     const waiters = [...this.waiters];
     this.waiters.clear();
     for (const waiter of waiters) waiter.wake();
@@ -132,10 +151,30 @@ export class Hub {
     this.waiters.clear();
   }
 
+  /** Simulates network failures for `count` random connections (test T3). Returns how many. */
+  dropRandom(count: number): number {
+    const connections = [...this.clients, ...this.waiters];
+    const dropped = Math.min(count, connections.length);
+    // A partial Fisher-Yates shuffle: the first `dropped` entries are a random sample.
+    for (let i = 0; i < dropped; i++) {
+      const j = i + Math.floor(Math.random() * (connections.length - i));
+      [connections[i], connections[j]] = [connections[j], connections[i]];
+      const connection = connections[i];
+      connection.close();
+      if ('send' in connection) this.clients.delete(connection);
+      else this.waiters.delete(connection);
+    }
+    return dropped;
+  }
+
   counts(): { ws: number; sse: number; lp: number } {
     const counts = { ws: 0, sse: 0, lp: this.waiters.size };
     for (const client of this.clients) counts[client.kind]++;
     return counts;
+  }
+
+  private cursorAt(id: number): string {
+    return formatCursor({ id, ts: this.log.tsOf(id) ?? 0 });
   }
 
   private heartbeat(): void {

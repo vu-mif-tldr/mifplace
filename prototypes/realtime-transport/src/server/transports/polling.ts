@@ -1,16 +1,17 @@
 import type { ServerResponse } from 'node:http';
-import { parseEventId, sendJson } from '../http-util.ts';
+import { parseCursor } from '../../shared/protocol.ts';
+import { sendJson } from '../http-util.ts';
 import { EMPTY_BATCH, HEARTBEAT, RESET, type CatchUp, type Hub, type Waiter } from '../hub.ts';
 
-/** GET /api/poll?after=<id>: answers at once, with an empty batch if there is nothing new. */
+/** GET /api/poll?after=<cursor>: answers at once, with an empty batch if there is nothing new. */
 export function handleShortPoll(res: ServerResponse, url: URL, hub: Hub): void {
-  const missed = hub.catchUp(parseEventId(url.searchParams.get('after')));
+  const missed = hub.catchUp(parseCursor(url.searchParams.get('after')));
   sendJson(res, 200, toPayload(missed, EMPTY_BATCH));
 }
 
-/** GET /api/lp?after=<id>: answers when there is something new, or with a heartbeat on timeout. */
+/** GET /api/lp?after=<cursor>: answers when there is something new, or with a heartbeat on timeout. */
 export function handleLongPoll(res: ServerResponse, url: URL, hub: Hub, timeoutMs: number): void {
-  const after = parseEventId(url.searchParams.get('after'));
+  const after = parseCursor(url.searchParams.get('after'));
   const missed = hub.catchUp(after);
   if (missed !== null) {
     sendJson(res, 200, toPayload(missed, EMPTY_BATCH));

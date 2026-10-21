@@ -8,6 +8,8 @@ export type ClientOptions = Partial<Omit<TransportOptions, 'baseUrl'>>;
 
 export interface ViewerPoolConfig {
   url: string;
+  /** For the slow viewers: the snapshot comes from the server itself, not through the proxy. */
+  snapshotUrl?: string;
   transport: TransportName;
   viewers: number;
   rampPerSecond: number;
@@ -17,11 +19,13 @@ export interface ViewerPoolConfig {
 export type ToViewers =
   /** The warm-up is over: reset the counters and start recording. */
   | { t: 'measure' }
+  /** After a server restart: count the viewers that are open and have at least event `id`. */
+  | { t: 'target'; id: number }
   /** The writer has stopped: wait until every viewer has `targetId`, then report and stop. */
   | { t: 'finish'; targetId: number; drainMs: number };
 
 export type FromViewers =
-  | { t: 'progress'; started: number; open: number; failed: number }
+  | { t: 'progress'; started: number; open: number; failed: number; caughtUp: number }
   | { t: 'report'; report: ViewerPoolReport };
 
 export interface ViewerPoolReport {
@@ -35,12 +39,14 @@ export interface ViewerPoolReport {
   /** Over the measurement window. */
   stats: LiveCanvasStats;
   latency: HistogramData;
+  /** How long viewers were without an open connection, ms, one sample per outage. */
+  outages: HistogramData;
   /** Event loop delay of this thread over the whole measurement window, ms. */
   eventLoop: { p99: number; max: number };
 }
 
 export function emptyStats(): LiveCanvasStats {
-  return { applied: 0, duplicates: 0, gaps: 0, resyncs: 0, reconnects: 0 };
+  return { applied: 0, duplicates: 0, gaps: 0, resyncs: 0, reconnects: 0, snapshotFailures: 0 };
 }
 
 /** target += factor * source, field by field. */

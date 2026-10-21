@@ -24,6 +24,10 @@ export interface AppOptions {
   sseRetryMaxMs: number;
   /** Placements per second made by the server itself, to have traffic without users. 0 = off. */
   botRate: number;
+  /** File for the event log, so that it survives a restart. '' = in memory only. */
+  logFile: string;
+  /** 1 = POST /api/debug/exit ends the process, to test restarts (T4). Off by default. */
+  allowExit: number;
 }
 
 export const DEFAULT_OPTIONS: AppOptions = {
@@ -38,14 +42,21 @@ export const DEFAULT_OPTIONS: AppOptions = {
   sseRetryMinMs: 1_000,
   sseRetryMaxMs: 5_000,
   botRate: 0,
+  logFile: '',
+  allowExit: 0,
 };
 
 /** GET /api/metrics. Counters are totals since the start; ProcessSample fields are per interval. */
 export interface ServerMetrics extends ProcessSample {
+  /** Changes when the server restarts; the counters start from 0 again then. */
+  startedAt: string;
+  node: string;
+  /** The server settings that change test results, recorded in the reports. */
+  settings: { batchMs: number; maxBufferedBytes: number; persistentLog: boolean };
   lastEventId: number;
   connections: { ws: number; sse: number; lp: number };
   requests: { place: number; lp: number; poll: number };
-  counters: { batches: number; messages: number; slowClientsDropped: number };
+  counters: Hub['counters'];
 }
 
 export interface App {
@@ -66,7 +77,8 @@ const NOT_FOUND = JSON.stringify({ ok: false, error: 'not found' });
 
 export async function startApp(overrides: Partial<AppOptions> = {}): Promise<App> {
   const options = { ...DEFAULT_OPTIONS, ...overrides };
-  const log = new EventLog();
+  const startedAt = new Date().toISOString();
+  const log = new EventLog(options.logFile === '' ? null : options.logFile);
   const hub = new Hub(log, options);
   const ws = new WebSocketTransport(hub, log, {
     pingMs: options.wsPingMs,
@@ -102,6 +114,7 @@ export async function startApp(overrides: Partial<AppOptions> = {}): Promise<App
           res,
           200,
           JSON.stringify({
+            startedAt,
             lastEventId: log.lastId,
             flushedId: hub.flushedId,
             connections: hub.counts(),
@@ -113,6 +126,13 @@ export async function startApp(overrides: Partial<AppOptions> = {}): Promise<App
       case 'GET /api/metrics': {
         const metrics: ServerMetrics = {
           ...sampler.sample(),
+          startedAt,
+          node: process.version,
+          settings: {
+            batchMs: options.batchMs,
+            maxBufferedBytes: options.maxBufferedBytes,
+            persistentLog: options.logFile !== '',
+          },
           lastEventId: log.lastId,
           connections: hub.counts(),
           requests,
@@ -120,9 +140,16 @@ export async function startApp(overrides: Partial<AppOptions> = {}): Promise<App
         };
         return sendJson(res, 200, JSON.stringify(metrics));
       }
-      case 'POST /api/debug/drop':
-        hub.dropAll();
-        res.writeHead(204).end();
+      // ?count=N drops N random connections (test T3); without it, all of them.
+      case 'POST /api/debug/drop': {
+        const count = url.searchParams.get('count');
+        const dropped = hub.dropRandom(count === null ? Infinity : Number(count));
+        return sendJson(res, 200, JSON.stringify({ dropped }));
+      }
+      // A crash for test T4: the process ends without closing anything, and Docker restarts it.
+      case 'POST /api/debug/exit':
+        if (options.allowExit !== 1) break;
+        res.writeHead(202).end(() => process.exit(1));
         return;
     }
     if (req.method === 'GET') return serveStatic(url.pathname, res);
@@ -131,6 +158,7 @@ export async function startApp(overrides: Partial<AppOptions> = {}): Promise<App
 
   const server = createServer((req, res) => {
     handle(req, res).catch((error: unknown) => {
+      hub.counters.errors++;
       if (res.headersSent) res.destroy();
       else sendJson(res, 500, JSON.stringify({ ok: false, error: String(error) }));
     });

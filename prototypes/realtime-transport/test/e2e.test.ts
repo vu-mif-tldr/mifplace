@@ -90,5 +90,28 @@ for (const transport of TRANSPORTS) {
       assert.equal(a.cells[2 * CANVAS_WIDTH + 2], 3);
       assert.equal(a.stats.gaps, 0);
     });
+
+    it('reloads the snapshot when a new log has issued its ids again', async () => {
+      // The dangerous case: by the time the client reconnects, the new log is longer than the old
+      // one, so the client's last id exists again, for another event. Only the cursor's time
+      // tells them apart; with the id alone the client would mix the two logs without a gap.
+      const a = await connect();
+      for (let x = 0; x < 3; x++) assert.ok((await a.place(x, 20, 1)).ok);
+      await waitFor('A has its pixels', () => a.lastEventId === app.log.lastId);
+      const resyncsBefore = a.stats.resyncs;
+
+      const port = Number(new URL(app.url).port);
+      await app.close();
+      app = await startApp({ ...SERVER, port });
+      // Right away, before A reconnects: the new log gets more events than A has seen.
+      for (let i = 0; i < a.lastEventId + 5; i++) app.log.place({ x: i % 64, y: 30, color: 4 });
+
+      await waitFor('A reloaded the snapshot', () => a.stats.resyncs > resyncsBefore);
+      await waitFor(
+        'A has the new log',
+        () => a.state === 'open' && a.lastEventId === app.log.lastId
+      );
+      assert.deepEqual(Array.from(a.cells), app.log.snapshot().cells);
+    });
   });
 }

@@ -31,8 +31,8 @@ export const DEFAULT_TRANSPORT_OPTIONS: Omit<TransportOptions, 'baseUrl'> = {
 };
 
 export interface TransportCallbacks {
-  /** The event id a new connection or request continues from. */
-  lastEventId(): number;
+  /** The cursor (see protocol.ts) a new connection or request continues from. */
+  cursor(): string;
   onMessage(message: ServerMessage): void;
   onState(state: TransportState, detail?: string): void;
 }
@@ -100,7 +100,7 @@ abstract class PushTransport implements Transport {
   }
 
   abstract place(x: number, y: number, color: number): Promise<PlaceResult>;
-  /** Opens a connection that continues from callbacks.lastEventId(). */
+  /** Opens a connection that continues from callbacks.cursor(). */
   protected abstract connect(): void;
   /** Closes the current connection, if any, without reporting it as lost. */
   protected abstract disconnect(): void;
@@ -168,7 +168,7 @@ class WebSocketTransport extends PushTransport {
   protected connect(): void {
     const url = new URL('/ws', this.options.baseUrl);
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    url.searchParams.set('after', String(this.callbacks.lastEventId()));
+    url.searchParams.set('after', this.callbacks.cursor());
 
     const socket = new WebSocket(url);
     this.socket = socket;
@@ -207,7 +207,7 @@ class SseTransport extends PushTransport {
 
   protected connect(): void {
     const url = new URL('/api/sse', this.options.baseUrl);
-    url.searchParams.set('after', String(this.callbacks.lastEventId()));
+    url.searchParams.set('after', this.callbacks.cursor());
 
     const source = new EventSource(url);
     this.source = source;
@@ -287,7 +287,7 @@ class PollingTransport implements Transport {
 
     while (current()) {
       const url = new URL(this.path, this.options.baseUrl);
-      url.searchParams.set('after', String(this.callbacks.lastEventId()));
+      url.searchParams.set('after', this.callbacks.cursor());
       this.request = new AbortController();
       try {
         const response = await fetch(url, {

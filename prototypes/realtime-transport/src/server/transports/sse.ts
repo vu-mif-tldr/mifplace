@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { parseEventId } from '../http-util.ts';
+import { parseCursor } from '../../shared/protocol.ts';
 import type { Hub, PushClient } from '../hub.ts';
 
 export interface SseOptions {
@@ -10,7 +10,7 @@ export interface SseOptions {
   retryMaxMs: number;
 }
 
-/** GET /api/sse?after=<id>: a one-way stream of batches. Placements go through POST /api/place. */
+/** GET /api/sse?after=<cursor>: a one-way stream of batches. Placements go through POST /api/place. */
 export function handleSse(
   req: IncomingMessage,
   res: ServerResponse,
@@ -21,7 +21,7 @@ export function handleSse(
   // When EventSource reconnects by itself it sends the last `id:` it received. The query
   // parameter only covers the first connection, made right after loading the snapshot.
   const lastEventId = req.headers['last-event-id'];
-  const after = parseEventId(
+  const after = parseCursor(
     typeof lastEventId === 'string' ? lastEventId : url.searchParams.get('after')
   );
 
@@ -40,7 +40,7 @@ export function handleSse(
 
   const client: PushClient = {
     kind: 'sse',
-    send(payload, lastId) {
+    send(payload, cursor) {
       // Do not buffer without limit for a slow client: drop it, it catches up after reconnecting.
       if (res.writableLength > maxBufferedBytes) {
         hub.counters.slowClientsDropped++;
@@ -48,7 +48,7 @@ export function handleSse(
         return;
       }
       res.write(
-        lastId === undefined ? `data: ${payload}\n\n` : `id: ${lastId}\ndata: ${payload}\n\n`
+        cursor === undefined ? `data: ${payload}\n\n` : `id: ${cursor}\ndata: ${payload}\n\n`
       );
     },
     close: () => res.destroy(),

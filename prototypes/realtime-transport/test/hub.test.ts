@@ -1,8 +1,17 @@
 import assert from 'node:assert/strict';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, it } from 'node:test';
 import { EventLog } from '../src/server/event-log.ts';
 import { Hub, type PushClient, type Waiter } from '../src/server/hub.ts';
-import type { ServerMessage } from '../src/shared/protocol.ts';
+import {
+  START,
+  formatCursor,
+  parseCursor,
+  type Cursor,
+  type ServerMessage,
+} from '../src/shared/protocol.ts';
 
 // The timers are never started: the tests call flush() themselves.
 const OPTIONS = { batchMs: 1_000, heartbeatMs: 1_000, maxBacklog: 10 };
@@ -13,15 +22,17 @@ function setup() {
   const place = (count: number) => {
     for (let i = 0; i < count; i++) assert.ok(log.place({ x: i % 64, y: 0, color: 1 }).ok);
   };
-  return { log, hub, place };
+  /** The cursor of a client whose last event is `id` of this log. */
+  const at = (id: number): Cursor => ({ id, ts: log.tsOf(id) ?? 0 });
+  return { log, hub, place, at };
 }
 
-function recorder(): PushClient & { received: { message: ServerMessage; lastId?: number }[] } {
-  const received: { message: ServerMessage; lastId?: number }[] = [];
+function recorder(): PushClient & { received: { message: ServerMessage; cursor?: string }[] } {
+  const received: { message: ServerMessage; cursor?: string }[] = [];
   return {
     kind: 'ws',
     received,
-    send: (payload, lastId) => received.push({ message: JSON.parse(payload), lastId }),
+    send: (payload, cursor) => received.push({ message: JSON.parse(payload), cursor }),
     close: () => {},
   };
 }
@@ -31,50 +42,70 @@ function ids(message: ServerMessage): number[] {
   return message.t === 'batch' ? message.events.map(([id]) => id) : [];
 }
 
+describe('cursors', () => {
+  it('round-trip, and anything malformed is null', () => {
+    assert.deepEqual(parseCursor(formatCursor({ id: 12, ts: 1_700_000_000_000 })), {
+      id: 12,
+      ts: 1_700_000_000_000,
+    });
+    assert.deepEqual(parseCursor(null), START);
+    assert.equal(parseCursor('12'), null);
+    assert.equal(parseCursor('-1:5'), null);
+  });
+});
+
 describe('Hub.catchUp', () => {
   it('returns nothing to a client that is up to date or ahead of the last batch', () => {
-    const { hub, place } = setup();
+    const { hub, place, at } = setup();
     place(3);
     hub.flush();
     place(2);
-    assert.equal(hub.catchUp(3), null);
-    assert.equal(hub.catchUp(5), null);
+    assert.equal(hub.catchUp(at(3)), null);
+    assert.equal(hub.catchUp(at(5)), null);
   });
 
-  it('returns the flushed events after the given id, not the unflushed ones', () => {
-    const { hub, place } = setup();
+  it('returns the flushed events after the cursor, not the unflushed ones', () => {
+    const { hub, place, at } = setup();
     place(3);
     hub.flush();
     place(2);
-    const missed = hub.catchUp(1);
+    const missed = hub.catchUp(at(1));
     assert.ok(missed !== null && missed !== 'reset');
     assert.deepEqual(ids(JSON.parse(missed.payload)), [2, 3]);
-    assert.equal(missed.toId, 3);
+    assert.equal(missed.cursor, formatCursor(at(3)));
   });
 
-  it('asks for a reset for an id the server never issued', () => {
+  it('asks for a reset for an id the server never issued, or a malformed cursor', () => {
     const { hub, place } = setup();
     place(3);
     hub.flush();
-    assert.equal(hub.catchUp(4), 'reset');
-    assert.equal(hub.catchUp(-1), 'reset');
+    assert.equal(hub.catchUp({ id: 4, ts: 1 }), 'reset');
+    assert.equal(hub.catchUp(null), 'reset');
+  });
+
+  it('asks for a reset when the id belongs to another log', () => {
+    // A restart that lost the log, or a restore from a backup: id 2 now names another event.
+    const { hub, place, at } = setup();
+    place(3);
+    hub.flush();
+    assert.equal(hub.catchUp({ id: 2, ts: at(2).ts - 1 }), 'reset');
   });
 
   it('asks for a reset when the backlog is longer than maxBacklog', () => {
-    const { hub, place } = setup();
+    const { hub, place, at } = setup();
     place(20);
     hub.flush();
-    assert.equal(hub.catchUp(9), 'reset');
-    assert.notEqual(hub.catchUp(10), 'reset');
+    assert.equal(hub.catchUp(at(9)), 'reset');
+    assert.notEqual(hub.catchUp(at(10)), 'reset');
   });
 });
 
 describe('Hub.flush', () => {
   it('sends every new event exactly once to every client', () => {
-    const { hub, place } = setup();
+    const { hub, place, at } = setup();
     const [a, b] = [recorder(), recorder()];
-    hub.connect(a, 0);
-    hub.connect(b, 0);
+    hub.connect(a, START);
+    hub.connect(b, START);
     place(2);
     hub.flush();
     place(1);
@@ -86,8 +117,8 @@ describe('Hub.flush', () => {
         [[1, 2], [3]]
       );
       assert.deepEqual(
-        client.received.map(({ lastId }) => lastId),
-        [2, 3]
+        client.received.map(({ cursor }) => cursor),
+        [formatCursor(at(2)), formatCursor(at(3))]
       );
     }
   });
@@ -97,7 +128,7 @@ describe('Hub.flush', () => {
     place(2);
     hub.flush();
     const client = recorder();
-    hub.connect(client, 0);
+    hub.connect(client, START);
     place(1);
     hub.flush();
     assert.deepEqual(
@@ -109,8 +140,8 @@ describe('Hub.flush', () => {
   it('tells a client of a restarted server to reset', () => {
     const { hub } = setup();
     const client = recorder();
-    hub.connect(client, 7);
-    assert.deepEqual(client.received, [{ message: { t: 'reset' }, lastId: undefined }]);
+    hub.connect(client, { id: 7, ts: 1 });
+    assert.deepEqual(client.received, [{ message: { t: 'reset' }, cursor: undefined }]);
   });
 
   it('wakes each parked long poll once', () => {
@@ -123,5 +154,35 @@ describe('Hub.flush', () => {
     place(1);
     hub.flush();
     assert.equal(wakes, 1);
+  });
+});
+
+describe('Hub.dropRandom', () => {
+  it('closes the given number of connections and forgets them', () => {
+    const { hub } = setup();
+    let closed = 0;
+    for (let i = 0; i < 5; i++) hub.connect({ ...recorder(), close: () => closed++ }, START);
+    assert.equal(hub.dropRandom(2), 2);
+    assert.equal(closed, 2);
+    assert.equal(hub.counts().ws, 3);
+    assert.equal(hub.dropRandom(10), 3);
+    assert.equal(hub.counts().ws, 0);
+  });
+});
+
+describe('EventLog with a file', () => {
+  it('reads its events back after a restart', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'event-log-'));
+    const file = path.join(dir, 'nested', 'events.jsonl');
+    const before = new EventLog(file);
+    assert.ok(before.place({ x: 1, y: 2, color: 3 }).ok);
+    assert.ok(before.place({ x: 1, y: 2, color: 4 }).ok);
+
+    const after = new EventLog(file);
+    assert.equal(after.lastId, 2);
+    assert.deepEqual(after.range(0, 2), before.range(0, 2));
+    assert.equal(after.snapshot().cells[2 * 64 + 1], 4);
+    assert.equal(after.snapshot().lastEventTs, before.tsOf(2));
+    assert.equal(after.place({ x: 0, y: 0, color: 0 }).ok && after.lastId, 3);
   });
 });

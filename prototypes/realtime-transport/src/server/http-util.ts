@@ -1,12 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-/** Parses an event id from a query parameter or a header. Missing = 0, invalid = -1 (reset). */
-export function parseEventId(value: string | null | undefined): number {
-  if (value === null || value === undefined || value === '') return 0;
-  const id = Number(value);
-  return Number.isSafeInteger(id) && id >= 0 ? id : -1;
-}
-
 export function sendJson(res: ServerResponse, status: number, body: string): void {
   res.writeHead(status, {
     'Content-Type': 'application/json',

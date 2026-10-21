@@ -58,7 +58,35 @@ export interface CanvasSnapshot {
   height: number;
   /** Id of the last event included in `cells`. */
   lastEventId: number;
+  /** Time of that event, 0 if there is none. Together with the id it makes the cursor. */
+  lastEventTs: number;
   cells: number[];
+}
+
+/**
+ * Where a client stands in the log: its last event's id and time, as `<id>:<ts>`. The id alone is
+ * not enough. After a restart that lost the log, or a restore from a backup, the same ids are
+ * issued again for other events, and a client would continue in the wrong log without any gap.
+ * The time tells the two events apart.
+ */
+export interface Cursor {
+  id: number;
+  ts: number;
+}
+
+export const START: Cursor = { id: 0, ts: 0 };
+
+export function formatCursor({ id, ts }: Cursor): string {
+  return `${id}:${ts}`;
+}
+
+/** Missing = the start of the log; malformed = `null`, which the server answers with a reset. */
+export function parseCursor(value: string | null | undefined): Cursor | null {
+  if (value === null || value === undefined || value === '') return START;
+  const match = /^(\d+):(\d+)$/.exec(value);
+  if (match === null) return null;
+  const cursor = { id: Number(match[1]), ts: Number(match[2]) };
+  return Number.isSafeInteger(cursor.id) && Number.isSafeInteger(cursor.ts) ? cursor : null;
 }
 
 export function toWire(event: PixelEvent): WireEvent {

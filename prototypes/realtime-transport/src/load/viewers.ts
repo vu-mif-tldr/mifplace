@@ -22,10 +22,22 @@ const sampler = new ProcessSampler();
 let failed = 0;
 let measuring = false;
 let latency = new Histogram();
+let outages = new Histogram();
 let baseline = emptyStats();
+/** Set after a server restart: the event id a viewer needs to count as caught up. */
+let target = Infinity;
+/**
+ * Viewers that applied an event after `target` was set. Without this, a viewer that has not yet
+ * noticed a restart which lost the log would count, because its old ids are higher than the new.
+ */
+let fresh = new Set<LiveCanvas>();
 
 const post = (message: FromViewers) => port.postMessage(message);
 const countOpen = () => viewers.filter((viewer) => viewer.state === 'open').length;
+const countCaughtUp = () =>
+  viewers.filter(
+    (viewer) => viewer.state === 'open' && viewer.lastEventId >= target && fresh.has(viewer)
+  ).length;
 
 function totalStats() {
   const total = emptyStats();
@@ -34,18 +46,32 @@ function totalStats() {
 }
 
 const progressTimer = setInterval(() => {
-  post({ t: 'progress', started: viewers.length, open: countOpen(), failed });
-}, 500);
+  post({
+    t: 'progress',
+    started: viewers.length,
+    open: countOpen(),
+    failed,
+    caughtUp: countCaughtUp(),
+  });
+}, 250);
 
 port.on('message', (message: ToViewers) => {
-  if (message.t === 'measure') {
-    measuring = true;
-    latency = new Histogram();
-    baseline = totalStats();
-    // Starts one interval that lasts the whole window: its p99 is over thousands of ticks.
-    sampler.sample();
-  } else {
-    void finish(message.targetId, message.drainMs);
+  switch (message.t) {
+    case 'measure':
+      measuring = true;
+      latency = new Histogram();
+      outages = new Histogram();
+      baseline = totalStats();
+      // Starts one interval that lasts the whole window: its p99 is over thousands of ticks.
+      sampler.sample();
+      break;
+    case 'target':
+      target = message.id;
+      fresh = new Set();
+      break;
+    case 'finish':
+      void finish(message.targetId, message.drainMs);
+      break;
   }
 });
 
@@ -71,6 +97,7 @@ async function finish(targetId: number, drainMs: number): Promise<void> {
       behind,
       stats,
       latency: latency.data(),
+      outages: outages.data(),
       eventLoop: { p99, max },
     },
   });
@@ -79,12 +106,26 @@ async function finish(targetId: number, drainMs: number): Promise<void> {
 async function ramp(): Promise<void> {
   const pauseMs = 1_000 / config.rampPerSecond;
   for (let i = 0; i < config.viewers; i++) {
-    const viewer = new LiveCanvas({
+    // Measures every outage: from losing the open connection to having one again.
+    let wasOpen = false;
+    let downSince: number | null = null;
+    const viewer: LiveCanvas = new LiveCanvas({
       baseUrl: config.url,
+      snapshotUrl: config.snapshotUrl,
       transport: config.transport,
       ...config.client,
       onApplied: (ms) => {
         if (measuring) latency.record(ms);
+        if (target !== Infinity) fresh.add(viewer);
+      },
+      onChange: () => {
+        const open = viewer.state === 'open';
+        if (wasOpen && !open) downSince = performance.now();
+        if (open && downSince !== null) {
+          if (measuring) outages.record(performance.now() - downSince);
+          downSince = null;
+        }
+        wasOpen = open;
       },
     });
     viewers.push(viewer);
