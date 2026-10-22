@@ -114,4 +114,4 @@ sudo docker compose logs -f     # app logs (rotated, at most 30 MB)
 sudo docker compose down -v     # stop and DELETE the database: an empty canvas on the next up -d
 ```
 
-Backups are not set up yet (MP-56, item 9).
+Backups are not set up yet (MP-73).
