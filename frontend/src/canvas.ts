@@ -1,30 +1,23 @@
 import type { CanvasState } from './api';
 import { PALETTE } from './palette';
 
-// Canvas size in cells (same as in the backend DB)
-export const CANVAS_WIDTH = 128;
-export const CANVAS_HEIGHT = 128;
-
-// Cell size on screen: 128 * 5 = 640x640 px
-export const PIXEL_SIZE = 5;
-
-// Color of cells nobody has painted yet
-const BACKGROUND_COLOR = '#ffffff';
+// The canvas has 128x128 cells, each cell is 5x5 px on screen (640x640 px in total)
+const CELL_SIZE = 5;
 
 // Draw the whole canvas received from the server
 export function drawCanvas(canvas: HTMLCanvasElement, state: CanvasState) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  // Start from a blank canvas
-  ctx.fillStyle = BACKGROUND_COLOR;
+  // White background for cells nobody has painted
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Turn each position into a column (x) and row (y)
+  // Turn each position into a column (x) and a row (y)
   for (const [position, colorId] of state.pixels) {
     const x = position % state.width;
     const y = Math.floor(position / state.width);
-    paintCell(canvas, x, y, PALETTE[colorId] ?? BACKGROUND_COLOR);
+    paintCell(canvas, x, y, PALETTE[colorId]);
   }
 }
 
@@ -34,13 +27,13 @@ export function paintCell(canvas: HTMLCanvasElement, x: number, y: number, color
   if (!ctx) return;
 
   ctx.fillStyle = color;
-  ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+  ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
 }
 
-// Which cell was clicked (offsetX/offsetY = position inside the canvas)
+// Find which cell was clicked (offsetX/offsetY = click position inside the canvas)
 export function getClickedCell(event: MouseEvent) {
   return {
-    x: Math.floor(event.offsetX / PIXEL_SIZE),
-    y: Math.floor(event.offsetY / PIXEL_SIZE),
+    x: Math.floor(event.offsetX / CELL_SIZE),
+    y: Math.floor(event.offsetY / CELL_SIZE),
   };
 }

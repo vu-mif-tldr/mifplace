@@ -1,14 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { getCanvas, placePixel } from './api';
-import {
-  CANVAS_HEIGHT,
-  CANVAS_WIDTH,
-  PIXEL_SIZE,
-  drawCanvas,
-  getClickedCell,
-  paintCell,
-} from './canvas';
+import { drawCanvas, getClickedCell, paintCell } from './canvas';
 import { PALETTE } from './palette';
 
 // Currently selected color (black by default)
@@ -17,12 +10,12 @@ const selectedColor = ref(PALETTE[0]);
 // The <canvas> element
 const canvasEl = ref<HTMLCanvasElement | null>(null);
 
-// Loading flag and error messages (empty string = no error)
+// Is the canvas still loading? Error texts are empty when there is no error.
 const loading = ref(true);
 const loadError = ref('');
 const pixelError = ref('');
 
-// Fetch the canvas from the server and draw it
+// Get the canvas from the server and draw it
 async function loadCanvas() {
   loading.value = true;
   loadError.value = '';
@@ -126,8 +119,8 @@ async function onCanvasClick(event: MouseEvent) {
         <canvas
           id="canvas"
           ref="canvasEl"
-          :width="CANVAS_WIDTH * PIXEL_SIZE"
-          :height="CANVAS_HEIGHT * PIXEL_SIZE"
+          width="640"
+          height="640"
           :style="{ transform: `translate(${x}px, ${y}px) scale(${scale})` }"
           @click="onCanvasClick"
         ></canvas>
