@@ -12,6 +12,8 @@ npm run dev     # backend (3000) ir frontend (5173) kartu
 
 Reikia Node 24 (`nvm use`). Kitos komandos: `npm run check`, `npm run test:coverage`, `npm run clean`.
 
+Diegimas į serverį: [deploy/README.md](deploy/README.md).
+
 ## Komandos nariai:
 
 - Dmitrij Kosmakov

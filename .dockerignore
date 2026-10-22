@@ -1,0 +1,13 @@
+# Only what the Dockerfile needs. Everything else (local .env and database, node_modules,
+# build output, prototypes) stays out of the build context and the image.
+*
+!package.json
+!package-lock.json
+!tsconfig.base.json
+!backend
+!frontend
+**/node_modules
+**/dist
+**/data
+**/.env
+**/coverage
