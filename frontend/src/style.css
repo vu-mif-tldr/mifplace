@@ -61,13 +61,9 @@ main {
   border-radius: 4px;
 }
 
-#canvas-section {
-  text-align: center;
-}
-
 #viewport {
-  width: 800px;
-  height: 600px;
+  width: 640px;
+  height: 640px;
   overflow: hidden;
   margin: 0 auto;
   border: 2px solid #333;
@@ -78,4 +74,8 @@ main {
   display: block;
   transform-origin: 0 0;
   image-rendering: pixelated;
+}
+
+.error {
+  color: #c00;
 }
