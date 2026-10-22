@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import { ignores, rules } from '../eslint.shared.mjs';
 
 export default tseslint.config(
   js.configs.recommended,
@@ -11,12 +12,9 @@ export default tseslint.config(
         project: './tsconfig.json',
       },
     },
-    rules: {
-      '@typescript-eslint/no-unused-vars': 'warn',
-      '@typescript-eslint/no-explicit-any': 'warn',
-    },
+    rules,
   },
   {
-    ignores: ['dist/**', 'node_modules/**'],
+    ignores,
   }
 );
