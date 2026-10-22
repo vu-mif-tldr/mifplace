@@ -1,74 +1,80 @@
-import { paintPixel } from './canvas';
+import { drawCanvas, getClickedCell, paintCell } from './canvas';
 import { PALETTE } from './palette';
 
 function fakeCanvas() {
   const ctx = { fillStyle: '', fillRect: vi.fn() };
-  const canvas = { getContext: vi.fn(() => ctx) } as unknown as HTMLCanvasElement;
+  const canvas = {
+    width: 640,
+    height: 640,
+    getContext: vi.fn(() => ctx),
+  } as unknown as HTMLCanvasElement;
   return { canvas, ctx };
 }
 
+const noContextCanvas = () => ({ getContext: () => null }) as unknown as HTMLCanvasElement;
+
 const click = (offsetX: number, offsetY: number) => ({ offsetX, offsetY }) as MouseEvent;
 
-describe('paintPixel', () => {
-  const fetchMock = vi.fn();
-
-  beforeEach(() => {
-    fetchMock.mockReset();
-    fetchMock.mockResolvedValue({ ok: true, status: 200 });
-    vi.stubGlobal('fetch', fetchMock);
+describe('getClickedCell', () => {
+  it('turns the click position into a cell (5x5 px each)', () => {
+    expect(getClickedCell(click(12, 7))).toEqual({ x: 2, y: 1 });
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
+  it('keeps clicks on a cell edge in that cell', () => {
+    expect(getClickedCell(click(0, 4.9))).toEqual({ x: 0, y: 0 });
+    expect(getClickedCell(click(5, 5))).toEqual({ x: 1, y: 1 });
   });
+});
 
-  it('fills the cell under the click with the chosen colour', async () => {
+describe('paintCell', () => {
+  it('fills the cell with the given colour', () => {
     const { canvas, ctx } = fakeCanvas();
 
-    await paintPixel(canvas, PALETTE[5], click(25, 37));
+    paintCell(canvas, 2, 3, PALETTE[5]);
 
     expect(ctx.fillStyle).toBe(PALETTE[5]);
-    expect(ctx.fillRect).toHaveBeenCalledWith(20, 30, 10, 10);
+    expect(ctx.fillRect).toHaveBeenCalledWith(10, 15, 5, 5);
   });
 
-  it('posts the cell and the palette index to the API', async () => {
-    const { canvas } = fakeCanvas();
+  it('does nothing when the canvas has no 2d context', () => {
+    expect(() => paintCell(noContextCanvas(), 0, 0, PALETTE[0])).not.toThrow();
+  });
+});
 
-    await paintPixel(canvas, PALETTE[5], click(25, 37));
+describe('drawCanvas', () => {
+  it('paints a white background, then every pixel from the server', () => {
+    const { canvas, ctx } = fakeCanvas();
 
-    expect(fetchMock).toHaveBeenCalledOnce();
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toMatch(/\/api\/pixels$/);
-    expect(init.method).toBe('POST');
-    expect(JSON.parse(init.body)).toEqual({ x: 2, y: 3, colorIndex: 5 });
+    // position = y * width + x, so 130 is x = 2, y = 1 on a 128-wide canvas
+    drawCanvas(canvas, {
+      width: 128,
+      height: 128,
+      pixels: [
+        [0, 3],
+        [130, 5],
+      ],
+    });
+
+    expect(ctx.fillRect.mock.calls).toEqual([
+      [0, 0, 640, 640],
+      [0, 0, 5, 5],
+      [10, 5, 5, 5],
+    ]);
+    expect(ctx.fillStyle).toBe(PALETTE[5]);
   });
 
-  it('logs an error when the server rejects the pixel', async () => {
-    const { canvas } = fakeCanvas();
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    fetchMock.mockResolvedValue({ ok: false, status: 400 });
+  it('leaves only the white background when nothing is painted', () => {
+    const { canvas, ctx } = fakeCanvas();
 
-    await paintPixel(canvas, PALETTE[0], click(0, 0));
+    drawCanvas(canvas, { width: 128, height: 128, pixels: [] });
 
-    expect(error).toHaveBeenCalledOnce();
+    expect(ctx.fillRect).toHaveBeenCalledOnce();
+    expect(ctx.fillStyle).toBe('#ffffff');
   });
 
-  it('logs an error when the request fails', async () => {
-    const { canvas } = fakeCanvas();
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    fetchMock.mockRejectedValue(new Error('network down'));
+  it('does nothing when the canvas has no 2d context', () => {
+    const state = { width: 128, height: 128, pixels: [[0, 3]] as [number, number][] };
 
-    await paintPixel(canvas, PALETTE[0], click(0, 0));
-
-    expect(error).toHaveBeenCalledOnce();
-  });
-
-  it('does nothing when the canvas has no 2d context', async () => {
-    const canvas = { getContext: () => null } as unknown as HTMLCanvasElement;
-
-    await paintPixel(canvas, PALETTE[0], click(0, 0));
-
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(() => drawCanvas(noContextCanvas(), state)).not.toThrow();
   });
 });
