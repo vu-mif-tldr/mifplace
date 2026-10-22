@@ -40,17 +40,62 @@ async function loadCanvas() {
 // Load the canvas when the page opens
 onMounted(loadCanvas);
 
-// Send the pixel to the server, draw it only if the server accepts it
-async function onCanvasClick(event: MouseEvent) {
-  if (!canvasEl.value) return;
+const scale = ref(1);
+const x = ref(0);
+const y = ref(0);
 
-  const { x, y } = getClickedCell(event);
+function onWheel(event: WheelEvent) {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  const mouseX = event.clientX - rect.left;
+  const mouseY = event.clientY - rect.top;
+
+  const zoom = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+  const newScale = Math.min(20, Math.max(0.5, scale.value * zoom));
+  const ratio = newScale / scale.value;
+
+  x.value = mouseX - (mouseX - x.value) * ratio;
+  y.value = mouseY - (mouseY - y.value) * ratio;
+  scale.value = newScale;
+}
+
+let dragging = false;
+let moved = false;
+let lastX = 0;
+let lastY = 0;
+let startX = 0;
+let startY = 0;
+
+function onMouseDown(event: MouseEvent) {
+  dragging = true;
+  moved = false;
+  startX = lastX = event.clientX;
+  startY = lastY = event.clientY;
+}
+
+function onMouseMove(event: MouseEvent) {
+  if (!dragging) return;
+
+  if (Math.hypot(event.clientX - startX, event.clientY - startY) > 4) moved = true;
+  if (!moved) return;
+
+  x.value += event.clientX - lastX;
+  y.value += event.clientY - lastY;
+  lastX = event.clientX;
+  lastY = event.clientY;
+}
+
+// Send the pixel to the server, draw it only if the server accepts it.
+// Ignored at the end of a drag, so moving the canvas does not place a pixel.
+async function onCanvasClick(event: MouseEvent) {
+  if (moved || !canvasEl.value) return;
+
+  const cell = getClickedCell(event);
   const color = selectedColor.value;
 
   try {
-    await placePixel(x, y, PALETTE.indexOf(color));
+    await placePixel(cell.x, cell.y, PALETTE.indexOf(color));
     pixelError.value = '';
-    paintCell(canvasEl.value, x, y, color);
+    paintCell(canvasEl.value, cell.x, cell.y, color);
   } catch (error) {
     console.error(error);
     pixelError.value = 'Pikselio padėti nepavyko';
@@ -69,14 +114,24 @@ async function onCanvasClick(event: MouseEvent) {
         <button @click="loadCanvas">Bandyti dar kartą</button>
       </div>
 
-      <canvas
+      <div
         v-show="!loading && !loadError"
-        id="canvas"
-        ref="canvasEl"
-        :width="CANVAS_WIDTH * PIXEL_SIZE"
-        :height="CANVAS_HEIGHT * PIXEL_SIZE"
-        @click="onCanvasClick"
-      ></canvas>
+        id="viewport"
+        @wheel.prevent="onWheel"
+        @mousedown="onMouseDown"
+        @mousemove="onMouseMove"
+        @mouseup="dragging = false"
+        @mouseleave="dragging = false"
+      >
+        <canvas
+          id="canvas"
+          ref="canvasEl"
+          :width="CANVAS_WIDTH * PIXEL_SIZE"
+          :height="CANVAS_HEIGHT * PIXEL_SIZE"
+          :style="{ transform: `translate(${x}px, ${y}px) scale(${scale})` }"
+          @click="onCanvasClick"
+        ></canvas>
+      </div>
       <p v-if="pixelError" class="error">{{ pixelError }}</p>
     </section>
 

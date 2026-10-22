@@ -69,6 +69,7 @@ export class MifDb {
   private readonly insertEvent;
   private readonly selectEventsAfter;
   private readonly selectLastEventId;
+  private readonly selectCanvasSize;
   private readonly healthQuery;
   private readonly appendTx;
 
@@ -79,6 +80,7 @@ export class MifDb {
     );
     this.selectEventsAfter = db.prepare(`SELECT * FROM events WHERE id > ? ORDER BY id`);
     this.selectLastEventId = db.prepare(`SELECT COALESCE(MAX(id), 0) AS id FROM events`);
+    this.selectCanvasSize = db.prepare('SELECT width, height FROM canvas');
     this.healthQuery = db.prepare('SELECT 1');
 
     // The event and the cooldown timestamp must change together.
@@ -90,6 +92,12 @@ export class MifDb {
 
   checkHealth(): void {
     this.healthQuery.get();
+  }
+
+  getCanvasSize(): { width: number; height: number } {
+    const wh = this.selectCanvasSize.get() as { width: number; height: number } | undefined;
+    if (!wh) throw new Error('getCanvasSize: canvas size is not set');
+    return wh;
   }
 
   // Appends an event to the log and returns its id.

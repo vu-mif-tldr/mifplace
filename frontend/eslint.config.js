@@ -24,6 +24,7 @@ export default tseslint.config(
         HTMLCanvasElement: 'readonly',
         Event: 'readonly',
         MouseEvent: 'readonly',
+        WheelEvent: 'readonly',
       },
     },
     rules: {

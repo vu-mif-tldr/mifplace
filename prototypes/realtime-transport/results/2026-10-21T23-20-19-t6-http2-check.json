@@ -1,0 +1,21 @@
+{
+  "url": "https://caddy:8443/",
+  "alpn": "h2",
+  "altSvc": "h3=\":8443\"; ma=2592000",
+  "streams": 10,
+  "seconds": 5,
+  "placed": 49,
+  "messagesPerStream": [
+    50,
+    50,
+    50,
+    50,
+    50,
+    50,
+    50,
+    50,
+    50,
+    50
+  ],
+  "sseConnectionsAtServer": 10
+}
