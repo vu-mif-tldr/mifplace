@@ -1,0 +1,32 @@
+{
+  "name": "realtime-transport-prototypes",
+  "private": true,
+  "version": "0.0.0",
+  "description": "MP-34: WebSocket, SSE, long polling and short polling prototypes on one shared protocol",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build:web": "tsc -p tsconfig.web.json",
+    "start": "npm run build:web && node src/server/main.ts",
+    "dev": "npm run build:web && node --watch-path=src/server --watch-path=src/shared src/server/main.ts",
+    "watch:web": "tsc -p tsconfig.web.json --watch",
+    "load": "node --experimental-eventsource --disable-warning=UNDICI-ES src/load/main.ts",
+    "load:matrix": "sh scripts/load-matrix.sh",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.web.json --noEmit",
+    "test": "node --experimental-eventsource --disable-warning=UNDICI-ES --test \"test/**/*.test.ts\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run typecheck && npm run format:check && npm test"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/ws": "^8.18.2",
+    "prettier": "^3.9.9",
+    "typescript": "^6.0.3"
+  }
+}

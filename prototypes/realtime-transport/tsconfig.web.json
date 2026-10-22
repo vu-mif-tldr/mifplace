@@ -1,0 +1,20 @@
+{
+  // The browser client: compiled to plain ES modules in dist/web, no bundler.
+  "compilerOptions": {
+    "target": "es2024",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "types": [],
+    "strict": true,
+    "rootDir": "src",
+    "outDir": "dist/web",
+    "sourceMap": true,
+    "rewriteRelativeImportExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/client", "src/shared"]
+}
