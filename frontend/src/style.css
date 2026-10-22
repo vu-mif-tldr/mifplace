@@ -20,7 +20,6 @@
 }
 
 canvas {
-  border: 1px solid #000;
   background: #fff;
   display: block;
   margin: 0 auto;
@@ -60,4 +59,23 @@ main {
   height: 64px;
   border: 2px solid #000;
   border-radius: 4px;
+}
+
+#canvas-section {
+  text-align: center;
+}
+
+#viewport {
+  width: 800px;
+  height: 600px;
+  overflow: hidden;
+  margin: 0 auto;
+  border: 2px solid #333;
+  box-sizing: content-box;
+}
+
+#canvas {
+  display: block;
+  transform-origin: 0 0;
+  image-rendering: pixelated;
 }
