@@ -1,0 +1,24 @@
+# T6: the prototype server behind Caddy with TLS, the way production will run it (NFR-9).
+{
+	# Certificates from Caddy's own local CA, so no public domain is needed. The load tool trusts
+	# its root certificate through NODE_EXTRA_CA_CERTS.
+	local_certs
+	# The same port inside and outside the container, so that the Alt-Svc header (HTTP/3) is right
+	# for a browser on the host.
+	https_port 8443
+	http_port 8080
+	admin off
+}
+
+# "caddy" for the load tool inside the Docker network, "localhost" for a browser on the host.
+caddy, localhost {
+	# Empty by default. CADDY_ENCODE="encode zstd gzip" turns compression on, to see whether it
+	# makes Caddy buffer the event stream.
+	{$CADDY_ENCODE}
+	reverse_proxy server:3100
+}
+
+# Caddy's own CPU and memory, read by the load tool (--proxy-metrics-url).
+http://:9180 {
+	metrics
+}

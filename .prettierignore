@@ -5,3 +5,6 @@ package-lock.json
 public/
 
 LICENSE
+
+# Prototypes are standalone projects with their own Prettier config and ignores
+prototypes/
