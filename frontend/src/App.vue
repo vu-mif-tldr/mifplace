@@ -36,6 +36,14 @@ onMounted(loadCanvas);
 const scale = ref(1);
 const x = ref(0);
 const y = ref(0);
+const VIEW_WIDTH = 800;
+const VIEW_HEIGHT = 600;
+
+function clampPosition() {
+  // x and y can't go above 0, or below the point where the far edge would show a gap
+  x.value = Math.min(0, Math.max(VIEW_WIDTH - VIEW_WIDTH * scale.value, x.value));
+  y.value = Math.min(0, Math.max(VIEW_HEIGHT - VIEW_HEIGHT * scale.value, y.value));
+}
 
 function onWheel(event: WheelEvent) {
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -43,12 +51,13 @@ function onWheel(event: WheelEvent) {
   const mouseY = event.clientY - rect.top;
 
   const zoom = event.deltaY < 0 ? 1.1 : 1 / 1.1;
-  const newScale = Math.min(20, Math.max(0.5, scale.value * zoom));
+  const newScale = Math.min(20, Math.max(1, scale.value * zoom));
   const ratio = newScale / scale.value;
 
   x.value = mouseX - (mouseX - x.value) * ratio;
   y.value = mouseY - (mouseY - y.value) * ratio;
   scale.value = newScale;
+  clampPosition();
 }
 
 let dragging = false;
@@ -75,6 +84,7 @@ function onMouseMove(event: MouseEvent) {
   y.value += event.clientY - lastY;
   lastX = event.clientX;
   lastY = event.clientY;
+  clampPosition();
 }
 
 // Send the pixel to the server, draw it only if the server accepts it.
