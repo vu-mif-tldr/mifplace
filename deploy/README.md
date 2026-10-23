@@ -25,8 +25,11 @@ Files in this directory: [`compose.yaml`](compose.yaml) (the app container),
 
 Needs SSH access to the server with `sudo`.
 
-1. **DNS.** At Spaceship: Domain Manager → `vu.place` → Advanced DNS, add `CNAME`, host `demo`,
-   value `vu.place`. Check: `dig +short demo.vu.place` prints the server address.
+1. **DNS.** The domain is registered at Spaceship, its DNS is on Cloudflare (Free plan). In
+   Cloudflare: `vu.place` → DNS → Records, add `CNAME`, name `demo`, target `vu.place`, proxy
+   status **DNS only** (grey cloud). Caddy gets the certificates itself, and behind the Cloudflare
+   proxy the app would see Cloudflare addresses instead of the users' ones.
+   Check: `dig +short demo.vu.place` prints the server address.
 
 2. **Firewall.** Only SSH, HTTP and HTTPS are open:
 
