@@ -1,5 +1,14 @@
 import express from 'express';
 import * as path from 'node:path';
+import rateLimit from 'express-rate-limit';
+
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20, // limit each IP to 20 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests, please try again later.',
+});
 
 export interface AppConfig {
   gridWidth: number;
@@ -36,6 +45,10 @@ export function createApp({
   appendEvent,
 }: AppConfig) {
   const app = express();
+
+  app.get('/', limiter, (req, res) => {
+    res.sendFile(path.join(STATIC_PATH, 'index.html'));
+  });
 
   app.get('/api/canvas', (_req, res) => {
     res.json(getCanvasState());
