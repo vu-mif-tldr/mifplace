@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Realtime transport prototype</title>
+    <style>
+      body {
+        margin: 16px;
+        font:
+          14px/1.4 system-ui,
+          sans-serif;
+        color: #222;
+        background: #fafafa;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 16px;
+        margin-bottom: 16px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 18px;
+      }
+      h2 {
+        margin: 0 0 4px;
+        font-size: 14px;
+      }
+      main {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+      section {
+        min-width: 0;
+      }
+      canvas {
+        display: block;
+        width: min(512px, calc(100vw - 32px));
+        aspect-ratio: 1;
+        border: 1px solid #ccc;
+        image-rendering: pixelated;
+        cursor: crosshair;
+      }
+      #palette {
+        display: flex;
+        gap: 4px;
+        margin-top: 8px;
+      }
+      #palette button {
+        width: 32px;
+        height: 32px;
+        border: 1px solid #999;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #palette button[aria-pressed='true'] {
+        outline: 3px solid #0083c7;
+        outline-offset: 1px;
+      }
+      pre {
+        margin: 0 0 16px;
+        font-size: 12px;
+      }
+      #log {
+        max-height: 520px;
+        margin: 0;
+        padding-left: 0;
+        overflow-y: auto;
+        font:
+          12px ui-monospace,
+          monospace;
+        list-style: none;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Realtime transport prototype</h1>
+      <label
+        >Transport
+        <select id="transport"></select
+      ></label>
+      <button id="drop" type="button">Drop my connection</button>
+      <button id="drop-all" type="button">Server: drop all connections</button>
+    </header>
+    <main>
+      <section>
+        <canvas id="canvas" width="64" height="64"></canvas>
+        <div id="palette"></div>
+      </section>
+      <section>
+        <h2>This client</h2>
+        <pre id="stats"></pre>
+        <h2>Server</h2>
+        <pre id="server"></pre>
+      </section>
+      <section>
+        <h2>Log</h2>
+        <ol id="log"></ol>
+      </section>
+    </main>
+    <script type="module" src="/js/client/main.js"></script>
+  </body>
+</html>

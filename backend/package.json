@@ -7,13 +7,13 @@
     "build": "npx tsc -p tsconfig.build.json",
     "typecheck": "npx tsc --noEmit",
     "lint": "eslint .",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
     "test": "tsx --test \"src/**/*.test.ts\"",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
+    "test:coverage": "tsx --test --experimental-test-coverage \"src/**/*.test.ts\"",
+    "check": "npm run typecheck && npm run lint && npm run test",
     "db:setup:prod": "node dist/scripts/setup-db.js",
     "db:setup:dev": "tsx src/scripts/setup-db.ts",
     "db:seed:dev": "tsx src/scripts/seed-events.ts",
+    "dev": "tsx watch src/server.ts",
     "watch": "npx tsc -p tsconfig.build.json --watch",
     "start": "node dist/server.js"
   },
@@ -22,20 +22,16 @@
   "license": "ISC",
   "type": "module",
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^9.6.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^24.0.0",
-    "eslint": "^10.12.0",
-    "prettier": "^3.9.9",
-    "tsx": "^4.23.15",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.71.1"
+    "tsx": "^4.23.15"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
     "cors": "^2.8.6",
-    "express": "^5.3.0"
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1"
   }
 }

@@ -1,0 +1,31 @@
+# Parts of /etc/caddy/Caddyfile on the server, see README.md next to this file.
+# The (security) snippet goes at the top of the file, after the global options block if there is
+# one, and every site imports it, vu.place too. Caddy gets the certificate for demo.vu.place itself
+# once the name points to the server.
+
+# Security headers for every site.
+(security) {
+	header {
+		# Browsers use only HTTPS for a year, even when a link says http://.
+		Strict-Transport-Security "max-age=31536000"
+		# A file is used only as the type it is served with, browsers do not guess.
+		X-Content-Type-Options nosniff
+		# Other sites see only https://<host>, not the full URL the user came from.
+		Referrer-Policy strict-origin-when-cross-origin
+		# No other site may show ours in a frame: a page could overlay the canvas and trick users
+		# into placing pixels (clickjacking). A full CSP (default-src 'self') needs testing with
+		# the frontend first.
+		Content-Security-Policy "frame-ancestors 'none'"
+	}
+}
+
+demo.vu.place {
+	import security
+	# The app has no sign-in yet: without a password anyone could draw on the demo canvas.
+	basic_auth {
+		demo <output of: caddy hash-password>
+	}
+	# Express does not compress responses.
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3001
+}

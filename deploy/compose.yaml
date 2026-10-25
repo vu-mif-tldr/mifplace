@@ -1,0 +1,45 @@
+# The demo at https://demo.vu.place, see README.md next to this file.
+#
+# Caddy runs on the host, not in Compose: it terminates TLS, asks for the password and forwards
+# everything to the app port below. The image is built by .github/workflows/docker.yml.
+#
+#   docker compose pull && docker compose up -d     update to the latest main
+#   MIFPLACE_TAG=sha-1a2b3c4 in .env                pin a version (rollback)
+
+name: mifplace-demo
+
+services:
+  app:
+    image: ghcr.io/vu-mif-tldr/mifplace:${MIFPLACE_TAG:-main}
+    restart: unless-stopped
+    ports:
+      # Loopback only: a port published on all interfaces bypasses ufw and would be reachable
+      # from the internet without TLS and without the password.
+      - '127.0.0.1:3001:3000'
+    volumes:
+      - data:/data
+    mem_limit: 1024m
+    # Hardening: if the app is ever taken over, the attacker can do little inside the container.
+    # The image's files cannot be changed, the app writes only to /data (the volume above).
+    read_only: true
+    # Writable scratch space in memory, for libraries that expect /tmp.
+    tmpfs:
+      - /tmp
+    # The app needs no Linux capabilities: it runs as the node user and listens on 3000, not on a
+    # port below 1024.
+    cap_drop:
+      - ALL
+    # No privilege gain through setuid binaries (su, etc.) inside the image.
+    security_opt:
+      - no-new-privileges:true
+    # Docker keeps container logs forever by default.
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+volumes:
+  # The SQLite database. Survives container re-creation and image updates,
+  # `docker compose down -v` deletes it.
+  data:

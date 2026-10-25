@@ -1,5 +1,4 @@
 dist/
-public/
 node_modules/
+results/
 package-lock.json
-.prettierrc
