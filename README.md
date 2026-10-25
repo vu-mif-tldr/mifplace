@@ -21,3 +21,4 @@ Diegimas į serverį: [deploy/README.md](deploy/README.md).
 - Lukas Vielius
 - Renatas Podberiozko
 - Lukas Petkevicius
+- Titas Mockevicius
