@@ -18,7 +18,7 @@ The frontend requests the palette **once during initial page load**. It keeps th
 ]
 ```
 
-`id` is the color identifier, and `color` is a `#RRGGBB` string. IDs may be non-consecutive. **Palette ID `0` is reserved for unpainted pixels and must not be assigned to a color.** Clients must not use array indexes as color IDs.
+`id` is the color identifier, and `color` is a `#RRGGBB` string. IDs may be non-consecutive. **Any negative color ID represents an unpainted pixel and must not be assigned to a palette color**. Clients must not use array indexes as color IDs.
 
 **Error:** `500 Internal Server Error` if the palette cannot be retrieved:
 
@@ -36,7 +36,7 @@ The frontend requests the **full canvas snapshot once during initial page load**
 {
   "width": 3,
   "height": 2,
-  "pixels": [5, 12, 0, 0, 5, 0],
+  "pixels": [5, 12, -1, -2, 5, -3],
   "eventId": 102,
   "timestamp": 1760000000000
 }
@@ -44,7 +44,7 @@ The frontend requests the **full canvas snapshot once during initial page load**
 
 - `width`, `height`: canvas dimensions. They are sent with the initial snapshot, not repeated in live pixel updates.
 - `pixels`: **flat array of color IDs**. Array index is the pixel `position`; the array length is exactly `width * height`. `position = y * width + x`, starting at the top-left.
-- `0`: unpainted pixel, rendered with the canvas background. `0` is reserved and cannot be used as a palette color ID.
+- Any negative value (`colorId < 0`) represents an unpainted pixel, rendered with the canvas background. Palette color IDs must be non-negative; `0` is a valid color ID.
 - `eventId`, `timestamp`: identify the **last event included in this snapshot**. `timestamp` is a Unix timestamp in milliseconds. For an empty event log both are `0`.
 
 The snapshot and its `eventId`/`timestamp` must represent the **same event-history point**. The frontend must not miss updates between the HTTP snapshot and WebSocket subscription.
