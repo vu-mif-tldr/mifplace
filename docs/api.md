@@ -6,28 +6,29 @@
 
 ### `GET /api/palette`
 
+The frontend requests the palette **once during initial page load**. It keeps the palette locally and does not fetch it again for ordinary pixel updates. A page reload or an explicit full reinitialization may fetch it again.
+
 **200 OK** — available colors:
 
 ```json
 [
-  { "id": 0, "color": "#000000" },
+  { "id": 1, "color": "#000000" },
   { "id": 5, "color": "#FFFFFF" },
   { "id": 12, "color": "#FF0000" }
 ]
 ```
 
-`id` is the color identifier, and `color` is a `#RRGGBB` string. IDs may be non-consecutive and need not start at zero. Clients must not use array indexes as color IDs.
+`id` is the color identifier, and `color` is a `#RRGGBB` string. IDs may be non-consecutive. **Palette ID `0` is reserved for unpainted pixels and must not be assigned to a color.** Clients must not use array indexes as color IDs.
 
-**Error:** If the server cannot retrieve the palette, it returns `500 Internal Server Error`:
+**Error:** `500 Internal Server Error` if the palette cannot be retrieved:
 
 ```json
-{
-  "success": false,
-  "error": "Internal server error"
-}
+{ "success": false, "error": "Internal server error" }
 ```
 
 ### `GET /api/canvas`
+
+The frontend requests the **full canvas snapshot once during initial page load**, after or alongside the palette. It does **not** poll this endpoint for routine updates. Later pixel changes arrive through WebSocket. A full snapshot is requested again after a `reset` or an explicit full reinitialization.
 
 **200 OK** — current canvas snapshot:
 
@@ -35,42 +36,38 @@
 {
   "width": 3,
   "height": 2,
-  "pixels": [[0, 5], [4, 12]],
-  "cursor": "102:1760000000000"
+  "pixels": [5, 12, 0, 0, 5, 0],
+  "eventId": 102,
+  "timestamp": 1760000000000
 }
 ```
 
-- `width`, `height`: canvas dimensions.
-- `pixels`: `[position, colorId]` pairs, matching the current canvas-state representation. Only the latest color for each painted position appears.
-- `position = y * width + x`, starting from zero at the top-left.
-- `cursor`: `<id>:<ts>` of the **last event included in this snapshot**. `ts` is a Unix timestamp in milliseconds; use `"0:0"` for an empty event log.
+- `width`, `height`: canvas dimensions. They are sent with the initial snapshot, not repeated in live pixel updates.
+- `pixels`: **flat array of color IDs**. Array index is the pixel `position`; the array length is exactly `width * height`. `position = y * width + x`, starting at the top-left.
+- `0`: unpainted pixel, rendered with the canvas background. `0` is reserved and cannot be used as a palette color ID.
+- `eventId`, `timestamp`: identify the **last event included in this snapshot**. `timestamp` is a Unix timestamp in milliseconds. For an empty event log both are `0`.
 
-The snapshot and cursor must represent the **same event-history point**, so updates cannot be missed when connecting to WebSocket.
+The snapshot and its `eventId`/`timestamp` must represent the **same event-history point**. The frontend must not miss updates between the HTTP snapshot and WebSocket subscription.
 
-**Error:** If the canvas snapshot cannot be loaded, the server returns `500 Internal Server Error`:
+**Error:** `500 Internal Server Error` if the canvas snapshot cannot be loaded:
 
 ```json
-{
-  "success": false,
-  "error": "Internal server error"
-}
+{ "success": false, "error": "Internal server error" }
 ```
 
-The server must not return a partial snapshot with status `200 OK`.
-
-**Unpainted pixels:** Positions omitted from the `pixels` array represent unpainted cells. The frontend renders them using the canvas background color. They must not be interpreted as palette color ID `0`.
+The server must not return a partial snapshot with `200 OK`.
 
 ### `POST /api/pixels`
 
-The existing endpoint remains the way to place pixels. `colorIndex` means **palette `id`**, not the index in the palette array.
+The frontend computes `position` using the canvas width obtained from `GET /api/canvas`. It sends **`position`, not `x` and `y`**. `colorIndex` is a palette `id`, not its index in the palette array.
 
 **Request:** `Content-Type: application/json`
 
 ```json
-{ "x": 1, "y": 1, "colorIndex": 12 }
+{ "position": 4, "colorIndex": 12 }
 ```
 
-`x` and `y` must be integers within the canvas bounds (`0 <= x < width`, `0 <= y < height`); `colorIndex` must identify an existing palette color.
+The backend validates that `position` is an integer in `0 <= position < width * height`, and that `colorIndex` is an integer matching an existing palette ID. The server must not trust client-side calculations without validation.
 
 **201 Created:**
 
@@ -78,38 +75,70 @@ The existing endpoint remains the way to place pixels. `colorIndex` means **pale
 { "success": true, "eventId": 103 }
 ```
 
-**Existing error responses:**
+**Error responses (target contract):**
 
-| Status | Case | JSON response 
-|  ---   | ---  | --- 
-| `400`  | Non-integer coordinates | `{"success":false,"error":"Coordinates are not a number"}` 
-| `400`  | Outside canvas | `{"success":false,"error":" Position not in canvas"}` 
-| `400`  | Invalid color | `{"success":false,"error":"Color not in palette"}` 
-| `500`  | Database insert failure | `{"success":false,"error":"Insert failed"}` 
+| Status | Case                                 | JSON response                                             |
+| ------ | ------------------------------------ | --------------------------------------------------------- |
+| `400`  | Non-integer position                 | `{"success":false,"error":"Position must be an integer"}` |
+| `400`  | Position outside canvas              | `{"success":false,"error":"Position not in canvas"}`      |
+| `400`  | Invalid palette ID                   | `{"success":false,"error":"Color not in palette"}`        |
+| `400`  | Malformed or missing required fields | `{"success":false,"error":"Invalid pixel request"}`       |
+| `500`  | Database insert failure              | `{"success":false,"error":"Insert failed"}`               |
 
-**Implementation note:** Current backend validation checks `colorIndex` against `paletteSize`, which does not support non-consecutive IDs. The backend will need to validate actual palette IDs; the POST request/response shape stays unchanged.
+**Implementation change:** The current backend accepts `{x, y, colorIndex}` and validates `colorIndex` against `paletteSize`. It must be updated to accept `{position, colorIndex}` and validate actual palette IDs. The error strings above are **proposed** for review, not claims about current behavior.
 
-## 2. WebSocket — `/api/ws?after=<id>:<ts>`
+## 2. WebSocket — `/api/ws`
 
-WebSocket sends **server → client JSON text messages only**. Pixel placement still uses HTTP POST.
+WebSocket delivers **pixel updates from server to client**. Clients place pixels through HTTP `POST /api/pixels`. The connection also uses standard WebSocket **ping/pong control frames** for connection health; those are not application JSON pixel messages.
 
-The `after` cursor is optional:
-- **Provided:** validate `id` and `ts`, replay events **after** that cursor, then send new events.
-- **Omitted:** send **only new events**; do not replay history.
+### Connecting and resuming
 
-The timestamp is required because restoring a database backup may reuse an event ID for a different event (ADR-0003, risk R2).
+**Initial connection after the snapshot:**
 
-### `pixels` — updates
+```text
+/api/ws?afterEventId=102&afterTimestamp=1760000000000
+```
+
+The two optional resume parameters form one logical checkpoint:
+
+- **Both provided:** the server validates the event ID and timestamp, sends events strictly **after** that checkpoint (catch-up), then continues with new live events.
+- **Neither provided:** the server sends **only new events** after connection; it does not replay history.
+- **Only one provided, invalid values, unknown ID, mismatched timestamp, or checkpoint too old:** the server sends `reset`.
+
+Keeping `eventId` and `timestamp` separate replaces the previous combined `cursor` field. The timestamp remains necessary to detect reused IDs after a database restore (ADR-0003, R2).
+
+### `pixels` — catch-up after disconnection
+
+When a client reconnects after being offline, the server replays events it missed, in order. Example:
 
 ```json
 {
   "type": "pixels",
-  "pixels": [[103, 4, 12], [104, 5, 5]],
-  "cursor": "104:1760000000100"
+  "pixels": [
+    [103, 4, 12],
+    [104, 5, 5]
+  ],
+  "eventId": 104,
+  "timestamp": 1760000000100
 }
 ```
 
-Each entry is `[eventId, position, colorId]`. The server batches changes every **100 ms**, sending a message **only when changes exist**. Events are applied in the order received; the message cursor identifies the last event in the batch. The client saves the new cursor only after applying the batch.
+Each entry is `[eventId, position, colorId]`. The client applies events in order and saves `eventId` and `timestamp` **only after successfully applying** the batch. The server must not create a gap between catch-up and live delivery. The client must not apply the same event twice.
+
+### `pixels` — live updates for all connected clients
+
+When any user successfully places a pixel via `POST /api/pixels`, the backend records the event and sends it to **all connected clients, including the sender**, as part of a live update batch:
+
+```json
+{
+  "type": "pixels",
+  "pixels": [[105, 1, 5]],
+  "eventId": 105,
+  "timestamp": 1760000000200
+}
+```
+
+The server batches live changes every **100 ms**, sending a JSON text message **only when at least one pixel changed**. It sends changed events, **not the entire canvas, palette, or dimensions**. The same message shape is used for catch-up and live updates so the frontend can use one handler; the distinction is _when_ the events are sent.
 
 ### `reset` — cannot resume
 
@@ -117,24 +146,24 @@ Each entry is `[eventId, position, colorId]`. The server batches changes every *
 { "type": "reset" }
 ```
 
-Sent when `after` is malformed, unknown, has a mismatched timestamp, or is too far behind. The client reloads `GET /api/canvas` and reconnects using the new snapshot cursor.
+Sent when the resume checkpoint is malformed, unknown, mismatched, or too far behind. The client requests a fresh `GET /api/canvas` snapshot and reconnects using the new `eventId` and `timestamp`. The palette need not be reloaded if it has not changed.
 
-### `hb` — heartbeat
+### Ping/pong — connection heartbeat
 
-```json
-{ "type": "hb" }
-```
+The **backend starts a heartbeat timer for each WebSocket connection**. When no other activity has occurred for **15 seconds**, it sends a standard WebSocket **ping control frame**. The client replies with a **pong control frame**; browser WebSocket implementations normally handle this automatically, without application JavaScript.
 
-Sent after **15 seconds without other messages**. It does not change pixels or the cursor.
+- **Server → client:** WebSocket `ping` control frame (not JSON).
+- **Client → server:** WebSocket `pong` control frame (not JSON).
+- **If no pong arrives:** the server marks the connection as unresponsive, closes it, and releases its connection resources. (suggested: 10 seconds after ping).
+- The client can detect a closed connection and reconnect with increasing delay and jitter. Neither ping nor pong changes pixel data or the saved event checkpoint.
 
-**Connection recovery:** On disconnect, reconnect using the last **successfully applied** cursor. Duplicate events should not be applied twice. If the client cannot safely reconcile the stream, it should reload the snapshot.
+**Connection recovery:** On disconnect, reconnect using the last **successfully applied** `eventId` and `timestamp`. If the client cannot safely reconcile events, it reloads the snapshot.
 
 ## 3. Frontend/backend flow
 
-1. **Initial load:** frontend requests palette and canvas; backend returns colors and a consistent snapshot with cursor.
-2. **Subscribe:** frontend opens `/api/ws?after=<snapshot cursor>`; backend replays missed changes and starts live updates.
-3. **Place pixel:** frontend sends `POST /api/pixels`; backend stores the event and broadcasts it through a WS `pixels` batch (including to the placing client).
-4. **Recover:** on disconnection, frontend reconnects from its last applied cursor; on `reset`, it fetches a fresh canvas snapshot.
-
-**Current implementation vs. contract:** `backend/src/canvas-state.ts` does not yet return `cursor`.
-
+1. **Initial page load:** frontend requests `GET /api/palette` and `GET /api/canvas` once, stores the palette, dimensions, full flat color array, `eventId`, and `timestamp`.
+2. **Subscribe:** frontend opens `/api/ws?afterEventId=<eventId>&afterTimestamp=<timestamp>`; backend sends any events missed since the snapshot, then streams live updates.
+3. **Place pixel:** frontend calculates `position = y * width + x` and sends `POST /api/pixels` with `position` and `colorIndex`; backend validates, saves, and broadcasts the event to all connected clients.
+4. **Apply updates:** frontend changes only the positions specified by incoming `pixels` events; it does not fetch the full canvas again after each update.
+5. **Recover:** after a disconnect, frontend reconnects using its last applied checkpoint. If it receives `reset`, it fetches a new full canvas snapshot and subscribes again. It keeps the existing palette unless it needs a full reinitialization.
+6. **Connection health:** backend sends WebSocket ping frames after 15 seconds of inactivity; clients respond with pong; dead connections are closed to free server resources.
