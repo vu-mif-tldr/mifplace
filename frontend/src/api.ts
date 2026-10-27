@@ -1,10 +1,4 @@
-import type { CanvasState, PlacePixelRequest } from '@mifplace/shared';
-
-// One color from GET /api/palette. id is the color id the server uses, not an index in the list
-export type PaletteColor = {
-  id: number;
-  color: string;
-};
+import type { CanvasState, PaletteColor, PlacePixelRequest } from '@mifplace/shared';
 
 // Get the color palette from the server
 export async function getPalette(): Promise<PaletteColor[]> {

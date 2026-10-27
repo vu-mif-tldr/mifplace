@@ -1,5 +1,4 @@
-import type { CanvasState } from '@mifplace/shared';
-import type { PaletteColor } from './api';
+import type { CanvasState, PaletteColor } from '@mifplace/shared';
 
 // The canvas has 128x128 cells, each cell is 5x5 px on screen (640x640 px in total)
 const CELL_SIZE = 5;

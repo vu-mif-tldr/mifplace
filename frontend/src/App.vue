@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { getCanvas, getPalette, placePixel, type PaletteColor } from './api';
+import type { PaletteColor } from '@mifplace/shared';
+import { getCanvas, getPalette, placePixel } from './api';
 import { drawCanvas, getClickedCell, paintCell } from './canvas';
 
 // Colors from the server, loaded together with the canvas
