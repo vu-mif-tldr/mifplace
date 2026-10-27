@@ -92,4 +92,21 @@ describe('openDb / MifDb', () => {
     mif.close();
     fs.rmSync(dir, { recursive: true });
   });
+
+  it('returns the palette ordered by color id', () => {
+    const db = new Database(':memory:');
+    migrate(db, loadMigrations(REAL_MIGRATIONS_DIR));
+    const mifdb = new MifDb(db);
+
+    const palette = mifdb.getPalette();
+    assert.equal(palette.length, 16);
+    assert.deepEqual(palette[0], { id: 0, color: '#000000' });
+    assert.deepEqual(palette[15], { id: 15, color: '#99D9EA' });
+    assert.deepEqual(
+      palette.map(({ id }) => id),
+      Array.from({ length: 16 }, (_, i) => i)
+    );
+
+    mifdb.close();
+  });
 });

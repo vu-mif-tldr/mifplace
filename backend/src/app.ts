@@ -1,7 +1,12 @@
 import express, { type Response } from 'express';
 import * as path from 'node:path';
 import rateLimit from 'express-rate-limit';
-import type { CanvasState, ErrorResponse, PlacePixelResponse } from '@mifplace/shared';
+import type {
+  CanvasState,
+  ErrorResponse,
+  PaletteColor,
+  PlacePixelResponse,
+} from '@mifplace/shared';
 import type { NewEvent } from './db.js';
 
 const limiter = rateLimit({
@@ -15,7 +20,8 @@ const limiter = rateLimit({
 export interface AppConfig {
   gridWidth: number;
   gridHeight: number;
-  paletteSize: number;
+  // Read once at start: the palette does not change while the server runs.
+  palette: PaletteColor[];
   getCanvasState: () => CanvasState;
 
   // Throws if the database is not reachable. Injected so the app can be built without a database.
@@ -37,7 +43,7 @@ type HealthResponse = {
 export function createApp({
   gridWidth,
   gridHeight,
-  paletteSize,
+  palette,
   checkHealth,
   getCanvasState,
   appendEvent,
@@ -46,6 +52,10 @@ export function createApp({
 
   app.get('/', limiter, (req, res) => {
     res.sendFile(path.join(STATIC_PATH, 'index.html'));
+  });
+
+  app.get('/api/palette', (_req, res: Response<PaletteColor[]>) => {
+    res.json(palette);
   });
 
   app.get('/api/canvas', (_req, res: Response<CanvasState>) => {
@@ -93,7 +103,7 @@ export function createApp({
       return res.status(400).json({ success: false, error: 'Coordinates are not a number' });
     } else if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
       return res.status(400).json({ success: false, error: ' Position not in canvas' });
-    } else if (colorIndex < 0 || colorIndex >= paletteSize) {
+    } else if (colorIndex < 0 || colorIndex >= palette.length) {
       return res.status(400).json({ success: false, error: 'Color not in palette' });
     } else {
       try {

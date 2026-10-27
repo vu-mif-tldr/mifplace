@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { PaletteColor } from '@mifplace/shared';
 
 export type Db = Database.Database;
 
@@ -70,6 +71,7 @@ export class MifDb {
   private readonly selectEventsAfter;
   private readonly selectLastEventId;
   private readonly selectCanvasSize;
+  private readonly selectPalette;
   private readonly healthQuery;
   private readonly appendTx;
 
@@ -81,6 +83,7 @@ export class MifDb {
     this.selectEventsAfter = db.prepare(`SELECT * FROM events WHERE id > ? ORDER BY id`);
     this.selectLastEventId = db.prepare(`SELECT COALESCE(MAX(id), 0) AS id FROM events`);
     this.selectCanvasSize = db.prepare('SELECT width, height FROM canvas');
+    this.selectPalette = db.prepare('SELECT color_id AS id, text AS color FROM palette');
     this.healthQuery = db.prepare('SELECT 1');
 
     // The event and the cooldown timestamp must change together.
@@ -98,6 +101,10 @@ export class MifDb {
     const wh = this.selectCanvasSize.get() as { width: number; height: number } | undefined;
     if (!wh) throw new Error('getCanvasSize: canvas size is not set');
     return wh;
+  }
+
+  getPalette(): PaletteColor[] {
+    return this.selectPalette.all() as PaletteColor[];
   }
 
   // Appends an event to the log and returns its id.

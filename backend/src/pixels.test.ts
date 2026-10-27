@@ -10,7 +10,7 @@ let testServer: Server;
 const app = createApp({
   gridWidth: 100,
   gridHeight: 100,
-  paletteSize: 16,
+  palette: Array.from({ length: 16 }, (_, id) => ({ id, color: '#000000' })),
   checkHealth: () => {},
   getCanvasState: () => ({ width: 100, height: 100, pixels: [] }),
   appendEvent: () => 42,
