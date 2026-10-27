@@ -1,4 +1,4 @@
-import type { CanvasState } from './api';
+import type { CanvasState } from '@mifplace/shared';
 import { PALETTE } from './palette';
 
 // The canvas has 128x128 cells, each cell is 5x5 px on screen (640x640 px in total)

@@ -4,6 +4,7 @@
 !package.json
 !package-lock.json
 !tsconfig.base.json
+!shared
 !backend
 !frontend
 **/node_modules
