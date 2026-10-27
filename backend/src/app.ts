@@ -49,6 +49,8 @@ export function createApp({
   appendEvent,
 }: AppConfig) {
   const app = express();
+  // Holds only palette ids, so any other colorIndex (missing, string, fraction, null...) is rejected.
+  const paletteIds = new Set(palette.map(({ id }) => id));
 
   app.get('/', limiter, (req, res) => {
     res.sendFile(path.join(STATIC_PATH, 'index.html'));
@@ -103,7 +105,7 @@ export function createApp({
       return res.status(400).json({ success: false, error: 'Coordinates are not a number' });
     } else if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
       return res.status(400).json({ success: false, error: ' Position not in canvas' });
-    } else if (colorIndex < 0 || colorIndex >= palette.length) {
+    } else if (!paletteIds.has(colorIndex)) {
       return res.status(400).json({ success: false, error: 'Color not in palette' });
     } else {
       try {
