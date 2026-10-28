@@ -8,7 +8,8 @@ import Database from 'better-sqlite3';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
-import { MifDb, type Db, type EventRow, type PaletteRow } from '../../backend/src/db.js';
+import type { PaletteColor } from '@mifplace/shared';
+import { MifDb, type Db, type EventRow } from '../../backend/src/db.js';
 import { loadMigrations, migrate } from '../../backend/src/scripts/migrate.js';
 import { createApp } from './app.js';
 
@@ -69,11 +70,13 @@ describe('createApp', () => {
     const size = JSON.parse(textOf(await client.callTool({ name: 'canvas_size' })));
     assert.deepEqual(size, { width: 128, height: 128 });
 
-    const palette = JSON.parse(textOf(await client.callTool({ name: 'palette' }))) as PaletteRow[];
+    const palette = JSON.parse(
+      textOf(await client.callTool({ name: 'palette' }))
+    ) as PaletteColor[];
     assert.equal(palette.length, 16);
     assert.deepEqual(
-      palette.find((c) => c.color_id === 0),
-      { color_id: 0, text: '#000000' }
+      palette.find((c) => c.id === 0),
+      { id: 0, color: '#000000' }
     );
   });
 

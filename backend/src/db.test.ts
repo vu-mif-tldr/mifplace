@@ -93,16 +93,27 @@ describe('openDb / MifDb', () => {
     fs.rmSync(dir, { recursive: true });
   });
 
-  it('reads the palette', () => {
+  it('returns the palette', () => {
     const db = new Database(':memory:');
     migrate(db, loadMigrations(REAL_MIGRATIONS_DIR));
-    const palette = new MifDb(db).getPalette();
+    const mifdb = new MifDb(db);
 
+    // The order of the colors is not guaranteed, look them up by id
+    const palette = mifdb.getPalette();
     assert.equal(palette.length, 16);
     assert.deepEqual(
-      palette.find((c) => c.color_id === 0),
-      { color_id: 0, text: '#000000' }
+      palette.find((c) => c.id === 0),
+      { id: 0, color: '#000000' }
     );
-    db.close();
+    assert.deepEqual(
+      palette.find((c) => c.id === 15),
+      { id: 15, color: '#99D9EA' }
+    );
+    assert.deepEqual(
+      palette.map(({ id }) => id).sort((a, b) => a - b),
+      Array.from({ length: 16 }, (_, i) => i)
+    );
+
+    mifdb.close();
   });
 });

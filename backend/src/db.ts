@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { PaletteColor } from '@mifplace/shared';
 
 export type Db = Database.Database;
 
@@ -15,11 +16,6 @@ export interface EventRow {
   color_id: number;
   position: number;
   timestamp: number;
-}
-
-export interface PaletteRow {
-  color_id: number;
-  text: string;
 }
 
 export interface NewEvent {
@@ -87,7 +83,7 @@ export class MifDb {
     this.selectEventsAfter = db.prepare(`SELECT * FROM events WHERE id > ? ORDER BY id`);
     this.selectLastEventId = db.prepare(`SELECT COALESCE(MAX(id), 0) AS id FROM events`);
     this.selectCanvasSize = db.prepare('SELECT width, height FROM canvas');
-    this.selectPalette = db.prepare('SELECT color_id, text FROM palette');
+    this.selectPalette = db.prepare('SELECT color_id AS id, text AS color FROM palette');
     this.healthQuery = db.prepare('SELECT 1');
 
     // The event and the cooldown timestamp must change together.
@@ -107,8 +103,8 @@ export class MifDb {
     return wh;
   }
 
-  getPalette(): PaletteRow[] {
-    return this.selectPalette.all() as PaletteRow[];
+  getPalette(): PaletteColor[] {
+    return this.selectPalette.all() as PaletteColor[];
   }
 
   // Appends an event to the log and returns its id.

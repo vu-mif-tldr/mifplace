@@ -9,6 +9,12 @@ export type CanvasState = {
   pixels: [number, number][];
 };
 
+// One color from GET /api/palette. id is the color id the server uses, not an index in the list
+export type PaletteColor = {
+  id: number;
+  color: string;
+};
+
 // Body of POST /api/pixels (colorIndex = index in the palette)
 export type PlacePixelRequest = {
   x: number;
