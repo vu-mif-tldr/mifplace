@@ -92,4 +92,17 @@ describe('openDb / MifDb', () => {
     mif.close();
     fs.rmSync(dir, { recursive: true });
   });
+
+  it('reads the palette', () => {
+    const db = new Database(':memory:');
+    migrate(db, loadMigrations(REAL_MIGRATIONS_DIR));
+    const palette = new MifDb(db).getPalette();
+
+    assert.equal(palette.length, 16);
+    assert.deepEqual(
+      palette.find((c) => c.color_id === 0),
+      { color_id: 0, text: '#000000' }
+    );
+    db.close();
+  });
 });
