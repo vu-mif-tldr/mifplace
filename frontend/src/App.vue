@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
 import { getCanvas, getCanvasSize, getPalette, placePixel } from './api';
 import { drawCanvas, getClickedCell, paintCell } from './canvas';
+import { clampOffset, fitCellSize } from './view';
 
 // Colors from the server, loaded together with the canvas
 const palette = ref<PaletteColor[]>([]);
@@ -33,7 +34,10 @@ async function loadCanvas() {
       getCanvas(),
     ]);
     canvasSize = size;
-    cellSize.value = VIEWPORT_SIZE / size.width;
+    // Start with the whole canvas in view
+    cellSize.value = fitCellSize(size, VIEWPORT_SIZE, VIEWPORT_SIZE);
+    scale.value = 1;
+    clampPosition();
     palette.value = colors;
     // After "try again" keep the selected color if the server still has it
     selectedColor.value = colors.find((c) => c.id === selectedColor.value?.id) ?? colors[0];
@@ -52,7 +56,7 @@ onMounted(loadCanvas);
 // The viewport is a VIEWPORT_SIZE x VIEWPORT_SIZE px square
 const VIEWPORT_SIZE = 640;
 
-// Screen px per cell at zoom 1: the canvas width fills the viewport
+// Screen px per cell at zoom 1: the whole canvas fits the viewport
 const cellSize = ref(1);
 
 // Zoom (1 to 20) and the canvas offset inside the viewport, in screen px
@@ -65,9 +69,8 @@ function clampPosition() {
   // Size of the canvas on screen
   const width = canvasSize.width * cellSize.value * scale.value;
   const height = canvasSize.height * cellSize.value * scale.value;
-  // x and y can't go above 0, or below the point where the far edge would show a gap
-  x.value = Math.min(0, Math.max(VIEWPORT_SIZE - width, x.value));
-  y.value = Math.min(0, Math.max(VIEWPORT_SIZE - height, y.value));
+  x.value = clampOffset(x.value, width, VIEWPORT_SIZE);
+  y.value = clampOffset(y.value, height, VIEWPORT_SIZE);
 }
 
 function onWheel(event: WheelEvent) {
