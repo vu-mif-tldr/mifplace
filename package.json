@@ -4,14 +4,17 @@
   "version": "1.0.0",
   "type": "module",
   "workspaces": [
+    "shared",
     "backend",
-    "frontend"
+    "frontend",
+    "mcp"
   ],
   "engines": {
     "node": ">=24"
   },
   "scripts": {
     "setup": "node scripts/setup.mjs",
+    "setup:mcp": "node scripts/setup-mcp.mjs",
     "clean": "node scripts/clean.mjs",
     "clean:all": "node scripts/clean.mjs --deps",
     "dev": "concurrently -k -n backend,frontend -c blue,green \"npm run dev -w backend\" \"npm run dev -w frontend\"",
@@ -22,8 +25,8 @@
     "lint": "npm run lint --workspaces",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm test --workspaces",
-    "test:coverage": "npm run test:coverage --workspaces",
+    "test": "npm test --workspaces --if-present",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test"
   },
   "devDependencies": {

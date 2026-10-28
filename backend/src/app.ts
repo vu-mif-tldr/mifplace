@@ -1,6 +1,13 @@
-import express from 'express';
+import express, { type Response } from 'express';
 import * as path from 'node:path';
 import rateLimit from 'express-rate-limit';
+import type {
+  CanvasState,
+  ErrorResponse,
+  PaletteColor,
+  PlacePixelResponse,
+} from '@mifplace/shared';
+import type { NewEvent } from './db.js';
 
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
@@ -13,16 +20,13 @@ const limiter = rateLimit({
 export interface AppConfig {
   gridWidth: number;
   gridHeight: number;
-  paletteSize: number;
-  getCanvasState: () => {
-    width: number;
-    height: number;
-    pixels: [number, number][];
-  };
+  // Read once at start: the palette does not change while the server runs.
+  palette: PaletteColor[];
+  getCanvasState: () => CanvasState;
 
   // Throws if the database is not reachable. Injected so the app can be built without a database.
   checkHealth: () => void;
-  appendEvent: (event: { user_id: number; color_id: number; position: number }) => number;
+  appendEvent: (event: NewEvent) => number;
 }
 
 type HealthResponse = {
@@ -39,18 +43,24 @@ type HealthResponse = {
 export function createApp({
   gridWidth,
   gridHeight,
-  paletteSize,
+  palette,
   checkHealth,
   getCanvasState,
   appendEvent,
 }: AppConfig) {
   const app = express();
+  // Holds only palette ids, so any other colorIndex (missing, string, fraction, null...) is rejected.
+  const paletteIds = new Set(palette.map(({ id }) => id));
 
   app.get('/', limiter, (req, res) => {
     res.sendFile(path.join(STATIC_PATH, 'index.html'));
   });
 
-  app.get('/api/canvas', (_req, res) => {
+  app.get('/api/palette', (_req, res: Response<PaletteColor[]>) => {
+    res.json(palette);
+  });
+
+  app.get('/api/canvas', (_req, res: Response<CanvasState>) => {
     res.json(getCanvasState());
   });
 
@@ -88,28 +98,29 @@ export function createApp({
   // need this for req.body because can only hold json but without it gives string.
   // Which req.body doesnt accept
   app.use(express.json());
-  app.post('/api/pixels', (req, res) => {
+  app.post('/api/pixels', (req, res: Response<PlacePixelResponse | ErrorResponse>) => {
     const { x, y, colorIndex } = req.body;
 
     if (!Number.isInteger(x) || !Number.isInteger(y)) {
       return res.status(400).json({ success: false, error: 'Coordinates are not a number' });
-    } else if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
-      return res.status(400).json({ success: false, error: ' Position not in canvas' });
-    } else if (colorIndex < 0 || colorIndex >= paletteSize) {
+    }
+    if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
+      return res.status(400).json({ success: false, error: 'Position not in canvas' });
+    }
+    if (!paletteIds.has(colorIndex)) {
       return res.status(400).json({ success: false, error: 'Color not in palette' });
-    } else {
-      try {
-        const eventId = appendEvent({
-          user_id: 0, // dev user
-          color_id: colorIndex,
-          position: y * gridWidth + x,
-        });
+    }
+    try {
+      const eventId = appendEvent({
+        user_id: 0, // dev user
+        color_id: colorIndex,
+        position: y * gridWidth + x,
+      });
 
-        return res.status(201).json({ success: true, eventId });
-      } catch (error) {
-        console.error('Insert failed:', error);
-        return res.status(500).json({ success: false, error: 'Insert failed' });
-      }
+      return res.status(201).json({ success: true, eventId });
+    } catch (error) {
+      console.error('Insert failed:', error);
+      return res.status(500).json({ success: false, error: 'Insert failed' });
     }
   });
 

@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { getCanvas, placePixel } from './api';
+import type { PaletteColor } from '@mifplace/shared';
+import { getCanvas, getPalette, placePixel } from './api';
 import { drawCanvas, getClickedCell, paintCell } from './canvas';
-import { PALETTE } from './palette';
 
-// Currently selected color (black by default)
-const selectedColor = ref(PALETTE[0]);
+// Colors from the server, loaded together with the canvas
+const palette = ref<PaletteColor[]>([]);
+
+// Currently selected color (the first palette color by default)
+const selectedColor = ref<PaletteColor | null>(null);
 
 // The <canvas> element
 const canvasEl = ref<HTMLCanvasElement | null>(null);
@@ -15,13 +18,16 @@ const loading = ref(true);
 const loadError = ref('');
 const pixelError = ref('');
 
-// Get the canvas from the server and draw it
+// Get the palette and the canvas from the server (both at once) and draw the canvas
 async function loadCanvas() {
   loading.value = true;
   loadError.value = '';
   try {
-    const state = await getCanvas();
-    if (canvasEl.value) drawCanvas(canvasEl.value, state);
+    const [colors, state] = await Promise.all([getPalette(), getCanvas()]);
+    palette.value = colors;
+    // After "try again" keep the selected color if the server still has it
+    selectedColor.value = colors.find((c) => c.id === selectedColor.value?.id) ?? colors[0];
+    if (canvasEl.value) drawCanvas(canvasEl.value, state, colors);
   } catch (error) {
     console.error(error);
     loadError.value = 'Nepavyko užkrauti drobės';
@@ -90,13 +96,13 @@ function onMouseMove(event: MouseEvent) {
 // Send the pixel to the server, draw it only if the server accepts it.
 // Ignored at the end of a drag, so moving the canvas does not place a pixel.
 async function onCanvasClick(event: MouseEvent) {
-  if (moved || !canvasEl.value) return;
+  if (moved || !canvasEl.value || !selectedColor.value) return;
 
   const cell = getClickedCell(event);
-  const color = selectedColor.value;
+  const { id, color } = selectedColor.value;
 
   try {
-    await placePixel(cell.x, cell.y, PALETTE.indexOf(color));
+    await placePixel(cell.x, cell.y, id);
     pixelError.value = '';
     paintCell(canvasEl.value, cell.x, cell.y, color);
   } catch (error) {
@@ -142,21 +148,21 @@ async function onCanvasClick(event: MouseEvent) {
       <h2>Palette</h2>
       <div id="palette">
         <button
-          v-for="color in PALETTE"
-          :key="color"
+          v-for="swatch in palette"
+          :key="swatch.id"
           class="swatch"
-          :class="{ selected: color === selectedColor }"
-          :style="{ backgroundColor: color }"
-          :title="color"
-          @click="selectedColor = color"
+          :class="{ selected: swatch.id === selectedColor?.id }"
+          :style="{ backgroundColor: swatch.color }"
+          :title="swatch.color"
+          @click="selectedColor = swatch"
         ></button>
       </div>
     </section>
 
     <section id="current-color-section">
       <h2>Selected color</h2>
-      <div id="current-color-swatch" :style="{ backgroundColor: selectedColor }"></div>
-      <span id="current-color-code">{{ selectedColor }}</span>
+      <div id="current-color-swatch" :style="{ backgroundColor: selectedColor?.color }"></div>
+      <span id="current-color-code">{{ selectedColor?.color }}</span>
     </section>
   </main>
 </template>
