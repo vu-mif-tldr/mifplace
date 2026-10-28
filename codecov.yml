@@ -61,7 +61,6 @@ component_management:
       name: Canvas UI
       paths:
         - frontend/src/canvas.ts
-        - frontend/src/view.ts
         - frontend/src/App.vue
     - component_id: frontend_api
       name: API client
