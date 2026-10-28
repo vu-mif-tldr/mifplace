@@ -9,8 +9,8 @@ const palette = [
 function fakeCanvas() {
   const ctx = { fillStyle: '', fillRect: vi.fn() };
   const canvas = {
-    width: 640,
-    height: 640,
+    width: 0,
+    height: 0,
     getContext: vi.fn(() => ctx),
   } as unknown as HTMLCanvasElement;
   return { canvas, ctx };
@@ -18,16 +18,52 @@ function fakeCanvas() {
 
 const noContextCanvas = () => ({ getContext: () => null }) as unknown as HTMLCanvasElement;
 
-const click = (offsetX: number, offsetY: number) => ({ offsetX, offsetY }) as MouseEvent;
+// A click on a canvas shown at left, top with the given on-screen size
+function click(
+  clientX: number,
+  clientY: number,
+  rect = { left: 0, top: 0, width: 640, height: 640 }
+) {
+  const currentTarget = { getBoundingClientRect: () => rect };
+  return { clientX, clientY, currentTarget } as unknown as MouseEvent;
+}
 
 describe('getClickedCell', () => {
-  it('turns the click position into a cell (5x5 px each)', () => {
-    expect(getClickedCell(click(12, 7))).toEqual({ x: 2, y: 1 });
+  const size = { width: 128, height: 128 };
+
+  it('turns the click position into a cell (5x5 px each on a 640 px canvas)', () => {
+    expect(getClickedCell(click(12, 7), size)).toEqual({ x: 2, y: 1 });
   });
 
   it('keeps clicks on a cell edge in that cell', () => {
-    expect(getClickedCell(click(0, 4.9))).toEqual({ x: 0, y: 0 });
-    expect(getClickedCell(click(5, 5))).toEqual({ x: 1, y: 1 });
+    expect(getClickedCell(click(0, 4.9), size)).toEqual({ x: 0, y: 0 });
+    expect(getClickedCell(click(5, 5), size)).toEqual({ x: 1, y: 1 });
+  });
+
+  it('takes the canvas position and zoom into account', () => {
+    // Zoomed in 4 times (20 px per cell) and moved, the canvas starts at 100, 50
+    const rect = { left: 100, top: 50, width: 2560, height: 2560 };
+    expect(getClickedCell(click(100 + 20 * 7 + 19, 50 + 20 * 3, rect), size)).toEqual({
+      x: 7,
+      y: 3,
+    });
+  });
+
+  it('works for a non-square canvas', () => {
+    // 200x100 cells shown as 640x320 px, 3.2 px per cell
+    const rect = { left: 0, top: 0, width: 640, height: 320 };
+    expect(getClickedCell(click(639, 319, rect), { width: 200, height: 100 })).toEqual({
+      x: 199,
+      y: 99,
+    });
+    expect(getClickedCell(click(3.3, 3.1, rect), { width: 200, height: 100 })).toEqual({
+      x: 1,
+      y: 0,
+    });
+  });
+
+  it('keeps a click on the far edge in the last cell', () => {
+    expect(getClickedCell(click(640, 640), size)).toEqual({ x: 127, y: 127 });
   });
 });
 
@@ -38,7 +74,7 @@ describe('paintCell', () => {
     paintCell(canvas, 2, 3, '#ff0000');
 
     expect(ctx.fillStyle).toBe('#ff0000');
-    expect(ctx.fillRect).toHaveBeenCalledWith(10, 15, 5, 5);
+    expect(ctx.fillRect).toHaveBeenCalledWith(2, 3, 1, 1);
   });
 
   it('does nothing when the canvas has no 2d context', () => {
@@ -66,11 +102,25 @@ describe('drawCanvas', () => {
     );
 
     expect(ctx.fillRect.mock.calls).toEqual([
-      [0, 0, 640, 640],
-      [0, 0, 5, 5],
-      [10, 5, 5, 5],
+      [0, 0, 128, 128],
+      [0, 0, 1, 1],
+      [2, 1, 1, 1],
     ]);
     expect(ctx.fillStyle).toBe('#00ff00');
+  });
+
+  it('sizes the canvas element from the server size, one pixel per cell', () => {
+    const { canvas, ctx } = fakeCanvas();
+
+    // position 250 is x = 50, y = 1 on a 200-wide canvas
+    drawCanvas(canvas, { width: 200, height: 100 }, { pixels: [[250, 3]] }, palette);
+
+    expect(canvas.width).toBe(200);
+    expect(canvas.height).toBe(100);
+    expect(ctx.fillRect.mock.calls).toEqual([
+      [0, 0, 200, 100],
+      [50, 1, 1, 1],
+    ]);
   });
 
   it('leaves only the white background when nothing is painted', () => {
