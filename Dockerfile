@@ -9,6 +9,7 @@ FROM node:${NODE_VERSION}-bookworm-slim AS build
 WORKDIR /app
 # Manifests first, so the npm ci layer is reused while the dependencies do not change.
 COPY package.json package-lock.json ./
+COPY shared/package.json shared/
 COPY backend/package.json backend/
 COPY frontend/package.json frontend/
 # --ignore-scripts: better-sqlite3 ships prebuilt binaries for Linux, but npm still
@@ -16,6 +17,7 @@ COPY frontend/package.json frontend/
 # The only other install script is esbuild's optional binary check.
 RUN npm ci --ignore-scripts
 COPY tsconfig.base.json ./
+COPY shared shared
 COPY backend backend
 COPY frontend frontend
 RUN npm run build
@@ -24,6 +26,7 @@ RUN npm run build
 FROM node:${NODE_VERSION}-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY shared/package.json shared/
 COPY backend/package.json backend/
 COPY frontend/package.json frontend/
 RUN npm ci --omit=dev --workspace=backend --ignore-scripts

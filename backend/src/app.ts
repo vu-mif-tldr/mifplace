@@ -1,6 +1,8 @@
-import express from 'express';
+import express, { type Response } from 'express';
 import * as path from 'node:path';
 import rateLimit from 'express-rate-limit';
+import type { CanvasState, ErrorResponse, PlacePixelResponse } from '@mifplace/shared';
+import type { NewEvent } from './db.js';
 
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
@@ -14,15 +16,11 @@ export interface AppConfig {
   gridWidth: number;
   gridHeight: number;
   paletteSize: number;
-  getCanvasState: () => {
-    width: number;
-    height: number;
-    pixels: [number, number][];
-  };
+  getCanvasState: () => CanvasState;
 
   // Throws if the database is not reachable. Injected so the app can be built without a database.
   checkHealth: () => void;
-  appendEvent: (event: { user_id: number; color_id: number; position: number }) => number;
+  appendEvent: (event: NewEvent) => number;
 }
 
 type HealthResponse = {
@@ -50,7 +48,7 @@ export function createApp({
     res.sendFile(path.join(STATIC_PATH, 'index.html'));
   });
 
-  app.get('/api/canvas', (_req, res) => {
+  app.get('/api/canvas', (_req, res: Response<CanvasState>) => {
     res.json(getCanvasState());
   });
 
@@ -88,7 +86,7 @@ export function createApp({
   // need this for req.body because can only hold json but without it gives string.
   // Which req.body doesnt accept
   app.use(express.json());
-  app.post('/api/pixels', (req, res) => {
+  app.post('/api/pixels', (req, res: Response<PlacePixelResponse | ErrorResponse>) => {
     const { x, y, colorIndex } = req.body;
 
     if (!Number.isInteger(x) || !Number.isInteger(y)) {
