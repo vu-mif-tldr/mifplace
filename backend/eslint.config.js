@@ -6,6 +6,10 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Explicit for every file, because the IDE lints backend and mcp in one process.
+    languageOptions: { parserOptions: { tsconfigRootDir: import.meta.dirname } },
+  },
+  {
     files: ['src/**/*.ts'],
     languageOptions: {
       parserOptions: {
