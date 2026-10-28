@@ -5,8 +5,9 @@
   "scripts": {
     "typecheck": "npx tsc --noEmit",
     "lint": "eslint .",
-    "test": "tsx --test \"src/**/*.test.ts\"",
-    "test:coverage": "tsx --test --experimental-test-coverage \"src/**/*.test.ts\""
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -17,7 +18,9 @@
     "@modelcontextprotocol/client": "^2.4.0",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^24.0.0",
-    "tsx": "^4.23.15"
+    "@vitest/coverage-v8": "^5.0.5",
+    "tsx": "^4.23.15",
+    "vitest": "^5.0.5"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",

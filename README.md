@@ -31,6 +31,9 @@ CI kiekviename pull request paleidžia `npm run test:coverage` ir siunčia atask
 [Codecov](https://codecov.io/gh/vu-mif-tldr/mifplace) (nustatymai `codecov.yml`). Kol kas padengimas tik
 rodomas ir sujungti netrukdo.
 
+CI taip pat siunčia testų rezultatus (JUnit) į Codecov Test Analytics: pull request matyti, kurie testai
+nepavyko, o laikui bėgant ir kurie testai nestabilūs ar lėti.
+
 ## Komandos nariai
 
 - Dmitrij Kosmakov

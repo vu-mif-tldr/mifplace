@@ -66,6 +66,48 @@ jobs:
           network_filter: frontend/
           disable_search: true
 
+      - name: Upload mcp coverage
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: mcp/coverage/lcov.info
+          flags: mcp
+          network_filter: mcp/
+          disable_search: true
+
+      # JUnit reports for Codecov Test Analytics. They run after failed tests too (that is when
+      # the report matters), but not after a cancelled run. One upload per workspace with a flag,
+      # because both name test files as src/...
+      - name: Upload backend test results
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          report_type: test_results
+          files: backend/test-results/junit.xml
+          flags: backend
+          disable_search: true
+
+      - name: Upload frontend test results
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          report_type: test_results
+          files: frontend/test-results/junit.xml
+          flags: frontend
+          disable_search: true
+
+      - name: Upload mcp test results
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          report_type: test_results
+          files: mcp/test-results/junit.xml
+          flags: mcp
+          disable_search: true
+
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest

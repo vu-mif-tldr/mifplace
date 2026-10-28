@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { after, before, describe, it } from 'node:test';
+import { afterAll, beforeAll, describe, it } from 'vitest';
 import Database from 'better-sqlite3';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
@@ -34,7 +34,7 @@ function textOf(result: ToolResult): string {
 describe('createApp', () => {
   const client = new Client({ name: 'test', version: '0.0.0' });
 
-  before(async () => {
+  beforeAll(async () => {
     const db = migratedDb();
     const mif = new MifDb(db);
     // (1, 2) is position 2 * 128 + 1 = 257, the next cell down is 257 + 128.
@@ -47,7 +47,7 @@ describe('createApp', () => {
     await client.connect(clientTransport);
   });
 
-  after(() => client.close());
+  afterAll(() => client.close());
 
   it('lists the schema resource and the tools', async () => {
     const { resources } = await client.listResources();

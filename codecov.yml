@@ -10,6 +10,15 @@ coverage:
         target: 70%
         informational: true
 
+# Entry points and dev-only scripts: they only wire things together or fill the dev database,
+# unit tests do not load them, so they would show 0% and pull the totals down.
+ignore:
+  - backend/src/server.ts
+  - backend/src/scripts/seed-events.ts
+  - backend/src/scripts/setup-db.ts
+  - frontend/src/main.ts
+  - mcp/src/server.ts
+
 flags:
   backend:
     paths:
@@ -19,6 +28,10 @@ flags:
   frontend:
     paths:
       - frontend/
+    carryforward: true
+  mcp:
+    paths:
+      - mcp/
     carryforward: true
 
 comment:
