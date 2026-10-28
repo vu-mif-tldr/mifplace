@@ -1,4 +1,4 @@
-import { getCanvas, placePixel } from './api';
+import { getCanvas, getPalette, placePixel } from './api';
 
 describe('api', () => {
   const fetchMock = vi.fn();
@@ -10,6 +10,46 @@ describe('api', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  describe('getPalette', () => {
+    const palette = [
+      { id: 0, color: '#000000' },
+      { id: 5, color: '#FFFFFF' },
+    ];
+
+    it('returns the palette from GET /api/palette', async () => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => palette });
+
+      await expect(getPalette()).resolves.toEqual(palette);
+      expect(fetchMock).toHaveBeenCalledWith('/api/palette');
+    });
+
+    it('throws when the server answers with an error', async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 500 });
+
+      await expect(getPalette()).rejects.toThrow('Could not load the palette');
+    });
+
+    it.each([
+      ['not a list', { id: 0, color: '#000000' }],
+      ['an empty list', []],
+      ['a plain list of colors', ['#000000']],
+      ['a negative id', [{ id: -1, color: '#000000' }]],
+      ['a non-integer id', [{ id: 1.5, color: '#000000' }]],
+      [
+        'a duplicate id',
+        [
+          { id: 1, color: '#000000' },
+          { id: 1, color: '#ffffff' },
+        ],
+      ],
+      ['a color that is not #rrggbb', [{ id: 0, color: 'red' }]],
+    ])('rejects a palette with %s', async (_case, body) => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => body });
+
+      await expect(getPalette()).rejects.toThrow('The palette from the server is invalid');
+    });
   });
 
   describe('getCanvas', () => {
@@ -29,7 +69,7 @@ describe('api', () => {
   });
 
   describe('placePixel', () => {
-    it('posts the cell and the palette index to /api/pixels', async () => {
+    it('posts the cell and the palette color id to /api/pixels', async () => {
       fetchMock.mockResolvedValue({ ok: true, status: 200 });
 
       await placePixel(2, 3, 5);
