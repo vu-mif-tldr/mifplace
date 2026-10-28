@@ -1,4 +1,4 @@
-import { getCanvas, getPalette, placePixel } from './api';
+import { getCanvas, getCanvasSize, getPalette, placePixel } from './api';
 
 describe('api', () => {
   const fetchMock = vi.fn();
@@ -52,9 +52,25 @@ describe('api', () => {
     });
   });
 
+  describe('getCanvasSize', () => {
+    it('returns the size from GET /api/canvas/size', async () => {
+      const size = { width: 128, height: 128 };
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => size });
+
+      await expect(getCanvasSize()).resolves.toEqual(size);
+      expect(fetchMock).toHaveBeenCalledWith('/api/canvas/size');
+    });
+
+    it('throws when the server answers with an error', async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 500 });
+
+      await expect(getCanvasSize()).rejects.toThrow();
+    });
+  });
+
   describe('getCanvas', () => {
     it('returns the canvas from GET /api/canvas', async () => {
-      const state = { width: 128, height: 128, pixels: [[130, 5]] };
+      const state = { pixels: [[130, 5]] };
       fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => state });
 
       await expect(getCanvas()).resolves.toEqual(state);

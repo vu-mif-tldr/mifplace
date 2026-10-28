@@ -1,4 +1,4 @@
-import type { CanvasState, PaletteColor, PlacePixelRequest } from '@mifplace/shared';
+import type { CanvasSize, CanvasState, PaletteColor, PlacePixelRequest } from '@mifplace/shared';
 
 // Get the color palette from the server
 export async function getPalette(): Promise<PaletteColor[]> {
@@ -22,7 +22,14 @@ function isValidPalette(data: unknown): data is PaletteColor[] {
   return true;
 }
 
-// Get the whole canvas from the server
+// Get the canvas size from the server. It does not change, so it is loaded once.
+export async function getCanvasSize(): Promise<CanvasSize> {
+  const response = await fetch('/api/canvas/size');
+  if (!response.ok) throw new Error('Could not load the canvas size');
+  return response.json();
+}
+
+// Get all painted pixels of the canvas from the server
 export async function getCanvas(): Promise<CanvasState> {
   const response = await fetch('/api/canvas');
   if (!response.ok) throw new Error('Could not load the canvas');

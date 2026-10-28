@@ -1,10 +1,15 @@
-import type { CanvasState, PaletteColor } from '@mifplace/shared';
+import type { CanvasSize, CanvasState, PaletteColor } from '@mifplace/shared';
 
 // The canvas has 128x128 cells, each cell is 5x5 px on screen (640x640 px in total)
 const CELL_SIZE = 5;
 
 // Draw the whole canvas received from the server
-export function drawCanvas(canvas: HTMLCanvasElement, state: CanvasState, palette: PaletteColor[]) {
+export function drawCanvas(
+  canvas: HTMLCanvasElement,
+  size: CanvasSize,
+  state: CanvasState,
+  palette: PaletteColor[]
+) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
@@ -21,8 +26,8 @@ export function drawCanvas(canvas: HTMLCanvasElement, state: CanvasState, palett
     const color = colorById.get(colorId);
     if (!color) continue;
 
-    const x = position % state.width;
-    const y = Math.floor(position / state.width);
+    const x = position % size.width;
+    const y = Math.floor(position / size.width);
     paintCell(canvas, x, y, color);
   }
 }

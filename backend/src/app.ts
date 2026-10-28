@@ -2,6 +2,7 @@ import express, { type Response } from 'express';
 import * as path from 'node:path';
 import rateLimit from 'express-rate-limit';
 import type {
+  CanvasSize,
   CanvasState,
   ErrorResponse,
   PaletteColor,
@@ -18,8 +19,8 @@ const limiter = rateLimit({
 });
 
 export interface AppConfig {
-  gridWidth: number;
-  gridHeight: number;
+  // Read once at start: the canvas size does not change while the server runs.
+  canvasSize: CanvasSize;
   // Read once at start: the palette does not change while the server runs.
   palette: PaletteColor[];
   getCanvasState: () => CanvasState;
@@ -41,8 +42,7 @@ type HealthResponse = {
 // Builds the Express app from plain values: it does not read .env or open the database,
 // so tests can create it without any setup. server.ts wires in the real values.
 export function createApp({
-  gridWidth,
-  gridHeight,
+  canvasSize,
   palette,
   checkHealth,
   getCanvasState,
@@ -58,6 +58,10 @@ export function createApp({
 
   app.get('/api/palette', (_req, res: Response<PaletteColor[]>) => {
     res.json(palette);
+  });
+
+  app.get('/api/canvas/size', (_req, res: Response<CanvasSize>) => {
+    res.json(canvasSize);
   });
 
   app.get('/api/canvas', (_req, res: Response<CanvasState>) => {
@@ -104,7 +108,7 @@ export function createApp({
     if (!Number.isInteger(x) || !Number.isInteger(y)) {
       return res.status(400).json({ success: false, error: 'Coordinates are not a number' });
     }
-    if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
+    if (x < 0 || x >= canvasSize.width || y < 0 || y >= canvasSize.height) {
       return res.status(400).json({ success: false, error: 'Position not in canvas' });
     }
     if (!paletteIds.has(colorIndex)) {
@@ -114,7 +118,7 @@ export function createApp({
       const eventId = appendEvent({
         user_id: 0, // dev user
         color_id: colorIndex,
-        position: y * gridWidth + x,
+        position: y * canvasSize.width + x,
       });
 
       return res.status(201).json({ success: true, eventId });

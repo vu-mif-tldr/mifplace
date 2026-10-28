@@ -104,6 +104,12 @@ describe('createApp', () => {
     assert.match(textOf(result), /less than canvas width \(128\)/);
   });
 
+  it('rejects y outside the canvas instead of returning no events', async () => {
+    const result = await client.callTool({ name: 'pixel_history', arguments: { x: 1, y: 128 } });
+    assert.equal(result.isError, true);
+    assert.match(textOf(result), /less than canvas height \(128\)/);
+  });
+
   it('rejects arguments outside the input schema', async () => {
     const result = await client.callTool({ name: 'pixel_history', arguments: { x: 0, y: -1 } });
     assert.equal(result.isError, true);

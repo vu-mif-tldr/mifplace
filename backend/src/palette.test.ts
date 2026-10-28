@@ -14,11 +14,10 @@ let testServer: Server;
 let baseUrl: string;
 
 const app = createApp({
-  gridWidth: 100,
-  gridHeight: 100,
+  canvasSize: { width: 100, height: 100 },
   palette: PALETTE,
   checkHealth: () => {},
-  getCanvasState: () => ({ width: 100, height: 100, pixels: [] }),
+  getCanvasState: () => ({ pixels: [] }),
   appendEvent: () => 42,
 });
 
@@ -39,4 +38,12 @@ test('GET /api/palette - returns the palette as JSON', async () => {
   assert.strictEqual(response.status, 200);
   assert.match(response.headers.get('content-type') ?? '', /application\/json/);
   assert.deepStrictEqual(await response.json(), PALETTE);
+});
+
+test('GET /api/canvas/size - returns the canvas size as JSON', async () => {
+  const response = await fetch(`${baseUrl}/api/canvas/size`);
+
+  assert.strictEqual(response.status, 200);
+  assert.match(response.headers.get('content-type') ?? '', /application\/json/);
+  assert.deepStrictEqual(await response.json(), { width: 100, height: 100 });
 });

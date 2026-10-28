@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { PaletteColor } from '@mifplace/shared';
+import type { CanvasSize, PaletteColor } from '@mifplace/shared';
 
 export type Db = Database.Database;
 
@@ -97,8 +97,8 @@ export class MifDb {
     this.healthQuery.get();
   }
 
-  getCanvasSize(): { width: number; height: number } {
-    const wh = this.selectCanvasSize.get() as { width: number; height: number } | undefined;
+  getCanvasSize(): CanvasSize {
+    const wh = this.selectCanvasSize.get() as CanvasSize | undefined;
     if (!wh) throw new Error('getCanvasSize: canvas size is not set');
     return wh;
   }
