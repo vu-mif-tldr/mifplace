@@ -52,7 +52,9 @@ http://127.0.0.1:3000
 - `npm run lint` — Check code with ESLint
 - `npm run format` — Format code with Prettier
 - `npm run format:check` — Check formatting without changing files
-- `npm test` — Run unit tests (`node:test` via `tsx`)
+- `npm test` — Run unit tests (Vitest, same runner as the frontend)
+- `npm run test:watch` — Re-run tests on changes
+- `npm run test:coverage` — Run tests with a coverage report in `coverage/`
 - `npm run check` — Run typecheck, lint, format:check and test in a row (same as CI)
 
 ### Database

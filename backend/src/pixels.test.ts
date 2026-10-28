@@ -1,4 +1,4 @@
-import { test, before, after } from 'node:test';
+import { afterAll, beforeAll, test } from 'vitest';
 import assert from 'node:assert';
 import { createApp } from './app.js';
 import { Server } from 'node:http';
@@ -21,13 +21,13 @@ const app = createApp({
   appendEvent: () => 42,
 });
 
-before(async () => {
+beforeAll(async () => {
   testServer = app.listen(TEST_PORT, '127.0.0.1', () => {
     console.log(`Test server running at ${BASE_URL}`);
   });
 });
 
-after(() => {
+afterAll(() => {
   return new Promise<void>((resolve) => {
     testServer.close(() => {
       console.log('Test server closed');
