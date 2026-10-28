@@ -62,6 +62,8 @@ main {
 }
 
 #viewport {
+  /* Shows where the canvas ends when it is smaller than the viewport */
+  background: #ddd;
   overflow: hidden;
   margin: 0 auto;
   border: 2px solid #333;
