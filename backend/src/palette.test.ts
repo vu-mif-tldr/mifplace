@@ -1,4 +1,4 @@
-import { test, before, after } from 'node:test';
+import { afterAll, beforeAll, test } from 'vitest';
 import assert from 'node:assert';
 import type { AddressInfo } from 'node:net';
 import { Server } from 'node:http';
@@ -23,13 +23,13 @@ const app = createApp({
 });
 
 // Port 0: the OS picks a free port, so this file can run in parallel with pixels.test.ts.
-before(async () => {
+beforeAll(async () => {
   testServer = app.listen(0, '127.0.0.1');
   await new Promise<void>((resolve) => testServer.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${(testServer.address() as AddressInfo).port}`;
 });
 
-after(() => {
+afterAll(() => {
   return new Promise<void>((resolve) => testServer.close(() => resolve()));
 });
 
