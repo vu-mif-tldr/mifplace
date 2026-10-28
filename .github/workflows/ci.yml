@@ -17,6 +17,10 @@ jobs:
     name: Typecheck, lint, format, build, test
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      # Codecov uploads authenticate with GitHub OIDC, no token secret needed
+      id-token: write
     steps:
       - uses: actions/checkout@v7
 
@@ -39,8 +43,28 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Test
-        run: npm test
+      - name: Test (with coverage)
+        run: npm run test:coverage
+
+      # One upload per workspace: both report paths as src/..., network_filter tells
+      # Codecov which directory they belong to. A failed upload does not fail the check.
+      - name: Upload backend coverage
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: backend/coverage/lcov.info
+          flags: backend
+          network_filter: backend/
+          disable_search: true
+
+      - name: Upload frontend coverage
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: frontend/coverage/lcov.info
+          flags: frontend
+          network_filter: frontend/
+          disable_search: true
 
   audit:
     name: Dependency audit

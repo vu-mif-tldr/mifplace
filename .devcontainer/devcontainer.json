@@ -1,0 +1,33 @@
+// Development environment for GitHub Codespaces (and VS Code Dev Containers).
+// Node major must match .nvmrc, Debian release matches the production image (Dockerfile).
+{
+  "name": "mifplace",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:4-24-bookworm",
+
+  // With a local checkout the repository is bind-mounted from the host. node_modules lives in
+  // volumes, otherwise npm ci in the container replaces the host packages with Linux binaries.
+  // The dev database too: SQLite WAL needs a local file system, not a bind mount.
+  "mounts": [
+    "source=mifplace-node_modules-${devcontainerId},target=${containerWorkspaceFolder}/node_modules,type=volume",
+    "source=mifplace-backend-node_modules-${devcontainerId},target=${containerWorkspaceFolder}/backend/node_modules,type=volume",
+    "source=mifplace-frontend-node_modules-${devcontainerId},target=${containerWorkspaceFolder}/frontend/node_modules,type=volume",
+    "source=mifplace-data-${devcontainerId},target=${containerWorkspaceFolder}/backend/data,type=volume"
+  ],
+
+  // Runs on creation and in prebuilds: dependencies, backend/.env and the dev database.
+  // New volumes belong to root, so they are handed to the node user first.
+  // npm run setup is safe to repeat, it keeps an existing .env and only applies new migrations.
+  "updateContentCommand": "sudo chown node:node node_modules backend/node_modules frontend/node_modules backend/data && npm ci && npm run setup",
+
+  "forwardPorts": [5173, 3000],
+  "portsAttributes": {
+    "5173": { "label": "frontend", "onAutoForward": "openBrowser" },
+    "3000": { "label": "backend", "onAutoForward": "silent" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["Vue.volar", "dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+    }
+  }
+}
