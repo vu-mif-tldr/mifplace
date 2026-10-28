@@ -20,6 +20,9 @@ lib-cov
 
 # Coverage directory used by tools like istanbul
 coverage
+
+# JUnit reports for Codecov Test Analytics, written by Vitest in CI
+test-results
 *.lcov
 
 # nyc test coverage
