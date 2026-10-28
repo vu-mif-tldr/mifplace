@@ -6,5 +6,8 @@ public/
 
 LICENSE
 
+# Local Claude Code settings, not part of the project
+.claude/
+
 # Prototypes are standalone projects with their own Prettier config and ignores
 prototypes/
