@@ -34,6 +34,43 @@ flags:
       - mcp/
     carryforward: true
 
+# Components split the coverage by part of the system (flags split it by workspace).
+# Paths are globs from the repository root; a new file needs to be added to its component here.
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        informational: true
+  individual_components:
+    - component_id: http_api
+      name: HTTP API
+      paths:
+        - backend/src/app.ts
+    - component_id: live
+      name: Live updates
+      # WebSocket server (MP-93), not written yet
+      paths:
+        - backend/src/live/**
+    - component_id: storage
+      name: Storage
+      paths:
+        - backend/src/db.ts
+        - backend/src/canvas-state.ts
+        - backend/src/scripts/migrate.ts
+    - component_id: frontend_canvas
+      name: Canvas UI
+      paths:
+        - frontend/src/canvas.ts
+        - frontend/src/App.vue
+    - component_id: frontend_api
+      name: API client
+      paths:
+        - frontend/src/api.ts
+    - component_id: mcp
+      name: MCP server
+      paths:
+        - mcp/src/**
+
 comment:
-  layout: 'condensed_header, diff, flags, files'
+  layout: 'condensed_header, diff, flags, components, files'
   require_changes: true
