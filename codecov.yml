@@ -1,0 +1,26 @@
+# Codecov settings. Reports are uploaded by .github/workflows/ci.yml.
+# Checks are informational for now: they show coverage in the pull request but never block merging.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        target: 70%
+        informational: true
+
+flags:
+  backend:
+    paths:
+      - backend/
+    # A PR that does not upload a report for a flag keeps the last known numbers instead of zero
+    carryforward: true
+  frontend:
+    paths:
+      - frontend/
+    carryforward: true
+
+comment:
+  layout: 'condensed_header, diff, flags, files'
+  require_changes: true
