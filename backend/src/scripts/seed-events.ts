@@ -59,10 +59,8 @@ loadDotEnv('.env');
 const db = openDb(resolveDbPath());
 
 try {
-  const canvas = db.prepare(`SELECT width, height FROM canvas`).get() as {
-    width: number;
-    height: number;
-  };
+  const mif = new MifDb(db);
+  const canvas = mif.getCanvasSize();
   if (
     offsetX < 0 ||
     offsetY < 0 ||
@@ -87,7 +85,6 @@ try {
     return id;
   };
 
-  const mif = new MifDb(db);
   const now = Date.now();
   let inserted = 0;
 

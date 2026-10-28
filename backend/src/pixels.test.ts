@@ -8,8 +8,7 @@ const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
 let testServer: Server;
 
 const app = createApp({
-  gridWidth: 100,
-  gridHeight: 100,
+  canvasSize: { width: 100, height: 100 },
   // Ids with gaps, as allowed by docs/api.md: the check must use the ids, not the count.
   palette: [
     { id: 0, color: '#000000' },
@@ -17,7 +16,7 @@ const app = createApp({
     { id: 12, color: '#FF0000' },
   ],
   checkHealth: () => {},
-  getCanvasState: () => ({ width: 100, height: 100, pixels: [] }),
+  getCanvasState: () => ({ pixels: [] }),
   appendEvent: () => 42,
 });
 

@@ -52,11 +52,18 @@ export function createApp(db: Db): McpServer {
       }),
     },
     async ({ x, y, limit }) => {
-      const { width } = mifDb.getCanvasSize();
+      const { width, height } = mifDb.getCanvasSize();
       // position is y * width + x, so x >= width would silently read a cell on the next row
       if (x >= width) {
         return {
           content: [{ type: 'text', text: `x must be less than canvas width (${width})` }],
+          isError: true,
+        };
+      }
+      // y >= height is a position past the last cell, it would silently return no events
+      if (y >= height) {
+        return {
+          content: [{ type: 'text', text: `y must be less than canvas height (${height})` }],
           isError: true,
         };
       }

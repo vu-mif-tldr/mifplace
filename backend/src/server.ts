@@ -2,7 +2,7 @@ import { MifDb, getDbVersion, openDb, resolveDbPath } from './db.js';
 import { loadDotEnv } from './env.js';
 import { createApp } from './app.js';
 import { getCanvasState } from './canvas-state.js';
-import type { PaletteColor } from '@mifplace/shared';
+import type { CanvasSize, PaletteColor } from '@mifplace/shared';
 
 // Settings come from the environment, then from .env (see .env.example).
 loadDotEnv('.env');
@@ -16,41 +16,36 @@ const hostname: string = process.env.HOST ?? '127.0.0.1';
 // Fails loudly if DB_PATH is not set or the file does not exist (run db:setup first).
 const dbPath = resolveDbPath();
 const db = openDb(dbPath);
-let palette: PaletteColor[];
-let gridHeight: number;
-let gridWidth: number;
 let mifDb: MifDb;
+let palette: PaletteColor[];
+let canvasSize: CanvasSize;
 
 try {
   // Version 0 means a file without any applied migration, MifDb cannot work with it.
+  console.log(`Database: ${dbPath}, schema version ${getDbVersion(db)}`);
   if (getDbVersion(db) === 0) {
     throw new Error(`Database ${dbPath} has no schema, run "npm run db:setup:dev" first`);
   }
-  // get on initialization the height, width only once. and then reuse.
-  const size = db.prepare('SELECT width, height FROM canvas').get() as
-    { width: number; height: number } | undefined;
-  // can be undefined so need to check if it becomes unefined
-  if (!size) throw new Error('canvas table missing row');
-  gridWidth = size.width;
-  gridHeight = size.height;
   mifDb = new MifDb(db);
+  console.log(`Last event id: ${mifDb.getLastEventId()}`);
+
   palette = mifDb.getPalette();
   // The frontend cannot work without colors, so fail at start instead of serving an empty list.
   if (palette.length === 0) throw new Error('palette table is empty');
-  console.log(
-    `DB: ${dbPath}, schema version ${getDbVersion(db)}, last event id: ${mifDb.getLastEventId()}`
-  );
+  console.log(`Palette: ${palette.length} colors`);
+
+  canvasSize = mifDb.getCanvasSize();
+  console.log(`Canvas size: ${canvasSize.width}x${canvasSize.height}`);
 } catch (e) {
   db.close();
   throw e;
 }
 
 const app = createApp({
-  gridWidth,
-  gridHeight,
+  canvasSize,
   palette,
   checkHealth: () => mifDb.checkHealth(),
-  getCanvasState: () => getCanvasState(mifDb),
+  getCanvasState: () => getCanvasState(mifDb, canvasSize),
   appendEvent: (eventObject) => mifDb.appendEvent(eventObject),
 });
 

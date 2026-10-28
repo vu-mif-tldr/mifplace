@@ -47,15 +47,16 @@ describe('paintCell', () => {
 });
 
 describe('drawCanvas', () => {
+  const size = { width: 128, height: 128 };
+
   it('paints a white background, then every pixel from the server', () => {
     const { canvas, ctx } = fakeCanvas();
 
     // position = y * width + x, so 130 is x = 2, y = 1 on a 128-wide canvas
     drawCanvas(
       canvas,
+      size,
       {
-        width: 128,
-        height: 128,
         pixels: [
           [0, 3],
           [130, 7],
@@ -75,7 +76,7 @@ describe('drawCanvas', () => {
   it('leaves only the white background when nothing is painted', () => {
     const { canvas, ctx } = fakeCanvas();
 
-    drawCanvas(canvas, { width: 128, height: 128, pixels: [] }, palette);
+    drawCanvas(canvas, size, { pixels: [] }, palette);
 
     expect(ctx.fillRect).toHaveBeenCalledOnce();
     expect(ctx.fillStyle).toBe('#ffffff');
@@ -88,15 +89,15 @@ describe('drawCanvas', () => {
       [0, -1],
       [1, 99],
     ];
-    drawCanvas(canvas, { width: 128, height: 128, pixels }, palette);
+    drawCanvas(canvas, size, { pixels }, palette);
 
     expect(ctx.fillRect).toHaveBeenCalledOnce();
     expect(ctx.fillStyle).toBe('#ffffff');
   });
 
   it('does nothing when the canvas has no 2d context', () => {
-    const state = { width: 128, height: 128, pixels: [[0, 3]] as [number, number][] };
+    const state = { pixels: [[0, 3]] as [number, number][] };
 
-    expect(() => drawCanvas(noContextCanvas(), state, palette)).not.toThrow();
+    expect(() => drawCanvas(noContextCanvas(), size, state, palette)).not.toThrow();
   });
 });

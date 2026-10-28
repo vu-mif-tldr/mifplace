@@ -74,11 +74,9 @@ describe('openDb / MifDb', () => {
     mif.appendEvent({ user_id: 0, color_id: 4, position: 10 }, 3000);
     mif.appendEvent({ user_id: 0, color_id: 2, position: 5 }, 4000);
 
-    const state = getCanvasState(mif);
+    const state = getCanvasState(mif, mif.getCanvasSize());
 
     assert.deepEqual(state, {
-      width: 128,
-      height: 128,
       pixels: [
         [5, 2],
         [10, 4],
@@ -115,5 +113,47 @@ describe('openDb / MifDb', () => {
     );
 
     mifdb.close();
+  });
+
+  it('keeps only one positive integer canvas size', () => {
+    const db = new Database(':memory:');
+    migrate(db, loadMigrations(REAL_MIGRATIONS_DIR));
+    const update = db.prepare('UPDATE canvas SET width = ?, height = ?');
+
+    for (const [width, height] of [
+      [0, 128],
+      [128, 0],
+      [-128, -128],
+      [1.5, 128],
+      ['abc', 128],
+    ]) {
+      assert.throws(() => update.run(width, height), `${width}x${height}`);
+    }
+    assert.throws(() => db.prepare('INSERT INTO canvas (width, height) VALUES (64, 64)').run());
+
+    update.run(256, 64);
+    assert.deepEqual(new MifDb(db).getCanvasSize(), { width: 256, height: 64 });
+    db.close();
+  });
+
+  it('keeps palette color ids unique and non-negative', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    migrate(db, loadMigrations(REAL_MIGRATIONS_DIR));
+    const insert = db.prepare('INSERT INTO palette (color_id, text) VALUES (?, ?)');
+
+    assert.throws(() => insert.run(-1, '#123456'), /CHECK constraint failed/);
+    assert.throws(() => insert.run(0, '#123456'), /UNIQUE constraint failed/);
+    assert.throws(() => insert.run('abc', '#123456'));
+
+    // Without an id the next free one is taken, events can still reference palette
+    const id = Number(
+      db.prepare("INSERT INTO palette (text) VALUES ('#123456')").run().lastInsertRowid
+    );
+    assert.equal(id, 16);
+    const mif = new MifDb(db);
+    mif.appendEvent({ user_id: 0, color_id: id, position: 0 }, 1000);
+    assert.throws(() => mif.appendEvent({ user_id: 0, color_id: 99, position: 0 }, 1000));
+    mif.close();
   });
 });

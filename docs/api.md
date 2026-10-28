@@ -26,24 +26,40 @@ The frontend requests the palette **once during initial page load**. It keeps th
 { "success": false, "error": "Internal server error" }
 ```
 
+### `GET /api/canvas/size`
+
+The canvas size does not change while the server runs. The backend reads it from the database once at start and serves it from memory. The frontend requests it **once during initial page load**, alongside the palette, and keeps it locally. It is not fetched again after a `reset`; a page reload or an explicit full reinitialization may fetch it again.
+
+**200 OK** — canvas dimensions:
+
+```json
+{ "width": 3, "height": 2 }
+```
+
+`position = y * width + x`, starting at the top-left; valid positions are `0 <= position < width * height`.
+
+**Error:** `500 Internal Server Error` if the size cannot be retrieved:
+
+```json
+{ "success": false, "error": "Internal server error" }
+```
+
 ### `GET /api/canvas`
 
-The frontend requests the **full canvas snapshot once during initial page load**, after or alongside the palette. It does **not** poll this endpoint for routine updates. Later pixel changes arrive through WebSocket. A full snapshot is requested again after a `reset` or an explicit full reinitialization.
+The frontend requests the **full canvas snapshot once during initial page load**, alongside the palette and the canvas size. It does **not** poll this endpoint for routine updates. Later pixel changes arrive through WebSocket. A full snapshot is requested again after a `reset` or an explicit full reinitialization.
 
 **200 OK** — current canvas snapshot:
 
 ```json
 {
-  "width": 3,
-  "height": 2,
   "pixels": [5, 12, -1, -2, 5, -3],
   "eventId": 102,
   "timestamp": 1760000000000
 }
 ```
 
-- `width`, `height`: canvas dimensions. They are sent with the initial snapshot, not repeated in live pixel updates.
-- `pixels`: **flat array of color IDs**. Array index is the pixel `position`; the array length is exactly `width * height`. `position = y * width + x`, starting at the top-left.
+- The snapshot does **not** contain the canvas dimensions: the frontend already has them from `GET /api/canvas/size`.
+- `pixels`: **flat array of color IDs**. Array index is the pixel `position`; the array length is exactly `width * height` (dimensions from `GET /api/canvas/size`).
 - Any negative value (`colorId < 0`) represents an unpainted pixel, rendered with the canvas background. Palette color IDs must be non-negative; `0` is a valid color ID.
 - `eventId`, `timestamp`: identify the **last event included in this snapshot**. `timestamp` is a Unix timestamp in milliseconds. For an empty event log both are `0`.
 
@@ -59,7 +75,7 @@ The server must not return a partial snapshot with `200 OK`.
 
 ### `POST /api/pixels`
 
-The frontend computes `position` using the canvas width obtained from `GET /api/canvas`. It sends **`position`, not `x` and `y`**. `colorIndex` is a palette `id`, not its index in the palette array.
+The frontend computes `position` using the canvas width obtained from `GET /api/canvas/size`. It sends **`position`, not `x` and `y`**. `colorIndex` is a palette `id`, not its index in the palette array.
 
 **Request:** `Content-Type: application/json`
 
@@ -146,7 +162,7 @@ The server batches live changes every **100 ms**, sending a JSON text message **
 { "type": "reset" }
 ```
 
-Sent when the resume checkpoint is malformed, unknown, mismatched, or too far behind. The client requests a fresh `GET /api/canvas` snapshot and reconnects using the new `eventId` and `timestamp`. The palette need not be reloaded if it has not changed.
+Sent when the resume checkpoint is malformed, unknown, mismatched, or too far behind. The client requests a fresh `GET /api/canvas` snapshot and reconnects using the new `eventId` and `timestamp`. The palette and the canvas size need not be reloaded.
 
 ### Ping/pong — connection heartbeat
 
@@ -161,9 +177,9 @@ The **backend starts a heartbeat timer for each WebSocket connection**. When no 
 
 ## 3. Frontend/backend flow
 
-1. **Initial page load:** frontend requests `GET /api/palette` and `GET /api/canvas` once, stores the palette, dimensions, full flat color array, `eventId`, and `timestamp`.
+1. **Initial page load:** frontend requests `GET /api/palette`, `GET /api/canvas/size` and `GET /api/canvas` once, stores the palette, dimensions, full flat color array, `eventId`, and `timestamp`.
 2. **Subscribe:** frontend opens `/api/ws?afterEventId=<eventId>&afterTimestamp=<timestamp>`; backend sends any events missed since the snapshot, then streams live updates.
 3. **Place pixel:** frontend calculates `position = y * width + x` and sends `POST /api/pixels` with `position` and `colorIndex`; backend validates, saves, and broadcasts the event to all connected clients.
 4. **Apply updates:** frontend changes only the positions specified by incoming `pixels` events; it does not fetch the full canvas again after each update.
-5. **Recover:** after a disconnect, frontend reconnects using its last applied checkpoint. If it receives `reset`, it fetches a new full canvas snapshot and subscribes again. It keeps the existing palette unless it needs a full reinitialization.
+5. **Recover:** after a disconnect, frontend reconnects using its last applied checkpoint. If it receives `reset`, it fetches a new full canvas snapshot and subscribes again. It keeps the existing palette and canvas size unless it needs a full reinitialization.
 6. **Connection health:** backend sends WebSocket ping frames after 15 seconds of inactivity; clients respond with pong; dead connections are closed to free server resources.

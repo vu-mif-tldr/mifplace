@@ -1,8 +1,8 @@
-import type { CanvasState } from '@mifplace/shared';
+import type { CanvasSize, CanvasState } from '@mifplace/shared';
 import { MifDb } from './db.js';
 
-export function getCanvasState(mifDb: MifDb): CanvasState {
-  const { width, height } = mifDb.getCanvasSize();
+// The size is passed in: it is read once at start, so this does not ask the database for it.
+export function getCanvasState(mifDb: MifDb, { width, height }: CanvasSize): CanvasState {
   const events = mifDb.iterateEvents(0);
   const pixels = new Map<number, number>();
 
@@ -11,5 +11,5 @@ export function getCanvasState(mifDb: MifDb): CanvasState {
     pixels.set(event.position, event.color_id);
   }
 
-  return { width, height, pixels: Array.from(pixels) };
+  return { pixels: Array.from(pixels) };
 }

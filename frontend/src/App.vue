@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import type { PaletteColor } from '@mifplace/shared';
-import { getCanvas, getPalette, placePixel } from './api';
+import type { CanvasSize, PaletteColor } from '@mifplace/shared';
+import { getCanvas, getCanvasSize, getPalette, placePixel } from './api';
 import { drawCanvas, getClickedCell, paintCell } from './canvas';
 
 // Colors from the server, loaded together with the canvas
 const palette = ref<PaletteColor[]>([]);
+
+// Canvas size from the server. It does not change, so it is loaded only once.
+let canvasSize: CanvasSize | null = null;
 
 // Currently selected color (the first palette color by default)
 const selectedColor = ref<PaletteColor | null>(null);
@@ -18,16 +21,22 @@ const loading = ref(true);
 const loadError = ref('');
 const pixelError = ref('');
 
-// Get the palette and the canvas from the server (both at once) and draw the canvas
+// Get the palette, the canvas size (only the first time) and the pixels from the server
+// (all at once) and draw the canvas
 async function loadCanvas() {
   loading.value = true;
   loadError.value = '';
   try {
-    const [colors, state] = await Promise.all([getPalette(), getCanvas()]);
+    const [colors, size, state] = await Promise.all([
+      getPalette(),
+      canvasSize ?? getCanvasSize(),
+      getCanvas(),
+    ]);
+    canvasSize = size;
     palette.value = colors;
     // After "try again" keep the selected color if the server still has it
     selectedColor.value = colors.find((c) => c.id === selectedColor.value?.id) ?? colors[0];
-    if (canvasEl.value) drawCanvas(canvasEl.value, state, colors);
+    if (canvasEl.value) drawCanvas(canvasEl.value, size, state, colors);
   } catch (error) {
     console.error(error);
     loadError.value = 'Nepavyko užkrauti drobės';
