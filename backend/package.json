@@ -7,8 +7,9 @@
     "build": "npx tsc -p tsconfig.build.json",
     "typecheck": "npx tsc --noEmit",
     "lint": "eslint .",
-    "test": "tsx --test \"src/**/*.test.ts\"",
-    "test:coverage": "tsx --test --experimental-test-coverage \"src/**/*.test.ts\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "check": "npm run typecheck && npm run lint && npm run test",
     "db:setup:prod": "node dist/scripts/setup-db.js",
     "db:setup:dev": "tsx src/scripts/setup-db.ts",
@@ -26,7 +27,9 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^24.0.0",
-    "tsx": "^4.23.15"
+    "@vitest/coverage-v8": "^5.0.5",
+    "tsx": "^4.23.15",
+    "vitest": "^5.0.5"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
