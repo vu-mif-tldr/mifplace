@@ -103,23 +103,24 @@ export function createApp({
 
     if (!Number.isInteger(x) || !Number.isInteger(y)) {
       return res.status(400).json({ success: false, error: 'Coordinates are not a number' });
-    } else if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
-      return res.status(400).json({ success: false, error: ' Position not in canvas' });
-    } else if (!paletteIds.has(colorIndex)) {
+    }
+    if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
+      return res.status(400).json({ success: false, error: 'Position not in canvas' });
+    }
+    if (!paletteIds.has(colorIndex)) {
       return res.status(400).json({ success: false, error: 'Color not in palette' });
-    } else {
-      try {
-        const eventId = appendEvent({
-          user_id: 0, // dev user
-          color_id: colorIndex,
-          position: y * gridWidth + x,
-        });
+    }
+    try {
+      const eventId = appendEvent({
+        user_id: 0, // dev user
+        color_id: colorIndex,
+        position: y * gridWidth + x,
+      });
 
-        return res.status(201).json({ success: true, eventId });
-      } catch (error) {
-        console.error('Insert failed:', error);
-        return res.status(500).json({ success: false, error: 'Insert failed' });
-      }
+      return res.status(201).json({ success: true, eventId });
+    } catch (error) {
+      console.error('Insert failed:', error);
+      return res.status(500).json({ success: false, error: 'Insert failed' });
     }
   });
 
