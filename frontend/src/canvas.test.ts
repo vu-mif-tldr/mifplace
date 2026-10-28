@@ -1,5 +1,10 @@
 import { drawCanvas, getClickedCell, paintCell } from './canvas';
-import { PALETTE } from './palette';
+
+// Ids have a gap on purpose: colors must be looked up by id, not by index
+const palette = [
+  { id: 3, color: '#ff0000' },
+  { id: 7, color: '#00ff00' },
+];
 
 function fakeCanvas() {
   const ctx = { fillStyle: '', fillRect: vi.fn() };
@@ -30,14 +35,14 @@ describe('paintCell', () => {
   it('fills the cell with the given colour', () => {
     const { canvas, ctx } = fakeCanvas();
 
-    paintCell(canvas, 2, 3, PALETTE[5]);
+    paintCell(canvas, 2, 3, '#ff0000');
 
-    expect(ctx.fillStyle).toBe(PALETTE[5]);
+    expect(ctx.fillStyle).toBe('#ff0000');
     expect(ctx.fillRect).toHaveBeenCalledWith(10, 15, 5, 5);
   });
 
   it('does nothing when the canvas has no 2d context', () => {
-    expect(() => paintCell(noContextCanvas(), 0, 0, PALETTE[0])).not.toThrow();
+    expect(() => paintCell(noContextCanvas(), 0, 0, '#ff0000')).not.toThrow();
   });
 });
 
@@ -46,27 +51,44 @@ describe('drawCanvas', () => {
     const { canvas, ctx } = fakeCanvas();
 
     // position = y * width + x, so 130 is x = 2, y = 1 on a 128-wide canvas
-    drawCanvas(canvas, {
-      width: 128,
-      height: 128,
-      pixels: [
-        [0, 3],
-        [130, 5],
-      ],
-    });
+    drawCanvas(
+      canvas,
+      {
+        width: 128,
+        height: 128,
+        pixels: [
+          [0, 3],
+          [130, 7],
+        ],
+      },
+      palette
+    );
 
     expect(ctx.fillRect.mock.calls).toEqual([
       [0, 0, 640, 640],
       [0, 0, 5, 5],
       [10, 5, 5, 5],
     ]);
-    expect(ctx.fillStyle).toBe(PALETTE[5]);
+    expect(ctx.fillStyle).toBe('#00ff00');
   });
 
   it('leaves only the white background when nothing is painted', () => {
     const { canvas, ctx } = fakeCanvas();
 
-    drawCanvas(canvas, { width: 128, height: 128, pixels: [] });
+    drawCanvas(canvas, { width: 128, height: 128, pixels: [] }, palette);
+
+    expect(ctx.fillRect).toHaveBeenCalledOnce();
+    expect(ctx.fillStyle).toBe('#ffffff');
+  });
+
+  it('skips unpainted (negative) and unknown color ids', () => {
+    const { canvas, ctx } = fakeCanvas();
+
+    const pixels: [number, number][] = [
+      [0, -1],
+      [1, 99],
+    ];
+    drawCanvas(canvas, { width: 128, height: 128, pixels }, palette);
 
     expect(ctx.fillRect).toHaveBeenCalledOnce();
     expect(ctx.fillStyle).toBe('#ffffff');
@@ -75,6 +97,6 @@ describe('drawCanvas', () => {
   it('does nothing when the canvas has no 2d context', () => {
     const state = { width: 128, height: 128, pixels: [[0, 3]] as [number, number][] };
 
-    expect(() => drawCanvas(noContextCanvas(), state)).not.toThrow();
+    expect(() => drawCanvas(noContextCanvas(), state, palette)).not.toThrow();
   });
 });
