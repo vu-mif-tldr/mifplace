@@ -9,7 +9,7 @@ import type {
   PaletteColor,
   PlacePixelResponse,
 } from '@mifplace/shared';
-import type { NewEvent } from './db.js';
+import type { NewEvent } from '@mifplace/db';
 
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute

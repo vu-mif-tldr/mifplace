@@ -11,11 +11,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "check": "npm run typecheck && npm run lint && npm run test",
-    "db:setup:prod": "node dist/scripts/setup-db.js",
-    "db:setup:dev": "tsx src/scripts/setup-db.ts",
-    "db:seed:dev": "tsx src/scripts/seed-png.ts",
-    "db:palette:export": "tsx src/scripts/export-palette.ts",
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch --conditions=@mifplace/source src/server.ts",
     "watch": "npx tsc -p tsconfig.build.json --watch",
     "start": "node dist/server.js"
   },
@@ -29,14 +25,13 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^24.0.0",
-    "@types/pngjs": "^6.0.5",
     "@vitest/coverage-v8": "^5.0.5",
-    "pngjs": "^7.0.0",
+    "better-sqlite3": "^13.0.3",
     "tsx": "^4.23.15",
     "vitest": "^5.0.5"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
+    "@mifplace/db": "*",
     "cors": "^2.8.6",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1"

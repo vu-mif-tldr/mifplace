@@ -2,26 +2,25 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, it } from 'vitest';
 import Database from 'better-sqlite3';
 import { MifDb, openDb, resolveDbPath } from './db.js';
-import { loadMigrations, migrate } from './scripts/migrate.js';
-import { getCanvasState } from './canvas-state.js';
-
-// The real migrations of this project, found without the MIGRATIONS_DIR setting.
-const REAL_MIGRATIONS_DIR = fileURLToPath(new URL('../migrations/', import.meta.url));
+import { REPO_ROOT } from './env.js';
+import { MIGRATIONS_DIR, loadMigrations, migrate } from './migrate.js';
 
 function tmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'mifplace-test-'));
 }
 
 describe('resolveDbPath', () => {
-  it('returns DB_PATH and throws when it is not set', () => {
+  it('resolves DB_PATH against the repository root and throws when it is not set', () => {
     const saved = process.env.DB_PATH;
     try {
       process.env.DB_PATH = '/x/y.db';
-      assert.equal(resolveDbPath(), '/x/y.db');
+      assert.equal(resolveDbPath(), path.resolve('/x/y.db'));
+
+      process.env.DB_PATH = './data/y.db';
+      assert.equal(resolveDbPath(), path.join(REPO_ROOT, 'data', 'y.db'));
 
       delete process.env.DB_PATH;
       assert.throws(() => resolveDbPath(), /DB_PATH must be set/);
@@ -60,7 +59,7 @@ describe('openDb / MifDb', () => {
     assert.equal(db.pragma('busy_timeout', { simple: true }), 5000);
     assert.equal(db.pragma('foreign_keys', { simple: true }), 1);
 
-    migrate(db, loadMigrations(REAL_MIGRATIONS_DIR));
+    migrate(db, loadMigrations(MIGRATIONS_DIR));
     const mif = new MifDb(db);
 
     assert.deepEqual(mif.getCanvasSize(), { width: 128, height: 128 });
@@ -74,14 +73,14 @@ describe('openDb / MifDb', () => {
     mif.appendEvent({ user_id: 0, color_id: 4, position: 10 }, 3000);
     mif.appendEvent({ user_id: 0, color_id: 2, position: 5 }, 4000);
 
-    const state = getCanvasState(mif, mif.getCanvasSize());
-
-    assert.deepEqual(state, {
-      pixels: [
-        [5, 2],
-        [10, 4],
-      ],
-    });
+    assert.deepEqual(
+      mif.getEventsAfter(id).map((e) => [e.position, e.color_id, e.timestamp]),
+      [
+        [5, 7, 2000],
+        [10, 4, 3000],
+        [5, 2, 4000],
+      ]
+    );
 
     assert.throws(() => mif.appendEvent({ user_id: -1, color_id: 7, position: 256 * 256 }, 1000));
     assert.throws(() => mif.appendEvent({ user_id: 0, color_id: -1, position: 256 * 256 }, 1000));
@@ -93,7 +92,7 @@ describe('openDb / MifDb', () => {
 
   it('returns the palette', () => {
     const db = new Database(':memory:');
-    migrate(db, loadMigrations(REAL_MIGRATIONS_DIR));
+    migrate(db, loadMigrations(MIGRATIONS_DIR));
     const mifdb = new MifDb(db);
 
     // The order of the colors is not guaranteed, look them up by id
@@ -117,7 +116,7 @@ describe('openDb / MifDb', () => {
 
   it('keeps only one positive integer canvas size', () => {
     const db = new Database(':memory:');
-    migrate(db, loadMigrations(REAL_MIGRATIONS_DIR));
+    migrate(db, loadMigrations(MIGRATIONS_DIR));
     const update = db.prepare('UPDATE canvas SET width = ?, height = ?');
 
     for (const [width, height] of [
@@ -139,7 +138,7 @@ describe('openDb / MifDb', () => {
   it('keeps palette color ids unique and non-negative', () => {
     const db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
-    migrate(db, loadMigrations(REAL_MIGRATIONS_DIR));
+    migrate(db, loadMigrations(MIGRATIONS_DIR));
     const insert = db.prepare('INSERT INTO palette (color_id, text) VALUES (?, ?)');
 
     assert.throws(() => insert.run(-1, '#123456'), /CHECK constraint failed/);

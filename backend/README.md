@@ -20,19 +20,15 @@ git --version
 ### 2. Go to mifplace folder in Command Prompt and run these commands, scripts
 
 ```
-cd frontend
 npm install
+npm run setup
 npm run build
-
-cd ../backend
-npm install
-cp .env.example .env
-npm run db:setup:dev
-npm run build
-npm start
+npm start -w backend
 ```
 
-`.env` holds `DB_PATH` and `MIGRATIONS_DIR` (required for the database scripts), see `.env.example`.
+`npm run setup` creates `.env` in the repository root (it holds `DB_PATH`, see `.env.example`)
+and the database. The data access code and the migrations are in [`db`](../db/README.md).
+`npm run dev` runs `@mifplace/db` from its TypeScript sources, `npm start` from the built `db/dist`.
 
 ### 3. The server should now be running at:
 
@@ -59,12 +55,8 @@ http://127.0.0.1:3000
 
 ### Database
 
-- `npm run db:setup:dev` — Create the SQLite file (if missing) and apply pending migrations, runs from TypeScript via `tsx`
-- `npm run db:setup:prod` — Same, but runs the compiled `dist/scripts/setup-db.js` (run `npm run build` first)
-- `npm run db:palette:export -- [palette.hex]` — Write the palette as a `.hex` file (one `rrggbb` per line) for an online pixel art editor, or to stdout if file name is not provided
-- `npm run db:seed:dev -- <picture.png>` — Dev only: fill the `events` table with a PNG in the palette colors, see the header of `src/scripts/seed-png.ts` and the root README
-
-Migrations are described in [`migrations/README.md`](migrations/README.md).
+The database scripts live in [`db`](../db/README.md) (`db:setup:dev`, `db:setup:prod`) and
+[`tools`](../tools/README.md) (`db:seed:dev`, `db:palette:export`).
 
 ## API
 

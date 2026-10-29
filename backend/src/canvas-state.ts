@@ -1,5 +1,5 @@
 import type { CanvasSize, CanvasState } from '@mifplace/shared';
-import { MifDb } from './db.js';
+import type { MifDb } from '@mifplace/db';
 
 // The size is passed in: it is read once at start, so this does not ask the database for it.
 export function getCanvasState(mifDb: MifDb, { width, height }: CanvasSize): CanvasState {

@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
+import { resolveFromRoot } from './env.js';
 
 export type Db = Database.Database;
 
@@ -24,12 +25,13 @@ export interface NewEvent {
   position: number;
 }
 
-// DB_PATH is required, there is no default: a process started from another
-// directory must never silently create a second database.
+// DB_PATH is required, there is no default. A relative value is resolved against the
+// repository root (not the cwd), so the backend, the db scripts, the tools and the MCP
+// server open the same file whichever directory they start from.
 // Locally it comes from .env (see .env.example), in Docker from ENV.
 export function resolveDbPath(): string {
   const fromEnv = process.env.DB_PATH;
-  if (fromEnv) return fromEnv;
+  if (fromEnv) return resolveFromRoot(fromEnv);
 
   throw new Error('resolveDbPath: DB_PATH must be set');
 }

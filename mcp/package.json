@@ -23,6 +23,7 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
+    "@mifplace/db": "*",
     "@modelcontextprotocol/server": "^2.4.0",
     "better-sqlite3": "^13.0.3",
     "zod": "^4.6.7"

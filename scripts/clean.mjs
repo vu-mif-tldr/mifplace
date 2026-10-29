@@ -1,18 +1,15 @@
 // Removes build output. With --deps also removes node_modules (run `npm install` afterwards).
 import { rmSync } from 'node:fs';
 
+const workspaces = ['db', 'backend', 'frontend', 'mcp', 'tools'];
 const targets = [
+  'db/dist',
   'backend/dist',
   'frontend/dist',
-  'backend/coverage',
-  'frontend/coverage',
-  'backend/test-results',
-  'frontend/test-results',
-  'mcp/coverage',
-  'mcp/test-results',
+  ...workspaces.flatMap((w) => [`${w}/coverage`, `${w}/test-results`]),
 ];
 if (process.argv.includes('--deps')) {
-  targets.push('node_modules', 'backend/node_modules', 'frontend/node_modules');
+  targets.push('node_modules', ...workspaces.map((w) => `${w}/node_modules`));
 }
 
 for (const target of targets) {

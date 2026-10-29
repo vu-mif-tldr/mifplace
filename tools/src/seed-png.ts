@@ -3,17 +3,18 @@
 // The PNG is not converted: every pixel must already be one of the palette colors. It starts
 // at the top left corner of the canvas, the part of a larger picture outside the canvas is
 // skipped. Prepare it in an online pixel art editor with the palette from
-// `npm run db:palette:export -w backend` (see README.md). A wrong color stops the script.
+// `npm run db:palette:export -w tools` (see README.md). A wrong color stops the script.
 //
-// Usage: npm run db:seed:dev -w backend -- <image.png>
-// Settings (DB_PATH) come from the environment, then from .env, see .env.example.
+// Usage: npm run db:seed:dev -w tools -- <image.png>
+//   A relative file name is taken from the directory npm was started in.
+// DB_PATH comes from the environment, then from .env in the repository root, see .env.example.
 //
 // - Every non-transparent pixel becomes one event of user 0 (Test User), in one transaction.
 // - events is append-only: a second run paints over the first one, the old events stay.
 //   Recreate the database to start from an empty canvas.
 import * as fs from 'node:fs';
-import { MifDb, openDb, resolveDbPath } from '../db.js';
-import { loadDotEnv } from '../env.js';
+import * as path from 'node:path';
+import { MifDb, loadDotEnv, openDb, resolveDbPath } from '@mifplace/db';
 import { decodePng, toCanvasPixels } from './png-canvas.js';
 
 const SEED_USER_ID = 0;
@@ -24,12 +25,12 @@ if (!file) {
   process.exit(1);
 }
 
-loadDotEnv('.env');
+loadDotEnv();
 const db = openDb(resolveDbPath());
 
 try {
   const mif = new MifDb(db);
-  const image = decodePng(fs.readFileSync(file));
+  const image = decodePng(fs.readFileSync(path.resolve(process.env.INIT_CWD ?? '', file)));
   const canvas = mif.getCanvasSize();
   const pixels = toCanvasPixels(image, mif.getPalette(), canvas);
   if (image.width > canvas.width || image.height > canvas.height) {
