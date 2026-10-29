@@ -3,8 +3,9 @@ import type { Server } from 'node:http';
 import * as path from 'node:path';
 import rateLimit from 'express-rate-limit';
 import {
-  cellError,
-  toPosition,
+  PlacePixelRequestSchema,
+  cellSchema,
+  formatError,
   type CanvasSize,
   type CanvasState,
   type ErrorResponse,
@@ -54,6 +55,8 @@ export function createApp({
   const app = express();
   // Holds only palette ids, so any other colorIndex (missing, string, fraction, null...) is rejected.
   const paletteIds = new Set(palette.map(({ id }) => id));
+  // The size does not change while the server runs, so the cell check is built once
+  const cell = cellSchema(canvasSize);
 
   app.get('/', limiter, (req, res) => {
     res.sendFile(path.join(STATIC_PATH, 'index.html'));
@@ -106,14 +109,17 @@ export function createApp({
   // Which req.body doesnt accept
   app.use(express.json());
   app.post('/api/pixels', (req, res: Response<PlacePixelResponse | ErrorResponse>) => {
-    const { x, y, colorIndex } = req.body;
-
-    if (!Number.isInteger(x) || !Number.isInteger(y)) {
-      return res.status(400).json({ success: false, error: 'Coordinates are not a number' });
+    // A missing or non-JSON body leaves req.body undefined, the schema rejects it too
+    const body = PlacePixelRequestSchema.safeParse(req.body);
+    if (!body.success) {
+      return res.status(400).json({ success: false, error: formatError(body.error) });
     }
-    if (cellError(canvasSize, x, y) !== undefined) {
-      return res.status(400).json({ success: false, error: 'Position not in canvas' });
+    const position = cell.safeParse(body.data);
+    if (!position.success) {
+      return res.status(400).json({ success: false, error: formatError(position.error) });
     }
+    const { colorIndex } = body.data;
+    // Which colors exist is a rule of the server, not of the request shape
     if (!paletteIds.has(colorIndex)) {
       return res.status(400).json({ success: false, error: 'Color not in palette' });
     }
@@ -121,7 +127,7 @@ export function createApp({
       const eventId = appendEvent({
         user_id: 0, // dev user
         color_id: colorIndex,
-        position: toPosition(canvasSize, x, y),
+        position: position.data,
       });
 
       return res.status(201).json({ success: true, eventId });

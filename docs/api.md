@@ -91,17 +91,18 @@ The backend validates that `position` is an integer in `0 <= position < width * 
 { "success": true, "eventId": 103 }
 ```
 
-**Error responses (target contract):**
+**Error responses:**
 
-| Status | Case                                 | JSON response                                             |
-| ------ | ------------------------------------ | --------------------------------------------------------- |
-| `400`  | Non-integer position                 | `{"success":false,"error":"Position must be an integer"}` |
-| `400`  | Position outside canvas              | `{"success":false,"error":"Position not in canvas"}`      |
-| `400`  | Invalid palette ID                   | `{"success":false,"error":"Color not in palette"}`        |
-| `400`  | Malformed or missing required fields | `{"success":false,"error":"Invalid pixel request"}`       |
-| `500`  | Database insert failure              | `{"success":false,"error":"Insert failed"}`               |
+| Status | Case                                             | JSON response                                                                             |
+| ------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `400`  | Malformed body, a field missing or of wrong type | `{"success":false,"error":"colorIndex: Invalid input: expected number, received string"}` |
+| `400`  | Cell outside the canvas                          | `{"success":false,"error":"x: x must be less than canvas width (128)"}`                   |
+| `400`  | Integer that is not a palette ID                 | `{"success":false,"error":"Color not in palette"}`                                        |
+| `500`  | Database insert failure                          | `{"success":false,"error":"Insert failed"}`                                               |
 
-**Implementation change:** The current backend accepts `{x, y, colorIndex}` and validates `colorIndex` against `paletteSize`. It must be updated to accept `{position, colorIndex}` and validate actual palette IDs. The error strings above are **proposed** for review, not claims about current behavior.
+The body is checked with the request schema from `@mifplace/shared` (`PlacePixelRequestSchema`, then the cell check `cellSchema`). A `400` from that check carries the schema's message as one line, `field: message`, several problems joined with `; ` (`formatError`). The exact wording comes from the schema and may change with it; clients show it, they do not parse it. `Color not in palette` and `Insert failed` are fixed strings of the backend.
+
+**Implementation change:** The current backend accepts `{x, y, colorIndex}` and validates `colorIndex` against the actual palette IDs. It must be updated to accept `{position, colorIndex}`; the position will then be checked by a schema in `@mifplace/shared` in the same way.
 
 ## 2. WebSocket — `/api/ws`
 

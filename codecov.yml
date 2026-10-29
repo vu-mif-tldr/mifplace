@@ -73,9 +73,10 @@ component_management:
         - db/src/env.ts
         - db/src/migrate.ts
         - backend/src/canvas-state.ts
-    - component_id: geometry
-      name: Canvas geometry
+    - component_id: shared
+      name: Shared API and geometry
       paths:
+        - shared/src/api.ts
         - shared/src/position.ts
     - component_id: frontend_canvas
       name: Canvas UI

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { cellError, fromPosition, toPosition } from './position.js';
+import { formatError } from './api.js';
+import { cellSchema, fromPosition, toPosition } from './position.js';
 
 const size = { width: 4, height: 3 };
 
@@ -12,7 +13,7 @@ describe('toPosition', () => {
   });
 
   it('throws for a cell outside the canvas', () => {
-    expect(() => toPosition(size, 4, 0)).toThrow(RangeError);
+    expect(() => toPosition(size, 4, 0)).toThrow(/less than canvas width \(4\)/);
     expect(() => toPosition(size, 0, 3)).toThrow(/less than canvas height \(3\)/);
   });
 });
@@ -31,18 +32,30 @@ describe('fromPosition', () => {
   });
 });
 
-describe('cellError', () => {
-  it('accepts every cell of the canvas', () => {
-    expect(cellError(size, 0, 0)).toBeUndefined();
-    expect(cellError(size, 3, 2)).toBeUndefined();
+describe('cellSchema', () => {
+  const cell = cellSchema(size);
+
+  // The error of a failed check, as an API response or an MCP tool result shows it
+  const errorOf = (input: unknown) => {
+    const result = cell.safeParse(input);
+    if (result.success) throw new Error(`expected ${JSON.stringify(input)} to fail`);
+    return formatError(result.error);
+  };
+
+  it('gives the position of every cell of the canvas', () => {
+    expect(cell.safeParse({ x: 0, y: 0 })).toEqual({ success: true, data: 0 });
+    expect(cell.safeParse({ x: 3, y: 2 })).toEqual({ success: true, data: 11 });
   });
 
   it('names the reason for a cell outside the canvas', () => {
-    expect(cellError(size, 4, 0)).toMatch(/x must be less than canvas width \(4\)/);
-    expect(cellError(size, 0, 3)).toMatch(/y must be less than canvas height \(3\)/);
-    expect(cellError(size, -1, 0)).toMatch(/must not be negative/);
-    expect(cellError(size, 0, -1)).toMatch(/must not be negative/);
-    expect(cellError(size, 0.5, 0)).toMatch(/must be integers/);
-    expect(cellError(size, 0, Number.NaN)).toMatch(/must be integers/);
+    expect(errorOf({ x: 4, y: 0 })).toBe('x: x must be less than canvas width (4)');
+    expect(errorOf({ x: 0, y: 3 })).toBe('y: y must be less than canvas height (3)');
+    expect(errorOf({ x: -1, y: 0 })).toBe('x: x must not be negative');
+    expect(errorOf({ x: 0, y: -1 })).toBe('y: y must not be negative');
+    expect(errorOf({ x: 0.5, y: 0 })).toBe('x: x must be an integer');
+    expect(errorOf({ x: 0, y: Number.NaN })).toBe('y: y must be an integer');
+    expect(errorOf({ x: 4, y: 3 })).toBe(
+      'x: x must be less than canvas width (4); y: y must be less than canvas height (3)'
+    );
   });
 });

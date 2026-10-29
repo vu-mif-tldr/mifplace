@@ -1,39 +1,48 @@
-import type { CanvasSize, CanvasState, PaletteColor, PlacePixelRequest } from '@mifplace/shared';
+import {
+  CanvasSizeSchema,
+  CanvasStateSchema,
+  PaletteSchema,
+  formatError,
+  type CanvasSize,
+  type CanvasState,
+  type PaletteColor,
+  type PlacePixelRequest,
+} from '@mifplace/shared';
+
+// TypeScript types are not checked at runtime, so every response is checked with the schema
+// of its type from @mifplace/shared before it is used.
 
 // Get the color palette from the server
 export async function getPalette(): Promise<PaletteColor[]> {
   const response = await fetch('/api/palette');
   if (!response.ok) throw new Error('Could not load the palette');
-  const palette: unknown = await response.json();
-  if (!isValidPalette(palette)) throw new Error('The palette from the server is invalid');
-  return palette;
-}
-
-// TypeScript types are not checked at runtime, so check the JSON before using it:
-// a non-empty list, unique non-negative integer ids (negative means unpainted), #rrggbb colors
-function isValidPalette(data: unknown): data is PaletteColor[] {
-  if (!Array.isArray(data) || data.length === 0) return false;
-  const ids = new Set<number>();
-  for (const item of data) {
-    if (!Number.isInteger(item?.id) || item.id < 0 || ids.has(item.id)) return false;
-    if (typeof item.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(item.color)) return false;
-    ids.add(item.id);
+  const palette = PaletteSchema.safeParse(await response.json());
+  if (!palette.success) {
+    throw new Error(`The palette from the server is invalid: ${formatError(palette.error)}`);
   }
-  return true;
+  return palette.data;
 }
 
 // Get the canvas size from the server. It does not change, so it is loaded once.
 export async function getCanvasSize(): Promise<CanvasSize> {
   const response = await fetch('/api/canvas/size');
   if (!response.ok) throw new Error('Could not load the canvas size');
-  return response.json();
+  const size = CanvasSizeSchema.safeParse(await response.json());
+  if (!size.success) {
+    throw new Error(`The canvas size from the server is invalid: ${formatError(size.error)}`);
+  }
+  return size.data;
 }
 
 // Get all painted pixels of the canvas from the server
 export async function getCanvas(): Promise<CanvasState> {
   const response = await fetch('/api/canvas');
   if (!response.ok) throw new Error('Could not load the canvas');
-  return response.json();
+  const state = CanvasStateSchema.safeParse(await response.json());
+  if (!state.success) {
+    throw new Error(`The canvas from the server is invalid: ${formatError(state.error)}`);
+  }
+  return state.data;
 }
 
 // Save one pixel on the server (colorIndex = palette color id)
