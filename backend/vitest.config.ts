@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  // @mifplace/db from its TypeScript sources, so the tests do not need a built db/dist.
+  // @mifplace/db and @mifplace/shared from their TypeScript sources, so the tests need no build.
   // The rest is Vite's default list, which this setting replaces.
   ssr: {
     resolve: { conditions: ['@mifplace/source', 'module', 'node', 'development|production'] },

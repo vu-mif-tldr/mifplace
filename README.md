@@ -20,7 +20,7 @@ Diegimas į serverį: [deploy/README.md](deploy/README.md).
 
 ### Saugyklos struktūra
 
-npm workspaces: `shared` (bendri tipai), [`db`](db/README.md) (duomenų bazė ir migracijos), `backend`,
+npm workspaces: [`shared`](shared/README.md) (bendri tipai ir drobės koordinatės), [`db`](db/README.md) (duomenų bazė ir migracijos), `backend`,
 `frontend`, `mcp`, [`tools`](tools/README.md) (tik kūrimui skirti įrankiai). Vienas `.env` saugyklos
 šaknyje (pavyzdys `.env.example`) galioja visiems paketams, o santykinis `DB_PATH` skaičiuojamas nuo
 saugyklos šaknies, nesvarbu, iš kurio katalogo paleista komanda.

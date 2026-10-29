@@ -1,4 +1,9 @@
-import type { CanvasSize, CanvasState, PaletteColor } from '@mifplace/shared';
+import {
+  fromPosition,
+  type CanvasSize,
+  type CanvasState,
+  type PaletteColor,
+} from '@mifplace/shared';
 
 // The <canvas> element has one pixel per cell. It is scaled up on screen with a CSS
 // transform, so cells stay sharp (image-rendering: pixelated) at any size.
@@ -24,14 +29,12 @@ export function drawCanvas(
   // Color ids can have gaps, so look colors up by id, not by index in the list
   const colorById = new Map(palette.map(({ id, color }) => [id, color]));
 
-  // Turn each position into a column (x) and a row (y)
   for (const [position, colorId] of state.pixels) {
     // Negative (unpainted) and unknown ids keep the background
     const color = colorById.get(colorId);
     if (!color) continue;
 
-    const x = position % size.width;
-    const y = Math.floor(position / size.width);
+    const { x, y } = fromPosition(size, position);
     paintCell(canvas, x, y, color);
   }
 }

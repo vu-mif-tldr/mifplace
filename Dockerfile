@@ -24,7 +24,8 @@ COPY backend backend
 COPY frontend frontend
 RUN npm run build
 
-# Production dependencies of the backend only (with @mifplace/db): no frontend packages, no dev tools.
+# Production dependencies of the backend only (with @mifplace/db and @mifplace/shared): no frontend
+# packages, no dev tools.
 FROM node:${NODE_VERSION}-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -40,6 +41,7 @@ WORKDIR /app
 COPY --from=deps /app ./
 # @mifplace/db finds its migrations next to dist/ (db/migrations).
 COPY db/migrations db/migrations
+COPY --from=build /app/shared/dist shared/dist
 COPY --from=build /app/db/dist db/dist
 COPY --from=build /app/backend/dist backend/dist
 COPY --from=build /app/frontend/dist frontend/dist

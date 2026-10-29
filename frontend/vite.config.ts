@@ -3,6 +3,12 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [vue()],
+  // @mifplace/shared from its TypeScript sources: no build of shared/dist is needed for the
+  // dev server, the bundle and the tests. The rest are Vite's defaults, which these settings replace.
+  resolve: { conditions: ['@mifplace/source', 'module', 'browser', 'development|production'] },
+  ssr: {
+    resolve: { conditions: ['@mifplace/source', 'module', 'node', 'development|production'] },
+  },
   server: {
     // IPv4 explicitly: "localhost" may resolve to ::1 only (e.g. in the dev container),
     // and the port forwarding of VS Code and Codespaces connects to 127.0.0.1

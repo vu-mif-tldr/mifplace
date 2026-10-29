@@ -36,4 +36,5 @@ Migrations are described in [`migrations/README.md`](migrations/README.md).
   `npm run dev`, the tests and the MCP server do not need a build and see edits at once;
 - `default` — `dist/index.js`, for plain `node` in production.
 
-A new consumer that runs the package from TypeScript needs the same condition.
+A new consumer that runs the package from TypeScript needs the same condition. `@mifplace/shared` is
+exported the same way; the frontend lists the condition in `resolve.conditions` of `vite.config.ts`.

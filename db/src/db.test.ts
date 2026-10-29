@@ -74,6 +74,16 @@ describe('openDb / MifDb', () => {
     mif.appendEvent({ user_id: 0, color_id: 2, position: 5 }, 4000);
 
     assert.deepEqual(
+      mif.getPixelHistory(5, 10).map((e) => e.color_id),
+      [2, 7]
+    );
+    assert.deepEqual(
+      mif.getPixelHistory(5, 1).map((e) => e.color_id),
+      [2]
+    );
+    assert.deepEqual(mif.getPixelHistory(6, 10), []);
+
+    assert.deepEqual(
       mif.getEventsAfter(id).map((e) => [e.position, e.color_id, e.timestamp]),
       [
         [5, 7, 2000],

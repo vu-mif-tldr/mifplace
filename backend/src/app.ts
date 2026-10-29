@@ -2,12 +2,14 @@ import express, { type Express, type Response } from 'express';
 import type { Server } from 'node:http';
 import * as path from 'node:path';
 import rateLimit from 'express-rate-limit';
-import type {
-  CanvasSize,
-  CanvasState,
-  ErrorResponse,
-  PaletteColor,
-  PlacePixelResponse,
+import {
+  cellError,
+  toPosition,
+  type CanvasSize,
+  type CanvasState,
+  type ErrorResponse,
+  type PaletteColor,
+  type PlacePixelResponse,
 } from '@mifplace/shared';
 import type { NewEvent } from '@mifplace/db';
 
@@ -109,7 +111,7 @@ export function createApp({
     if (!Number.isInteger(x) || !Number.isInteger(y)) {
       return res.status(400).json({ success: false, error: 'Coordinates are not a number' });
     }
-    if (x < 0 || x >= canvasSize.width || y < 0 || y >= canvasSize.height) {
+    if (cellError(canvasSize, x, y) !== undefined) {
       return res.status(400).json({ success: false, error: 'Position not in canvas' });
     }
     if (!paletteIds.has(colorIndex)) {
@@ -119,7 +121,7 @@ export function createApp({
       const eventId = appendEvent({
         user_id: 0, // dev user
         color_id: colorIndex,
-        position: y * canvasSize.width + x,
+        position: toPosition(canvasSize, x, y),
       });
 
       return res.status(201).json({ success: true, eventId });
