@@ -14,7 +14,8 @@ coverage:
 # unit tests do not load them, so they would show 0% and pull the totals down.
 ignore:
   - backend/src/server.ts
-  - backend/src/scripts/seed-events.ts
+  - backend/src/scripts/export-palette.ts
+  - backend/src/scripts/seed-png.ts
   - backend/src/scripts/setup-db.ts
   - frontend/src/main.ts
   - mcp/src/server.ts
@@ -57,6 +58,7 @@ component_management:
         - backend/src/db.ts
         - backend/src/canvas-state.ts
         - backend/src/scripts/migrate.ts
+        - backend/src/scripts/png-canvas.ts
     - component_id: frontend_canvas
       name: Canvas UI
       paths:

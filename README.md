@@ -38,6 +38,22 @@ npm run dev
 `DB_PATH` aplinkos kintamasis turi pirmenybę prieš `backend/.env`, todėl tame pačiame terminale
 `npm run dev` naudoja naują bazę. Kitame terminale (be `DB_PATH`) vėl naudojama pagrindinė.
 
+### Paveikslėlis drobėje (seed)
+
+Vietinę duomenų bazę galima užpildyti PNG paveikslėliu: kiekvienas jo pikselis tampa įvykiu
+(vartotojas 0). Paveikslėlis nekonvertuojamas, todėl jį reikia paruošti iš anksto:
+
+1. Išsaugoti paletę `.hex` failu: `npm run db:palette:export -w backend -- paletė.hex`.
+2. Internetiniame pikselių grafikos redaktoriuje, pvz.
+   [Image-to-Pixel](https://tezumie.github.io/Image-to-Pixel/editor/), importuoti `paletė.hex`,
+   nustatyti drobės dydį (numatytasis 128×128) ir eksportuoti PNG mastelyje 1.
+3. Įrašyti: `npm run db:seed:dev -w backend -- paveikslas.png`. Paveikslėlis dedamas nuo viršutinio
+   kairiojo drobės kampo: mažesnis už drobę užpildo tik jos dalį, iš didesnio įrašoma tik
+   ant drobės tilpusi dalis.
+
+Visos PNG spalvos turi tiksliai sutapti su paletės spalvomis, kitaip skriptas sustoja ir nurodo
+pirmą netinkamą pikselį. Pakeitus paletę, `.hex` failą reikia išsaugoti iš naujo.
+
 ## GitHub Codespaces
 
 Nieko nediegiant savo kompiuteryje: **Code → Codespaces → Create codespace on main**. Aplinka
@@ -62,3 +78,5 @@ nepavyko, o laikui bėgant ir kurie testai nestabilūs ar lėti.
 - Renatas Podberiozko
 - Lukas Petkevicius
 - Titas Mockevicius
+- Klaudija Antropikienė
+- Gėpėtė Openaitytė

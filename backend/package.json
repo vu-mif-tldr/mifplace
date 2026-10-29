@@ -13,7 +13,8 @@
     "check": "npm run typecheck && npm run lint && npm run test",
     "db:setup:prod": "node dist/scripts/setup-db.js",
     "db:setup:dev": "tsx src/scripts/setup-db.ts",
-    "db:seed:dev": "tsx src/scripts/seed-events.ts",
+    "db:seed:dev": "tsx src/scripts/seed-png.ts",
+    "db:palette:export": "tsx src/scripts/export-palette.ts",
     "dev": "tsx watch src/server.ts",
     "watch": "npx tsc -p tsconfig.build.json --watch",
     "start": "node dist/server.js"
@@ -28,7 +29,9 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^24.0.0",
+    "@types/pngjs": "^6.0.5",
     "@vitest/coverage-v8": "^5.0.5",
+    "pngjs": "^7.0.0",
     "tsx": "^4.23.15",
     "vitest": "^5.0.5"
   },
