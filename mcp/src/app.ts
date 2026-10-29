@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { MifDb, type Db } from '@mifplace/db';
+import { MifDb, cellError, toPosition, type Db } from '@mifplace/db';
 
 // Every call returns a new instance: serveStdio may call the factory more than once.
 export function createApp(db: Db): McpServer {
@@ -51,24 +51,12 @@ export function createApp(db: Db): McpServer {
       }),
     },
     async ({ x, y, limit }) => {
-      const { width, height } = mifDb.getCanvasSize();
-      // position is y * width + x, so x >= width would silently read a cell on the next row
-      if (x >= width) {
-        return {
-          content: [{ type: 'text', text: `x must be less than canvas width (${width})` }],
-          isError: true,
-        };
+      const size = mifDb.getCanvasSize();
+      const error = cellError(size, x, y);
+      if (error !== undefined) {
+        return { content: [{ type: 'text', text: error }], isError: true };
       }
-      // y >= height is a position past the last cell, it would silently return no events
-      if (y >= height) {
-        return {
-          content: [{ type: 'text', text: `y must be less than canvas height (${height})` }],
-          isError: true,
-        };
-      }
-      const rows = db
-        .prepare('SELECT * FROM events WHERE position = ? ORDER BY id DESC LIMIT ?')
-        .all(y * width + x, limit);
+      const rows = mifDb.getPixelHistory(toPosition(size, x, y), limit);
       return { content: [{ type: 'text', text: JSON.stringify(rows) }] };
     }
   );

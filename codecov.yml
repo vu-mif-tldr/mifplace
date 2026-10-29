@@ -67,6 +67,7 @@ component_management:
         - db/src/db.ts
         - db/src/env.ts
         - db/src/migrate.ts
+        - db/src/position.ts
         - backend/src/canvas-state.ts
     - component_id: frontend_canvas
       name: Canvas UI

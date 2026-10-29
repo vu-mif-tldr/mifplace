@@ -2,6 +2,7 @@
 // Kept apart from the scripts so it can be tested without a database.
 import pngjs from 'pngjs';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
+import { toPosition } from '@mifplace/db';
 
 export interface CanvasPixel {
   color_id: number;
@@ -31,7 +32,7 @@ export function decodePng(bytes: Buffer): RGBAImage {
 }
 
 // One pixel per non-transparent pixel of the image, from the top left corner of the canvas.
-// position = y * canvas.width + x, as in the events table. The part of a larger image outside
+// position is toPosition(canvas, x, y), as in the events table. The part of a larger image outside
 // the canvas is skipped, its colors are not checked. Every other color must be exactly
 // a palette color: the image is not converted, prepare it with the palette from export-palette.
 export function toCanvasPixels(
@@ -49,7 +50,7 @@ export function toCanvasPixels(
         '#' + [0, 1, 2].map((c) => image.data[i + c].toString(16).padStart(2, '0')).join('');
       const id = ids.get(hex);
       if (id === undefined) throw new Error(`Color ${hex} at ${x},${y} is not in the palette`);
-      pixels.push({ color_id: id, position: y * canvas.width + x });
+      pixels.push({ color_id: id, position: toPosition(canvas, x, y) });
     }
   }
   return pixels;

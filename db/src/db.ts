@@ -71,6 +71,7 @@ export function getDbVersion(db: Db): number {
 export class MifDb {
   private readonly insertEvent;
   private readonly selectEventsAfter;
+  private readonly selectPixelHistory;
   private readonly selectLastEventId;
   private readonly selectCanvasSize;
   private readonly selectPalette;
@@ -83,6 +84,9 @@ export class MifDb {
             VALUES (?, ?, ?, ?)`
     );
     this.selectEventsAfter = db.prepare(`SELECT * FROM events WHERE id > ? ORDER BY id`);
+    this.selectPixelHistory = db.prepare(
+      'SELECT * FROM events WHERE position = ? ORDER BY id DESC LIMIT ?'
+    );
     this.selectLastEventId = db.prepare(`SELECT COALESCE(MAX(id), 0) AS id FROM events`);
     this.selectCanvasSize = db.prepare('SELECT width, height FROM canvas');
     this.selectPalette = db.prepare('SELECT color_id AS id, text AS color FROM palette');
@@ -122,6 +126,12 @@ export class MifDb {
   // Events with id greater than afterId, used for catching up after a reconnect.
   getEventsAfter(afterId: number): EventRow[] {
     return this.selectEventsAfter.all(afterId) as EventRow[];
+  }
+
+  // Events of one cell (see toPosition), newest first. There is no index on position,
+  // so this scans the log: fine for the MCP server, not for a request path.
+  getPixelHistory(position: number, limit: number): EventRow[] {
+    return this.selectPixelHistory.all(position, limit) as EventRow[];
   }
 
   // Streams events one by one, used to rebuild the canvas on server start
