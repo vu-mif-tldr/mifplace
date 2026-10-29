@@ -1,6 +1,7 @@
 import { MifDb, getDbVersion, openDb, resolveDbPath } from './db.js';
 import { loadDotEnv } from './env.js';
-import { createApp } from './app.js';
+import type { Server } from 'node:http';
+import { createApp, listen } from './app.js';
 import { getCanvasState } from './canvas-state.js';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
 
@@ -49,9 +50,16 @@ const app = createApp({
   appendEvent: (eventObject) => mifDb.appendEvent(eventObject),
 });
 
-const server = app.listen(PORT, hostname, () => {
-  console.log(`Server running at http://${hostname}:${PORT}/`);
-});
+let server: Server;
+try {
+  server = await listen(app, PORT, hostname);
+} catch (error) {
+  // Usually the port is taken by another backend (EADDRINUSE)
+  console.error(`Cannot listen on http://${hostname}:${PORT}/: ${(error as Error).message}`);
+  db.close();
+  process.exit(1);
+}
+console.log(`Server running at http://${hostname}:${PORT}/`);
 
 // Stop accepting connections, then close the database so the WAL is checkpointed.
 // The database is closed in the callback: it is not needed until open connections are done.

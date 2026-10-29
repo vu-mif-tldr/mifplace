@@ -61,7 +61,8 @@ http://127.0.0.1:3000
 
 - `npm run db:setup:dev` — Create the SQLite file (if missing) and apply pending migrations, runs from TypeScript via `tsx`
 - `npm run db:setup:prod` — Same, but runs the compiled `dist/scripts/setup-db.js` (run `npm run build` first)
-- `npm run db:seed:dev -- <sprite.c> [offsetX] [offsetY]` — Dev only: fill the `events` table with a sprite exported as a C array, see the header of `src/scripts/seed-events.ts`
+- `npm run db:palette:export -- [palette.hex]` — Write the palette as a `.hex` file (one `rrggbb` per line) for an online pixel art editor, or to stdout if file name is not provided
+- `npm run db:seed:dev -- <picture.png>` — Dev only: fill the `events` table with a PNG in the palette colors, see the header of `src/scripts/seed-png.ts` and the root README
 
 Migrations are described in [`migrations/README.md`](migrations/README.md).
 

@@ -1,4 +1,5 @@
-import express, { type Response } from 'express';
+import express, { type Express, type Response } from 'express';
+import type { Server } from 'node:http';
 import * as path from 'node:path';
 import rateLimit from 'express-rate-limit';
 import type {
@@ -140,4 +141,16 @@ export function createApp({
   });
 
   return app;
+}
+
+// Starts the server. Resolves once it listens, rejects if it cannot (e.g. EADDRINUSE when
+// another backend has the port). Express 5 does not throw in that case, it passes the error
+// to the listen callback, and the server would stay without a port.
+export function listen(app: Express, port: number, host: string): Promise<Server> {
+  return new Promise((resolve, reject) => {
+    const server = app.listen(port, host, (error?: Error) => {
+      if (error) reject(error);
+      else resolve(server);
+    });
+  });
 }
