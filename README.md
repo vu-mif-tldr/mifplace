@@ -8,7 +8,7 @@ r/place klonas benda pikselių drobė, kurioje kiekvienas gali idėti po vieną 
 
 ```bash
 npm install
-npm run setup   # sukuria backend/.env ir vietinę duomenų bazę
+npm run setup   # sukuria .env ir vietinę duomenų bazę
 npm run dev     # backend (3000) ir frontend (5173) kartu
 ```
 
@@ -18,6 +18,13 @@ MCP serveris (Claude Code): `npm run setup:mcp` sukuria `.mcp.json` iš `.mcp.js
 
 Diegimas į serverį: [deploy/README.md](deploy/README.md).
 
+### Saugyklos struktūra
+
+npm workspaces: `shared` (bendri tipai), [`db`](db/README.md) (duomenų bazė ir migracijos), `backend`,
+`frontend`, `mcp`, [`tools`](tools/README.md) (tik kūrimui skirti įrankiai). Vienas `.env` saugyklos
+šaknyje (pavyzdys `.env.example`) galioja visiems paketams, o santykinis `DB_PATH` skaičiuojamas nuo
+saugyklos šaknies, nesvarbu, iš kurio katalogo paleista komanda.
+
 ### Kitas drobės dydis
 
 Drobės dydis saugomas duomenų bazės lentelėje `canvas` (numatytasis 128×128). Serveris jį nuskaito
@@ -25,17 +32,17 @@ paleidžiamas, puslapis – atsidarydamas, todėl pakeitus dydį reikia perkraut
 naujoje duomenų bazėje: pikselio vieta saugoma kaip `y * width + x`, todėl pakeitus jau naudojamos
 drobės dydį padėti pikseliai pasislinktų. Plotis ir aukštis turi būti teigiami sveikieji skaičiai.
 
-Atskira duomenų bazė, pvz. 200×100 (pagrindinė `backend/data/mifplace.db` lieka nepaliesta;
-santykinis `DB_PATH` skaičiuojamas nuo `backend/`):
+Atskira duomenų bazė, pvz. 200×100 (pagrindinė `data/mifplace.db` lieka nepaliesta; komandos
+paleidžiamos saugyklos šaknyje):
 
 ```bash
 export DB_PATH=./data/canvas-200x100.db
-npm run db:setup:dev -w backend
-npm exec -w backend -- node -e "require('better-sqlite3')(process.env.DB_PATH).prepare('UPDATE canvas SET width = ?, height = ?').run(200, 100)"
+npm run db:setup:dev -w db
+node -e "require('better-sqlite3')(process.env.DB_PATH).prepare('UPDATE canvas SET width = ?, height = ?').run(200, 100)"
 npm run dev
 ```
 
-`DB_PATH` aplinkos kintamasis turi pirmenybę prieš `backend/.env`, todėl tame pačiame terminale
+`DB_PATH` aplinkos kintamasis turi pirmenybę prieš `.env`, todėl tame pačiame terminale
 `npm run dev` naudoja naują bazę. Kitame terminale (be `DB_PATH`) vėl naudojama pagrindinė.
 
 ### Paveikslėlis drobėje (seed)
@@ -43,16 +50,17 @@ npm run dev
 Vietinę duomenų bazę galima užpildyti PNG paveikslėliu: kiekvienas jo pikselis tampa įvykiu
 (vartotojas 0). Paveikslėlis nekonvertuojamas, todėl jį reikia paruošti iš anksto:
 
-1. Išsaugoti paletę `.hex` failu: `npm run db:palette:export -w backend -- paletė.hex`.
+1. Išsaugoti paletę `.hex` failu: `npm run db:palette:export -w tools -- paletė.hex`.
 2. Internetiniame pikselių grafikos redaktoriuje, pvz.
    [Image-to-Pixel](https://tezumie.github.io/Image-to-Pixel/editor/), importuoti `paletė.hex`,
    nustatyti drobės dydį (numatytasis 128×128) ir eksportuoti PNG mastelyje 1.
-3. Įrašyti: `npm run db:seed:dev -w backend -- paveikslas.png`. Paveikslėlis dedamas nuo viršutinio
+3. Įrašyti: `npm run db:seed:dev -w tools -- paveikslas.png`. Paveikslėlis dedamas nuo viršutinio
    kairiojo drobės kampo: mažesnis už drobę užpildo tik jos dalį, iš didesnio įrašoma tik
    ant drobės tilpusi dalis.
 
 Visos PNG spalvos turi tiksliai sutapti su paletės spalvomis, kitaip skriptas sustoja ir nurodo
-pirmą netinkamą pikselį. Pakeitus paletę, `.hex` failą reikia išsaugoti iš naujo.
+pirmą netinkamą pikselį. Pakeitus paletę, `.hex` failą reikia išsaugoti iš naujo. Santykiniai failų
+keliai skaičiuojami nuo katalogo, kuriame paleista komanda.
 
 ## GitHub Codespaces
 

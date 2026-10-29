@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { getDbVersion, type Db } from '../db.js';
+import { getDbVersion, type Db } from './db.js';
 
 export interface Migration {
   version: number;
@@ -31,18 +31,13 @@ export function migrationFile(m: Migration): string {
   return `${String(m.version).padStart(3, '0')}_${m.name}.sql`;
 }
 
-// Migrations live in backend/migrations as NNN_name.sql files, applied in order
+// Migrations live in db/migrations as NNN_name.sql files, applied in order
 // and tracked by the database version (see getDbVersion). Never edit an already released file,
 // add a new one instead.
 //
-// The directory is taken from the MIGRATIONS_DIR env variable (a relative value is
-// resolved against the cwd), there is no default. Locally it comes from .env
-// (see .env.example), in Docker from ENV.
-export function resolveMigrationsDir(): string {
-  const fromEnv = process.env.MIGRATIONS_DIR;
-  if (fromEnv) return path.resolve(fromEnv);
-  throw new Error('resolveMigrationsDir: MIGRATIONS_DIR must be set');
-}
+// They ship with this package, so the directory is found next to the code (one level above
+// src/ and dist/), there is no setting for it.
+export const MIGRATIONS_DIR = path.resolve(import.meta.dirname, '../migrations');
 
 const MIGRATION_FILE = /^(\d+)_([a-z0-9_]+)\.sql$/;
 

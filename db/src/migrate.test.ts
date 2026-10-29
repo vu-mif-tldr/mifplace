@@ -3,22 +3,17 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, it } from 'vitest';
-import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
-import { configureDb, getDbVersion } from '../db.js';
+import { configureDb, getDbVersion } from './db.js';
 import {
   MigrationError,
   loadMigrations,
   migrate,
   setDbVersion,
-  resolveMigrationsDir,
   migrationChecksum,
+  MIGRATIONS_DIR,
   type Migration,
 } from './migrate.js';
-
-// The real migrations of this project. Tests find them by themselves and do not
-// depend on the MIGRATIONS_DIR setting.
-const REAL_MIGRATIONS_DIR = fileURLToPath(new URL('../../migrations/', import.meta.url));
 
 function tmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'mifplace-test-'));
@@ -28,7 +23,7 @@ describe('migrate', () => {
   it('applies the real migrations on :memory:', () => {
     const db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
-    const migrations = loadMigrations(REAL_MIGRATIONS_DIR);
+    const migrations = loadMigrations(MIGRATIONS_DIR);
     assert.deepEqual(
       migrate(db, migrations),
       migrations.map((m) => m.version)
@@ -39,7 +34,7 @@ describe('migrate', () => {
 
   it('is a no-op on the second run', () => {
     const db = new Database(':memory:');
-    const migrations = loadMigrations(REAL_MIGRATIONS_DIR);
+    const migrations = loadMigrations(MIGRATIONS_DIR);
     migrate(db, migrations);
     assert.deepEqual(migrate(db, migrations), []);
     db.close();
@@ -207,28 +202,6 @@ describe('migrate: safety', () => {
     a.close();
     b.close();
     fs.rmSync(dir, { recursive: true });
-  });
-});
-
-describe('resolveMigrationsDir', () => {
-  it('returns MIGRATIONS_DIR as an absolute path and throws when it is not set', () => {
-    const saved = process.env.MIGRATIONS_DIR;
-    try {
-      process.env.MIGRATIONS_DIR = '/x/migrations';
-      assert.equal(resolveMigrationsDir(), '/x/migrations');
-
-      process.env.MIGRATIONS_DIR = 'rel/dir';
-      assert.equal(resolveMigrationsDir(), path.resolve('rel/dir'));
-
-      delete process.env.MIGRATIONS_DIR;
-      assert.throws(() => resolveMigrationsDir(), /MIGRATIONS_DIR must be set/);
-
-      process.env.MIGRATIONS_DIR = '';
-      assert.throws(() => resolveMigrationsDir(), /MIGRATIONS_DIR must be set/);
-    } finally {
-      if (saved === undefined) delete process.env.MIGRATIONS_DIR;
-      else process.env.MIGRATIONS_DIR = saved;
-    }
   });
 });
 

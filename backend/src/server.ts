@@ -1,12 +1,11 @@
-import { MifDb, getDbVersion, openDb, resolveDbPath } from './db.js';
-import { loadDotEnv } from './env.js';
+import { MifDb, getDbVersion, loadDotEnv, openDb, resolveDbPath } from '@mifplace/db';
 import type { Server } from 'node:http';
 import { createApp, listen } from './app.js';
 import { getCanvasState } from './canvas-state.js';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
 
-// Settings come from the environment, then from .env (see .env.example).
-loadDotEnv('.env');
+// Settings come from the environment, then from .env in the repository root (see .env.example).
+loadDotEnv();
 
 const PORT: number = Number(process.env.PORT ?? 3000);
 if (!Number.isInteger(PORT) || PORT < 0 || PORT > 65535) {
@@ -25,7 +24,7 @@ try {
   // Version 0 means a file without any applied migration, MifDb cannot work with it.
   console.log(`Database: ${dbPath}, schema version ${getDbVersion(db)}`);
   if (getDbVersion(db) === 0) {
-    throw new Error(`Database ${dbPath} has no schema, run "npm run db:setup:dev" first`);
+    throw new Error(`Database ${dbPath} has no schema, run "npm run db:setup:dev -w db" first`);
   }
   mifDb = new MifDb(db);
   console.log(`Last event id: ${mifDb.getLastEventId()}`);

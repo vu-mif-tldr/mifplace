@@ -39,7 +39,7 @@ For every candidate check both, and record the evidence:
 Also look at the current coverage: run `npm run test:coverage` (Node 24) and read `*/coverage/lcov.info`. A real launcher
 is at or near 0%. A candidate with noticeable coverage is imported by tests after all; recheck step 1.
 
-Never use globs such as `backend/src/scripts/*.ts`: they silently drop tested modules (`scripts/migrate.ts` is tested)
+Never use globs such as `tools/src/*.ts`: they silently drop tested modules (`png-canvas.ts` is tested)
 and every future file in the directory. List files one by one.
 
 ## 3. Compare with codecov.yml

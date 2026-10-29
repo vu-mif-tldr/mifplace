@@ -1,7 +1,8 @@
 # Migrations
 
 Files `NNN_name.sql` (`NNN` is a gap-free sequence starting at 001, name is `[a-z0-9_]+`)
-are applied in order by `npm run db:setup`. Each file runs in its own transaction.
+are applied in order by `npm run db:setup:dev -w db` (`db:setup:prod` in production).
+Each file runs in its own transaction.
 The applied state is kept in the database version (SQLite's `PRAGMA user_version`, see
 `getDbVersion`) and in the `schema_migrations`
 table (version, name, checksum).
@@ -38,7 +39,6 @@ Remember to recreate indexes and triggers of the dropped table.
 
 ## Where the files are looked up
 
-`MIGRATIONS_DIR` is required, there is no default: the environment variable wins, then
-`backend/.env` (see `.env.example`). `db:setup` fails if neither is set. In Docker copy
-the `migrations/` directory into the image and set `ENV MIGRATIONS_DIR=/app/migrations`.
-A relative value is resolved against the cwd.
+The migrations ship with `@mifplace/db`: `MIGRATIONS_DIR` in `src/migrate.ts` points to this
+directory, one level above `src/` and `dist/`, so there is no setting for it. In Docker copy
+`db/migrations` next to `db/dist`.

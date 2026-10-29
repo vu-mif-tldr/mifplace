@@ -46,8 +46,17 @@ jobs:
       - name: Test (with coverage)
         run: npm run test:coverage
 
-      # One upload per workspace: both report paths as src/..., network_filter tells
+      # One upload per workspace: all of them report paths as src/..., network_filter tells
       # Codecov which directory they belong to. A failed upload does not fail the check.
+      - name: Upload db coverage
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: db/coverage/lcov.info
+          flags: db
+          network_filter: db/
+          disable_search: true
+
       - name: Upload backend coverage
         uses: codecov/codecov-action@v7
         with:
@@ -75,9 +84,28 @@ jobs:
           network_filter: mcp/
           disable_search: true
 
+      - name: Upload tools coverage
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: tools/coverage/lcov.info
+          flags: tools
+          network_filter: tools/
+          disable_search: true
+
       # JUnit reports for Codecov Test Analytics. They run after failed tests too (that is when
       # the report matters), but not after a cancelled run. One upload per workspace with a flag,
-      # because both name test files as src/...
+      # because all of them name test files as src/...
+      - name: Upload db test results
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          report_type: test_results
+          files: db/test-results/junit.xml
+          flags: db
+          disable_search: true
+
       - name: Upload backend test results
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v7
@@ -106,6 +134,16 @@ jobs:
           report_type: test_results
           files: mcp/test-results/junit.xml
           flags: mcp
+          disable_search: true
+
+      - name: Upload tools test results
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          report_type: test_results
+          files: tools/test-results/junit.xml
+          flags: tools
           disable_search: true
 
   audit:

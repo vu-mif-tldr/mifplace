@@ -9,11 +9,16 @@ import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
 import type { PaletteColor } from '@mifplace/shared';
-import { MifDb, type Db, type EventRow } from '../../backend/src/db.js';
-import { loadMigrations, migrate } from '../../backend/src/scripts/migrate.js';
+import {
+  MIGRATIONS_DIR,
+  MifDb,
+  loadMigrations,
+  migrate,
+  type Db,
+  type EventRow,
+} from '@mifplace/db';
 import { createApp } from './app.js';
 
-const MIGRATIONS_DIR = fileURLToPath(new URL('../../backend/migrations/', import.meta.url));
 const SERVER = fileURLToPath(new URL('./server.ts', import.meta.url));
 
 type ToolResult = Awaited<ReturnType<Client['callTool']>>;
@@ -128,7 +133,8 @@ describe('server', () => {
     await client.connect(
       new StdioClientTransport({
         command: process.execPath,
-        args: ['--import', 'tsx', SERVER],
+        // The same condition as in the dev npm scripts: @mifplace/db from its TypeScript sources.
+        args: ['--import', 'tsx', '--conditions=@mifplace/source', SERVER],
         env: { ...process.env, DB_PATH: file } as Record<string, string>,
       })
     );

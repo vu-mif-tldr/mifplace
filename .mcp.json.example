@@ -2,8 +2,7 @@
   "mcpServers": {
     "mifplace": {
       "command": "npx",
-      "args": ["tsx", "{{REPO_ROOT}}/mcp/src/server.ts"],
-      "env": { "DB_PATH": "{{REPO_ROOT}}/backend/data/mifplace.db" }
+      "args": ["tsx", "--conditions=@mifplace/source", "{{REPO_ROOT}}/mcp/src/server.ts"]
     }
   }
 }

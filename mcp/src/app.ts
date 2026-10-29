@@ -1,8 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { MifDb, type Db } from '../../backend/src/db.js';
+import { MifDb, type Db } from '@mifplace/db';
 
-// The backend is not a library package, so its data access code is imported by path.
 // Every call returns a new instance: serveStdio may call the factory more than once.
 export function createApp(db: Db): McpServer {
   const mifDb = new MifDb(db);
