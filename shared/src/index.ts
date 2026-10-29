@@ -1,5 +1,6 @@
-// Types of the HTTP API shared by the backend and the frontend (see docs/api.md).
-// Types only: the package has no runtime code, so import it with `import type`.
+// Types of the HTTP API shared by the backend and the frontend (see docs/api.md),
+// and the canvas geometry (position.ts) used by every workspace.
+export * from './position.js';
 
 // What GET /api/canvas/size returns. The size does not change while the server runs,
 // so the frontend asks for it once and keeps it.

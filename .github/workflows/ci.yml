@@ -48,6 +48,15 @@ jobs:
 
       # One upload per workspace: all of them report paths as src/..., network_filter tells
       # Codecov which directory they belong to. A failed upload does not fail the check.
+      - name: Upload shared coverage
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: shared/coverage/lcov.info
+          flags: shared
+          network_filter: shared/
+          disable_search: true
+
       - name: Upload db coverage
         uses: codecov/codecov-action@v7
         with:
@@ -96,6 +105,16 @@ jobs:
       # JUnit reports for Codecov Test Analytics. They run after failed tests too (that is when
       # the report matters), but not after a cancelled run. One upload per workspace with a flag,
       # because all of them name test files as src/...
+      - name: Upload shared test results
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          report_type: test_results
+          files: shared/test-results/junit.xml
+          flags: shared
+          disable_search: true
+
       - name: Upload db test results
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v7

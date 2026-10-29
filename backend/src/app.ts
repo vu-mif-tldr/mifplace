@@ -2,14 +2,16 @@ import express, { type Express, type Response } from 'express';
 import type { Server } from 'node:http';
 import * as path from 'node:path';
 import rateLimit from 'express-rate-limit';
-import type {
-  CanvasSize,
-  CanvasState,
-  ErrorResponse,
-  PaletteColor,
-  PlacePixelResponse,
+import {
+  cellError,
+  toPosition,
+  type CanvasSize,
+  type CanvasState,
+  type ErrorResponse,
+  type PaletteColor,
+  type PlacePixelResponse,
 } from '@mifplace/shared';
-import { cellError, toPosition, type NewEvent } from '@mifplace/db';
+import type { NewEvent } from '@mifplace/db';
 
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute

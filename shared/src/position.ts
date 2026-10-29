@@ -1,4 +1,7 @@
-import type { CanvasSize } from '@mifplace/shared';
+import type { CanvasSize } from './index.js';
+
+// Canvas geometry: a cell (x = column, y = row) is sent and stored as one number,
+// position = y * width + x (GET /api/canvas, the live messages, the events table).
 
 // Why (x, y) is not a cell of the canvas, or undefined if it is one.
 export function cellError({ width, height }: CanvasSize, x: number, y: number): string | undefined {
@@ -11,10 +14,15 @@ export function cellError({ width, height }: CanvasSize, x: number, y: number): 
   return undefined;
 }
 
-// A cell as the events table stores it: position = y * width + x.
 // Throws a RangeError for a cell outside the canvas, so a wrong (x, y) never becomes another cell.
 export function toPosition(size: CanvasSize, x: number, y: number): number {
   const error = cellError(size, x, y);
   if (error !== undefined) throw new RangeError(`toPosition: ${error}`);
   return y * size.width + x;
+}
+
+// The reverse of toPosition. The range is not checked: a position past the last cell
+// (e.g. left over from a larger canvas) gives y >= height.
+export function fromPosition({ width }: CanvasSize, position: number): { x: number; y: number } {
+  return { x: position % width, y: Math.floor(position / width) };
 }

@@ -1,8 +1,9 @@
 // Removes build output. With --deps also removes node_modules (run `npm install` afterwards).
 import { rmSync } from 'node:fs';
 
-const workspaces = ['db', 'backend', 'frontend', 'mcp', 'tools'];
+const workspaces = ['shared', 'db', 'backend', 'frontend', 'mcp', 'tools'];
 const targets = [
+  'shared/dist',
   'db/dist',
   'backend/dist',
   'frontend/dist',

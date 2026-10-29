@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { MifDb, cellError, toPosition, type Db } from '@mifplace/db';
+import { cellError, toPosition } from '@mifplace/shared';
+import { MifDb, type Db } from '@mifplace/db';
 
 // Every call returns a new instance: serveStdio may call the factory more than once.
 export function createApp(db: Db): McpServer {

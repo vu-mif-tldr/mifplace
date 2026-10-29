@@ -1,8 +1,7 @@
 // PNG and palette files for the canvas, used by seed-png.ts and export-palette.ts.
 // Kept apart from the scripts so it can be tested without a database.
 import pngjs from 'pngjs';
-import type { CanvasSize, PaletteColor } from '@mifplace/shared';
-import { toPosition } from '@mifplace/db';
+import { toPosition, type CanvasSize, type PaletteColor } from '@mifplace/shared';
 
 export interface CanvasPixel {
   color_id: number;

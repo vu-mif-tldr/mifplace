@@ -16,16 +16,21 @@ ignore:
   - backend/src/server.ts
   - db/src/index.ts
   - db/src/setup-db.ts
+  - shared/src/index.ts
   - frontend/src/main.ts
   - mcp/src/server.ts
   - tools/src/export-palette.ts
   - tools/src/seed-png.ts
 
 flags:
+  shared:
+    paths:
+      - shared/
+    # A PR that does not upload a report for a flag keeps the last known numbers instead of zero
+    carryforward: true
   db:
     paths:
       - db/
-    # A PR that does not upload a report for a flag keeps the last known numbers instead of zero
     carryforward: true
   backend:
     paths:
@@ -67,8 +72,11 @@ component_management:
         - db/src/db.ts
         - db/src/env.ts
         - db/src/migrate.ts
-        - db/src/position.ts
         - backend/src/canvas-state.ts
+    - component_id: geometry
+      name: Canvas geometry
+      paths:
+        - shared/src/position.ts
     - component_id: frontend_canvas
       name: Canvas UI
       paths:
