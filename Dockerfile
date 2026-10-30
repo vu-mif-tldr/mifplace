@@ -1,5 +1,5 @@
 # Production image: the backend serves the API and the built frontend on one port.
-# Docker is used for deployment only, local development runs without it (see README.md).
+# Docker is used for deployment only, local development runs without it (see docs/development.md).
 # How the image gets to the server: deploy/README.md.
 
 # Must match .nvmrc, CI passes the value from there.

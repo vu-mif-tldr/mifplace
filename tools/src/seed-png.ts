@@ -3,7 +3,7 @@
 // The PNG is not converted: every pixel must already be one of the palette colors. It starts
 // at the top left corner of the canvas, the part of a larger picture outside the canvas is
 // skipped. Prepare it in an online pixel art editor with the palette from
-// `npm run db:palette:export -w tools` (see README.md). A wrong color stops the script.
+// `npm run db:palette:export -w tools` (see docs/development.md). A wrong color stops the script.
 //
 // Usage: npm run db:seed:dev -w tools -- <image.png>
 //   A relative file name is taken from the directory npm was started in.
