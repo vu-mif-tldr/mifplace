@@ -84,20 +84,17 @@ test('POST /api/pixels - palette id above the palette size returns 201', async (
   assert.strictEqual(response.status, 201);
 });
 
-const INVALID_COLORS: [string, unknown][] = [
+// Not an integer: the request schema rejects it and names the field
+const MALFORMED_COLORS: [string, unknown][] = [
   ['missing', undefined],
   ['fractional', 1.5],
-  ['negative', -1],
   ['string', '0'],
   ['bool', true],
   ['object', {}],
   ['null', null],
-  ['too large', 13],
-  ['far too large', 999],
-  ['unknown id in a gap', 3],
 ];
 
-for (const [name, colorIndex] of INVALID_COLORS) {
+for (const [name, colorIndex] of MALFORMED_COLORS) {
   test(`POST /api/pixels - ${name} colorIndex returns 400`, async () => {
     const response = await fetch(`${BASE_URL}/api/pixels`, {
       method: 'POST',
@@ -108,6 +105,60 @@ for (const [name, colorIndex] of INVALID_COLORS) {
 
     assert.strictEqual(response.status, 400);
     const data = (await response.json()) as PixelResponse;
+    assert.match(data.error || '', /^colorIndex: /);
+  });
+}
+
+// An integer that is not a palette id: the server's own check
+const UNKNOWN_COLORS: [string, number][] = [
+  ['negative', -1],
+  ['too large', 13],
+  ['far too large', 999],
+  ['unknown id in a gap', 3],
+];
+
+for (const [name, colorIndex] of UNKNOWN_COLORS) {
+  test(`POST /api/pixels - ${name} colorIndex returns 400`, async () => {
+    const response = await fetch(`${BASE_URL}/api/pixels`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ x: 10, y: 20, colorIndex }),
+    });
+
+    assert.strictEqual(response.status, 400);
+    const data = (await response.json()) as PixelResponse;
     assert.match(data.error || '', /Color not in palette/);
   });
 }
+
+test('POST /api/pixels - a cell outside the canvas names the limit', async () => {
+  const response = await fetch(`${BASE_URL}/api/pixels`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ x: 100, y: 20, colorIndex: 0 }),
+  });
+
+  assert.strictEqual(response.status, 400);
+  const data = (await response.json()) as PixelResponse;
+  assert.strictEqual(data.error, 'x: x must be less than canvas width (100)');
+});
+
+test('POST /api/pixels - a string coordinate returns 400', async () => {
+  const response = await fetch(`${BASE_URL}/api/pixels`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ x: '10', y: 20, colorIndex: 0 }),
+  });
+
+  assert.strictEqual(response.status, 400);
+  const data = (await response.json()) as PixelResponse;
+  assert.match(data.error || '', /^x: /);
+});
+
+test('POST /api/pixels - a request without a JSON body returns 400', async () => {
+  const response = await fetch(`${BASE_URL}/api/pixels`, { method: 'POST' });
+
+  assert.strictEqual(response.status, 400);
+  const data = (await response.json()) as PixelResponse;
+  assert.strictEqual(data.success, false);
+});

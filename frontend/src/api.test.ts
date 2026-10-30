@@ -66,6 +66,16 @@ describe('api', () => {
 
       await expect(getCanvasSize()).rejects.toThrow();
     });
+
+    it.each([
+      ['a zero width', { width: 0, height: 128 }],
+      ['a missing height', { width: 128 }],
+      ['a string', '128x128'],
+    ])('rejects a size with %s', async (_case, body) => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => body });
+
+      await expect(getCanvasSize()).rejects.toThrow('The canvas size from the server is invalid');
+    });
   });
 
   describe('getCanvas', () => {
@@ -81,6 +91,16 @@ describe('api', () => {
       fetchMock.mockResolvedValue({ ok: false, status: 500 });
 
       await expect(getCanvas()).rejects.toThrow();
+    });
+
+    it.each([
+      ['no pixels list', {}],
+      ['a negative position', { pixels: [[-1, 5]] }],
+      ['a pixel without a color', { pixels: [[130]] }],
+    ])('rejects a canvas with %s', async (_case, body) => {
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => body });
+
+      await expect(getCanvas()).rejects.toThrow('The canvas from the server is invalid');
     });
   });
 
