@@ -1,7 +1,8 @@
 import { MifDb, getDbVersion, loadDotEnv, openDb, resolveDbPath } from '@mifplace/db';
 import type { Server } from 'node:http';
 import { createApp, listen } from './app.js';
-import { CanvasStore } from './canvas-state.js';
+import type { CanvasStore } from './canvas-state.js';
+import { loadCanvas, placePixel } from './canvas-log.js';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
 
 // Settings come from the environment, then from .env in the repository root (see .env.example).
@@ -39,7 +40,7 @@ try {
   console.log(`Canvas size: ${canvasSize.width}x${canvasSize.height}`);
 
   // Reads the whole event log once; after that GET /api/canvas is served from memory
-  canvas = new CanvasStore(mifDb, canvasSize);
+  canvas = loadCanvas(mifDb, canvasSize);
   const { eventId, timestamp } = canvas.snapshot();
   console.log(`Canvas loaded up to event ${eventId} (${new Date(timestamp).toISOString()})`);
 } catch (e) {
@@ -52,7 +53,7 @@ const app = createApp({
   palette,
   checkHealth: () => mifDb.checkHealth(),
   getCanvasState: () => canvas.snapshot(),
-  appendEvent: (eventObject) => canvas.append(eventObject),
+  appendEvent: (eventObject) => placePixel(mifDb, canvas, eventObject),
 });
 
 let server: Server;
