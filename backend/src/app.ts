@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import rateLimit from 'express-rate-limit';
 import {
   PlacePixelRequestSchema,
-  cellSchema,
+  positionSchema,
   zodErrorMessage,
   type CanvasSize,
   type CanvasState,
@@ -27,10 +27,12 @@ export interface AppConfig {
   canvasSize: CanvasSize;
   // Read once at start: the palette does not change while the server runs.
   palette: PaletteColor[];
+  // The snapshot for GET /api/canvas, with the checkpoint of its last event
   getCanvasState: () => CanvasState;
 
   // Throws if the database is not reachable. Injected so the app can be built without a database.
   checkHealth: () => void;
+  // Saves a new pixel and returns its event id
   appendEvent: (event: NewEvent) => number;
 }
 
@@ -55,8 +57,8 @@ export function createApp({
   const app = express();
   // Holds only palette ids, so any other colorIndex (missing, string, fraction, null...) is rejected.
   const paletteIds = new Set(palette.map(({ id }) => id));
-  // The size does not change while the server runs, so the cell check is built once
-  const cell = cellSchema(canvasSize);
+  // The size does not change while the server runs, so the position check is built once
+  const cell = positionSchema(canvasSize);
 
   app.get('/', limiter, (req, res) => {
     res.sendFile(path.join(STATIC_PATH, 'index.html'));
@@ -70,8 +72,14 @@ export function createApp({
     res.json(canvasSize);
   });
 
-  app.get('/api/canvas', (_req, res: Response<CanvasState>) => {
-    res.json(getCanvasState());
+  app.get('/api/canvas', (_req, res: Response<CanvasState | ErrorResponse>) => {
+    // A failure is a 500 with the error body of the API, never a partial snapshot
+    try {
+      res.json(getCanvasState());
+    } catch (error) {
+      console.error('Canvas snapshot failed:', error);
+      res.status(500).json({ success: false, error: 'Internal server error' });
+    }
   });
 
   app.get('/health', (_req, res) => {
@@ -114,6 +122,7 @@ export function createApp({
     if (!body.success) {
       return res.status(400).json({ success: false, error: zodErrorMessage(body.error) });
     }
+    // The client computes the position, the server checks it is on the canvas
     const position = cell.safeParse(body.data);
     if (!position.success) {
       return res.status(400).json({ success: false, error: zodErrorMessage(position.error) });

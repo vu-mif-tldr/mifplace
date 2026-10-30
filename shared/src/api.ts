@@ -12,11 +12,16 @@ export const CanvasSizeSchema = z.object({
 });
 export type CanvasSize = z.infer<typeof CanvasSizeSchema>;
 
-// What GET /api/canvas returns.
-// pixels has only the painted cells, as [position, colorId] (see position.ts);
-// a negative colorId is an unpainted cell.
+// What GET /api/canvas returns: the snapshot of the whole canvas.
+// pixels is the color id of every cell, index = pos (see position.ts), so its length is
+// width * height; a negative colorId is an unpainted cell. The length cannot be checked
+// here, the size is a separate response.
+// eventId and timestamp are the last event in the snapshot (both 0 for an empty log):
+// the checkpoint /api/ws resumes from.
 export const CanvasStateSchema = z.object({
-  pixels: z.array(z.tuple([z.int().nonnegative(), z.int()])),
+  pixels: z.array(z.int()),
+  eventId: z.int().nonnegative(),
+  timestamp: z.int().nonnegative(),
 });
 export type CanvasState = z.infer<typeof CanvasStateSchema>;
 
@@ -35,10 +40,10 @@ export const PaletteSchema = z
     error: 'palette color ids must be unique',
   });
 
-// Body of POST /api/pixels (colorIndex = palette color id)
+// Body of POST /api/pixels (pos = position = y * width + x, see toPosition; colorIndex = palette color id).
+// Only the shape is checked here: whether the position is on the canvas is positionSchema.
 export const PlacePixelRequestSchema = z.object({
-  x: z.int(),
-  y: z.int(),
+  pos: z.int(),
   colorIndex: z.int(),
 });
 export type PlacePixelRequest = z.infer<typeof PlacePixelRequestSchema>;

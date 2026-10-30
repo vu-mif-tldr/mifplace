@@ -45,27 +45,31 @@ describe('CanvasSizeSchema', () => {
 });
 
 describe('CanvasStateSchema', () => {
-  it('accepts [position, colorId] pairs, a negative colorId is an unpainted cell', () => {
-    expect(
-      CanvasStateSchema.safeParse({
-        pixels: [
-          [5, 2],
-          [10, -1],
-        ],
-      }).success
-    ).toBe(true);
-    expect(CanvasStateSchema.safeParse({ pixels: [[-1, 2]] }).success).toBe(false);
-    expect(CanvasStateSchema.safeParse({ pixels: [[5]] }).success).toBe(false);
+  const snapshot = { pixels: [5, 12, -1, -2, 5, -3], eventId: 102, timestamp: 1760000000000 };
+
+  it('accepts a flat array of color ids with its checkpoint, negative is unpainted', () => {
+    expect(CanvasStateSchema.safeParse(snapshot).success).toBe(true);
+    expect(CanvasStateSchema.safeParse({ pixels: [], eventId: 0, timestamp: 0 }).success).toBe(
+      true
+    );
+  });
+
+  it('rejects a snapshot without a checkpoint or with something else than color ids', () => {
+    expect(CanvasStateSchema.safeParse({ pixels: [5] }).success).toBe(false);
+    expect(CanvasStateSchema.safeParse({ ...snapshot, eventId: -1 }).success).toBe(false);
+    expect(CanvasStateSchema.safeParse({ ...snapshot, timestamp: 1.5 }).success).toBe(false);
+    expect(CanvasStateSchema.safeParse({ ...snapshot, pixels: [[5, 2]] }).success).toBe(false);
+    expect(CanvasStateSchema.safeParse({ ...snapshot, pixels: [0.5] }).success).toBe(false);
     expect(CanvasStateSchema.safeParse({}).success).toBe(false);
   });
 });
 
 describe('zodErrorMessage', () => {
   it('puts every failed field on one line with its path', () => {
-    const result = PlacePixelRequestSchema.safeParse({ x: 'a', y: 1 });
+    const result = PlacePixelRequestSchema.safeParse({ pos: 'a' });
     expect(result.success).toBe(false);
     if (result.success) return;
-    expect(zodErrorMessage(result.error)).toMatch(/^x: .+; colorIndex: .+$/);
+    expect(zodErrorMessage(result.error)).toMatch(/^pos: .+; colorIndex: .+$/);
   });
 
   it('has no path prefix for a problem with the whole value', () => {

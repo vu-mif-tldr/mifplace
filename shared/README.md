@@ -5,13 +5,14 @@ What every workspace agrees on:
 - **The HTTP API** ([docs/api.md](../docs/api.md)) as [zod](https://zod.dev) schemas, in `src/api.ts`. Each type is inferred from its schema (`type CanvasSize = z.infer<typeof CanvasSizeSchema>`), so the type and the run-time check are one definition. The backend checks requests with them, the frontend checks responses.
 - **The canvas geometry**, in `src/position.ts`: a cell (x, y) is sent and stored as one number, `position = y * width + x`.
   - `cellSchema(size).safeParse({ x, y })` checks a cell and gives `{ success: true, data: position }` or `{ success: false, error }`, it never throws;
-  - `toPosition` is the same check that throws, for code that must only see cells on the canvas;
-  - `fromPosition` is the reverse.
+  - `toPosition` is the same check that throws, for code that must only see cells on the canvas (the frontend computes the position of a click with it);
+  - `fromPosition` is the reverse;
+  - `positionSchema(size).safeParse({ pos })` checks a position from a client (`pos` of `POST /api/pixels`): the server does not trust the client's calculation.
 
 ```ts
 import {
   PlacePixelRequestSchema,
-  cellSchema,
+  positionSchema,
   zodErrorMessage,
   type CanvasSize,
 } from '@mifplace/shared';
@@ -19,6 +20,7 @@ import {
 const body = PlacePixelRequestSchema.safeParse(req.body);
 if (!body.success)
   return res.status(400).json({ success: false, error: zodErrorMessage(body.error) });
+const position = positionSchema(canvasSize).safeParse(body.data);
 ```
 
 `zodErrorMessage` turns a failed check into one line, `field: message`, problems joined with `; `; the backend and the MCP server use it for their error texts.

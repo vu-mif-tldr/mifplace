@@ -16,7 +16,7 @@ const app = createApp({
     { id: 12, color: '#FF0000' },
   ],
   checkHealth: () => {},
-  getCanvasState: () => ({ pixels: [] }),
+  getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
   appendEvent: () => 42,
 });
 
@@ -45,7 +45,7 @@ test('POST /api/pixels - valid input returns 201', async () => {
   const response = await fetch(`${BASE_URL}/api/pixels`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ x: 10, y: 20, colorIndex: 0 }),
+    body: JSON.stringify({ pos: 2010, colorIndex: 0 }),
   });
 
   assert.strictEqual(response.status, 201);
@@ -54,21 +54,21 @@ test('POST /api/pixels - valid input returns 201', async () => {
   assert.strictEqual(data.eventId, 42);
 });
 
-test('POST /api/pixels - invalid x returns 400', async () => {
+test('POST /api/pixels - a negative position returns 400', async () => {
   const response = await fetch(`${BASE_URL}/api/pixels`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ x: -1, y: 20, colorIndex: 0 }),
+    body: JSON.stringify({ pos: -1, colorIndex: 0 }),
   });
 
   assert.strictEqual(response.status, 400);
 });
 
-test('POST /api/pixels - invalid y returns 400', async () => {
+test('POST /api/pixels - a fractional position returns 400', async () => {
   const response = await fetch(`${BASE_URL}/api/pixels`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ x: 10, y: -1, colorIndex: 0 }),
+    body: JSON.stringify({ pos: 1.5, colorIndex: 0 }),
   });
 
   assert.strictEqual(response.status, 400);
@@ -78,7 +78,7 @@ test('POST /api/pixels - palette id above the palette size returns 201', async (
   const response = await fetch(`${BASE_URL}/api/pixels`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ x: 10, y: 20, colorIndex: 12 }),
+    body: JSON.stringify({ pos: 2010, colorIndex: 12 }),
   });
 
   assert.strictEqual(response.status, 201);
@@ -100,7 +100,7 @@ for (const [name, colorIndex] of MALFORMED_COLORS) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       // JSON.stringify drops a key whose value is undefined, so 'missing' sends no colorIndex
-      body: JSON.stringify({ x: 10, y: 20, colorIndex }),
+      body: JSON.stringify({ pos: 2010, colorIndex }),
     });
 
     assert.strictEqual(response.status, 400);
@@ -122,7 +122,7 @@ for (const [name, colorIndex] of UNKNOWN_COLORS) {
     const response = await fetch(`${BASE_URL}/api/pixels`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ x: 10, y: 20, colorIndex }),
+      body: JSON.stringify({ pos: 2010, colorIndex }),
     });
 
     assert.strictEqual(response.status, 400);
@@ -131,28 +131,51 @@ for (const [name, colorIndex] of UNKNOWN_COLORS) {
   });
 }
 
-test('POST /api/pixels - a cell outside the canvas names the limit', async () => {
+test('POST /api/pixels - the last cell of the canvas returns 201', async () => {
   const response = await fetch(`${BASE_URL}/api/pixels`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ x: 100, y: 20, colorIndex: 0 }),
+    body: JSON.stringify({ pos: 9999, colorIndex: 0 }),
   });
 
-  assert.strictEqual(response.status, 400);
-  const data = (await response.json()) as PixelResponse;
-  assert.strictEqual(data.error, 'x: x must be less than canvas width (100)');
+  assert.strictEqual(response.status, 201);
 });
 
-test('POST /api/pixels - a string coordinate returns 400', async () => {
+test('POST /api/pixels - a position past the last cell names the limit', async () => {
   const response = await fetch(`${BASE_URL}/api/pixels`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ x: '10', y: 20, colorIndex: 0 }),
+    body: JSON.stringify({ pos: 10000, colorIndex: 0 }),
   });
 
   assert.strictEqual(response.status, 400);
   const data = (await response.json()) as PixelResponse;
-  assert.match(data.error || '', /^x: /);
+  assert.strictEqual(data.error, 'pos: pos must be less than 10000 (canvas 100x100)');
+});
+
+test('POST /api/pixels - a string position returns 400', async () => {
+  const response = await fetch(`${BASE_URL}/api/pixels`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pos: '10', colorIndex: 0 }),
+  });
+
+  assert.strictEqual(response.status, 400);
+  const data = (await response.json()) as PixelResponse;
+  assert.match(data.error || '', /^pos: /);
+});
+
+// The old body: x and y are not read any more, so pos is missing
+test('POST /api/pixels - x and y without pos return 400', async () => {
+  const response = await fetch(`${BASE_URL}/api/pixels`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ x: 10, y: 20, colorIndex: 0 }),
+  });
+
+  assert.strictEqual(response.status, 400);
+  const data = (await response.json()) as PixelResponse;
+  assert.match(data.error || '', /^pos: /);
 });
 
 test('POST /api/pixels - a request without a JSON body returns 400', async () => {

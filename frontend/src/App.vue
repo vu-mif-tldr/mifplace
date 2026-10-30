@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import type { CanvasSize, PaletteColor } from '@mifplace/shared';
+import { toPosition, type CanvasSize, type PaletteColor } from '@mifplace/shared';
 import { getCanvas, getCanvasSize, getPalette, placePixel } from './api';
 import { drawCanvas, getClickedCell, paintCell } from './canvas';
 import { clampOffset, fitCellSize } from './view';
@@ -124,7 +124,8 @@ async function onCanvasClick(event: MouseEvent) {
   const { id, color } = selectedColor.value;
 
   try {
-    await placePixel(cell.x, cell.y, id);
+    // The server checks the position again, it does not trust the client
+    await placePixel(toPosition(canvasSize, cell.x, cell.y), id);
     pixelError.value = '';
     paintCell(canvasEl.value, cell.x, cell.y, color);
   } catch (error) {
