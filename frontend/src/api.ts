@@ -2,7 +2,7 @@ import {
   CanvasSizeSchema,
   CanvasStateSchema,
   PaletteSchema,
-  formatError,
+  zodErrorMessage,
   type CanvasSize,
   type CanvasState,
   type PaletteColor,
@@ -18,7 +18,7 @@ export async function getPalette(): Promise<PaletteColor[]> {
   if (!response.ok) throw new Error('Could not load the palette');
   const palette = PaletteSchema.safeParse(await response.json());
   if (!palette.success) {
-    throw new Error(`The palette from the server is invalid: ${formatError(palette.error)}`);
+    throw new Error(`The palette from the server is invalid: ${zodErrorMessage(palette.error)}`);
   }
   return palette.data;
 }
@@ -29,7 +29,7 @@ export async function getCanvasSize(): Promise<CanvasSize> {
   if (!response.ok) throw new Error('Could not load the canvas size');
   const size = CanvasSizeSchema.safeParse(await response.json());
   if (!size.success) {
-    throw new Error(`The canvas size from the server is invalid: ${formatError(size.error)}`);
+    throw new Error(`The canvas size from the server is invalid: ${zodErrorMessage(size.error)}`);
   }
   return size.data;
 }
@@ -40,7 +40,7 @@ export async function getCanvas(): Promise<CanvasState> {
   if (!response.ok) throw new Error('Could not load the canvas');
   const state = CanvasStateSchema.safeParse(await response.json());
   if (!state.success) {
-    throw new Error(`The canvas from the server is invalid: ${formatError(state.error)}`);
+    throw new Error(`The canvas from the server is invalid: ${zodErrorMessage(state.error)}`);
   }
   return state.data;
 }

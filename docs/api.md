@@ -100,7 +100,7 @@ The backend validates that `position` is an integer in `0 <= position < width * 
 | `400`  | Integer that is not a palette ID                 | `{"success":false,"error":"Color not in palette"}`                                        |
 | `500`  | Database insert failure                          | `{"success":false,"error":"Insert failed"}`                                               |
 
-The body is checked with the request schema from `@mifplace/shared` (`PlacePixelRequestSchema`, then the cell check `cellSchema`). A `400` from that check carries the schema's message as one line, `field: message`, several problems joined with `; ` (`formatError`). The exact wording comes from the schema and may change with it; clients show it, they do not parse it. `Color not in palette` and `Insert failed` are fixed strings of the backend.
+The body is checked with the request schema from `@mifplace/shared` (`PlacePixelRequestSchema`, then the cell check `cellSchema`). A `400` from that check carries the schema's message as one line, `field: message`, several problems joined with `; ` (`zodErrorMessage`). The exact wording comes from the schema and may change with it; clients show it, they do not parse it. `Color not in palette` and `Insert failed` are fixed strings of the backend.
 
 **Implementation change:** The current backend accepts `{x, y, colorIndex}` and validates `colorIndex` against the actual palette IDs. It must be updated to accept `{position, colorIndex}`; the position will then be checked by a schema in `@mifplace/shared` in the same way.
 

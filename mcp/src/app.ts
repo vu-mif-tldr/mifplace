@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { cellSchema, formatError } from '@mifplace/shared';
+import { cellSchema, zodErrorMessage } from '@mifplace/shared';
 import { MifDb, type Db } from '@mifplace/db';
 
 // Every call returns a new instance: serveStdio may call the factory more than once.
@@ -54,7 +54,10 @@ export function createApp(db: Db): McpServer {
     async ({ x, y, limit }) => {
       const position = cellSchema(mifDb.getCanvasSize()).safeParse({ x, y });
       if (!position.success) {
-        return { content: [{ type: 'text', text: formatError(position.error) }], isError: true };
+        return {
+          content: [{ type: 'text', text: zodErrorMessage(position.error) }],
+          isError: true,
+        };
       }
       const rows = mifDb.getPixelHistory(position.data, limit);
       return { content: [{ type: 'text', text: JSON.stringify(rows) }] };

@@ -6,7 +6,7 @@ import type { CanvasSize } from './api.js';
 
 // Checks that (x, y) is a cell of the canvas and turns it into its position.
 // cellSchema(size).safeParse({ x, y }) never throws: it gives { success: true, data: position }
-// or { success: false, error } (see formatError).
+// or { success: false, error } (see zodErrorMessage).
 export function cellSchema({ width, height }: CanvasSize): CellSchema {
   // Building a zod schema costs far more than checking with it, and toPosition is called
   // once per pixel (e.g. by the PNG seed), so there is one schema per canvas size.

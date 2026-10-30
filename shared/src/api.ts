@@ -59,7 +59,7 @@ export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
 
 // A failed check as one line for an error response or an MCP tool result,
 // e.g. "x: x must be less than canvas width (128)". Issues are joined with "; ".
-export function formatError(error: z.ZodError): string {
+export function zodErrorMessage(error: z.ZodError): string {
   return error.issues
     .map((issue) => (issue.path.length > 0 ? `${issue.path.join('.')}: ` : '') + issue.message)
     .join('; ');

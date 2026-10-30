@@ -12,15 +12,16 @@ What every workspace agrees on:
 import {
   PlacePixelRequestSchema,
   cellSchema,
-  formatError,
+  zodErrorMessage,
   type CanvasSize,
 } from '@mifplace/shared';
 
 const body = PlacePixelRequestSchema.safeParse(req.body);
-if (!body.success) return res.status(400).json({ success: false, error: formatError(body.error) });
+if (!body.success)
+  return res.status(400).json({ success: false, error: zodErrorMessage(body.error) });
 ```
 
-`formatError` turns a failed check into one line, `field: message`, problems joined with `; `; the backend and the MCP server use it for their error texts.
+`zodErrorMessage` turns a failed check into one line, `field: message`, problems joined with `; `; the backend and the MCP server use it for their error texts.
 
 ## Adding a message
 

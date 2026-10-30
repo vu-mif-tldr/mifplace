@@ -5,7 +5,7 @@ import rateLimit from 'express-rate-limit';
 import {
   PlacePixelRequestSchema,
   cellSchema,
-  formatError,
+  zodErrorMessage,
   type CanvasSize,
   type CanvasState,
   type ErrorResponse,
@@ -112,11 +112,11 @@ export function createApp({
     // A missing or non-JSON body leaves req.body undefined, the schema rejects it too
     const body = PlacePixelRequestSchema.safeParse(req.body);
     if (!body.success) {
-      return res.status(400).json({ success: false, error: formatError(body.error) });
+      return res.status(400).json({ success: false, error: zodErrorMessage(body.error) });
     }
     const position = cell.safeParse(body.data);
     if (!position.success) {
-      return res.status(400).json({ success: false, error: formatError(position.error) });
+      return res.status(400).json({ success: false, error: zodErrorMessage(position.error) });
     }
     const { colorIndex } = body.data;
     // Which colors exist is a rule of the server, not of the request shape

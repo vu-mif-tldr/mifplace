@@ -4,7 +4,7 @@ import {
   CanvasStateSchema,
   PaletteSchema,
   PlacePixelRequestSchema,
-  formatError,
+  zodErrorMessage,
 } from './api.js';
 
 describe('PaletteSchema', () => {
@@ -60,18 +60,18 @@ describe('CanvasStateSchema', () => {
   });
 });
 
-describe('formatError', () => {
+describe('zodErrorMessage', () => {
   it('puts every failed field on one line with its path', () => {
     const result = PlacePixelRequestSchema.safeParse({ x: 'a', y: 1 });
     expect(result.success).toBe(false);
     if (result.success) return;
-    expect(formatError(result.error)).toMatch(/^x: .+; colorIndex: .+$/);
+    expect(zodErrorMessage(result.error)).toMatch(/^x: .+; colorIndex: .+$/);
   });
 
   it('has no path prefix for a problem with the whole value', () => {
     const result = PlacePixelRequestSchema.safeParse(undefined);
     expect(result.success).toBe(false);
     if (result.success) return;
-    expect(formatError(result.error)).not.toMatch(/^: /);
+    expect(zodErrorMessage(result.error)).not.toMatch(/^: /);
   });
 });

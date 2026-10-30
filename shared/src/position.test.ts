@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatError } from './api.js';
+import { zodErrorMessage } from './api.js';
 import { cellSchema, fromPosition, toPosition } from './position.js';
 
 const size = { width: 4, height: 3 };
@@ -39,7 +39,7 @@ describe('cellSchema', () => {
   const errorOf = (input: unknown) => {
     const result = cell.safeParse(input);
     if (result.success) throw new Error(`expected ${JSON.stringify(input)} to fail`);
-    return formatError(result.error);
+    return zodErrorMessage(result.error);
   };
 
   it('gives the position of every cell of the canvas', () => {
