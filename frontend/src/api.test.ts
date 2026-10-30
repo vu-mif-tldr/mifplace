@@ -80,7 +80,7 @@ describe('api', () => {
 
   describe('getCanvas', () => {
     it('returns the canvas from GET /api/canvas', async () => {
-      const state = { pixels: [[130, 5]] };
+      const state = { pixels: [5, 12, -1, -2, 5, -3], eventId: 102, timestamp: 1760000000000 };
       fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => state });
 
       await expect(getCanvas()).resolves.toEqual(state);
@@ -94,9 +94,10 @@ describe('api', () => {
     });
 
     it.each([
-      ['no pixels list', {}],
-      ['a negative position', { pixels: [[-1, 5]] }],
-      ['a pixel without a color', { pixels: [[130]] }],
+      ['no pixels list', { eventId: 0, timestamp: 0 }],
+      ['no checkpoint', { pixels: [5, -1] }],
+      ['the old [position, colorId] pairs', { pixels: [[130, 5]], eventId: 0, timestamp: 0 }],
+      ['a negative eventId', { pixels: [5], eventId: -1, timestamp: 0 }],
     ])('rejects a canvas with %s', async (_case, body) => {
       fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => body });
 
@@ -105,29 +106,29 @@ describe('api', () => {
   });
 
   describe('placePixel', () => {
-    it('posts the cell and the palette color id to /api/pixels', async () => {
+    it('posts the position and the palette color id to /api/pixels', async () => {
       fetchMock.mockResolvedValue({ ok: true, status: 200 });
 
-      await placePixel(2, 3, 5);
+      await placePixel(6, 5);
 
       expect(fetchMock).toHaveBeenCalledOnce();
       const [url, init] = fetchMock.mock.calls[0];
       expect(url).toBe('/api/pixels');
       expect(init.method).toBe('POST');
       expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
-      expect(JSON.parse(init.body)).toEqual({ x: 2, y: 3, colorIndex: 5 });
+      expect(JSON.parse(init.body)).toEqual({ pos: 6, colorIndex: 5 });
     });
 
     it('throws when the server rejects the pixel', async () => {
       fetchMock.mockResolvedValue({ ok: false, status: 400 });
 
-      await expect(placePixel(0, 0, 0)).rejects.toThrow();
+      await expect(placePixel(0, 0)).rejects.toThrow();
     });
 
     it('lets network errors through to the caller', async () => {
       fetchMock.mockRejectedValue(new Error('network down'));
 
-      await expect(placePixel(0, 0, 0)).rejects.toThrow('network down');
+      await expect(placePixel(0, 0)).rejects.toThrow('network down');
     });
   });
 });

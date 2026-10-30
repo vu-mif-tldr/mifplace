@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { zodErrorMessage } from './api.js';
-import { cellSchema, fromPosition, toPosition } from './position.js';
+import { cellSchema, fromPosition, positionSchema, toPosition } from './position.js';
 
 const size = { width: 4, height: 3 };
 
@@ -57,5 +57,37 @@ describe('cellSchema', () => {
     expect(errorOf({ x: 4, y: 3 })).toBe(
       'x: x must be less than canvas width (4); y: y must be less than canvas height (3)'
     );
+  });
+});
+
+describe('positionSchema', () => {
+  const position = positionSchema(size);
+
+  const errorOf = (input: unknown) => {
+    const result = position.safeParse(input);
+    if (result.success) throw new Error(`expected ${JSON.stringify(input)} to fail`);
+    return zodErrorMessage(result.error);
+  };
+
+  it('accepts every cell of the canvas', () => {
+    expect(position.safeParse({ pos: 0 })).toEqual({ success: true, data: 0 });
+    expect(position.safeParse({ pos: 11 })).toEqual({ success: true, data: 11 });
+  });
+
+  it('reads only pos, so it checks a whole POST /api/pixels body', () => {
+    expect(position.safeParse({ pos: 4, colorIndex: 12 })).toEqual({ success: true, data: 4 });
+  });
+
+  it('names the reason for a position outside the canvas', () => {
+    expect(errorOf({ pos: 12 })).toBe('pos: pos must be less than 12 (canvas 4x3)');
+    expect(errorOf({ pos: -1 })).toBe('pos: pos must not be negative');
+    expect(errorOf({ pos: 0.5 })).toBe('pos: pos must be an integer');
+    expect(errorOf({ pos: Number.NaN })).toBe('pos: pos must be an integer');
+    expect(errorOf({})).toBe('pos: pos must be an integer');
+  });
+
+  it('is built once per canvas size', () => {
+    expect(positionSchema({ ...size })).toBe(position);
+    expect(positionSchema({ width: 3, height: 4 })).not.toBe(position);
   });
 });

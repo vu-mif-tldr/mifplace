@@ -83,26 +83,25 @@ describe('paintCell', () => {
 });
 
 describe('drawCanvas', () => {
-  const size = { width: 128, height: 128 };
+  const size = { width: 4, height: 3 };
+  const _ = -1;
 
-  it('paints a white background, then every pixel from the server', () => {
+  // A snapshot of GET /api/canvas with the given color ids, index = position
+  const snapshot = (pixels: number[]) => ({ pixels, eventId: 1, timestamp: 1000 });
+
+  it('paints a white background, then every painted cell from the server', () => {
     const { canvas, ctx } = fakeCanvas();
 
-    // position = y * width + x, so 130 is x = 2, y = 1 on a 128-wide canvas
-    drawCanvas(
-      canvas,
-      size,
-      {
-        pixels: [
-          [0, 3],
-          [130, 7],
-        ],
-      },
-      palette
-    );
+    // position = y * width + x, so 6 is x = 2, y = 1 on a 4-wide canvas
+    // prettier-ignore
+    drawCanvas(canvas, size, snapshot([
+      3, _, _, _,
+      _, _, 7, _,
+      _, _, _, _,
+    ]), palette);
 
     expect(ctx.fillRect.mock.calls).toEqual([
-      [0, 0, 128, 128],
+      [0, 0, 4, 3],
       [0, 0, 1, 1],
       [2, 1, 1, 1],
     ]);
@@ -111,9 +110,11 @@ describe('drawCanvas', () => {
 
   it('sizes the canvas element from the server size, one pixel per cell', () => {
     const { canvas, ctx } = fakeCanvas();
-
+    const pixels = Array<number>(200 * 100).fill(_);
     // position 250 is x = 50, y = 1 on a 200-wide canvas
-    drawCanvas(canvas, { width: 200, height: 100 }, { pixels: [[250, 3]] }, palette);
+    pixels[250] = 3;
+
+    drawCanvas(canvas, { width: 200, height: 100 }, snapshot(pixels), palette);
 
     expect(canvas.width).toBe(200);
     expect(canvas.height).toBe(100);
@@ -126,28 +127,34 @@ describe('drawCanvas', () => {
   it('leaves only the white background when nothing is painted', () => {
     const { canvas, ctx } = fakeCanvas();
 
-    drawCanvas(canvas, size, { pixels: [] }, palette);
+    drawCanvas(canvas, size, snapshot(Array(12).fill(_)), palette);
 
     expect(ctx.fillRect).toHaveBeenCalledOnce();
     expect(ctx.fillStyle).toBe('#ffffff');
   });
 
-  it('skips unpainted (negative) and unknown color ids', () => {
+  it('skips unpainted (any negative) and unknown color ids', () => {
     const { canvas, ctx } = fakeCanvas();
 
-    const pixels: [number, number][] = [
-      [0, -1],
-      [1, 99],
-    ];
-    drawCanvas(canvas, size, { pixels }, palette);
+    drawCanvas(canvas, size, snapshot([-1, -2, 99, ...Array(9).fill(_)]), palette);
 
     expect(ctx.fillRect).toHaveBeenCalledOnce();
     expect(ctx.fillStyle).toBe('#ffffff');
+  });
+
+  it('throws and draws nothing for a snapshot of another size', () => {
+    const { canvas, ctx } = fakeCanvas();
+
+    expect(() => drawCanvas(canvas, size, snapshot(Array(11).fill(3)), palette)).toThrow(
+      'The canvas has 11 cells, expected 4x3'
+    );
+    expect(() => drawCanvas(canvas, size, snapshot(Array(13).fill(3)), palette)).toThrow();
+    expect(ctx.fillRect).not.toHaveBeenCalled();
   });
 
   it('does nothing when the canvas has no 2d context', () => {
-    const state = { pixels: [[0, 3]] as [number, number][] };
-
-    expect(() => drawCanvas(noContextCanvas(), size, state, palette)).not.toThrow();
+    expect(() =>
+      drawCanvas(noContextCanvas(), size, snapshot(Array(12).fill(3)), palette)
+    ).not.toThrow();
   });
 });

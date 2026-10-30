@@ -1,7 +1,8 @@
 import { MifDb, getDbVersion, loadDotEnv, openDb, resolveDbPath } from '@mifplace/db';
 import type { Server } from 'node:http';
 import { createApp, listen } from './app.js';
-import { getCanvasState } from './canvas-state.js';
+import type { CanvasStore } from './canvas-state.js';
+import { loadCanvas, placePixel } from './canvas-log.js';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
 
 // Settings come from the environment, then from .env in the repository root (see .env.example).
@@ -19,6 +20,7 @@ const db = openDb(dbPath);
 let mifDb: MifDb;
 let palette: PaletteColor[];
 let canvasSize: CanvasSize;
+let canvas: CanvasStore;
 
 try {
   // Version 0 means a file without any applied migration, MifDb cannot work with it.
@@ -36,6 +38,11 @@ try {
 
   canvasSize = mifDb.getCanvasSize();
   console.log(`Canvas size: ${canvasSize.width}x${canvasSize.height}`);
+
+  // Reads the whole event log once; after that GET /api/canvas is served from memory
+  canvas = loadCanvas(mifDb, canvasSize);
+  const { eventId, timestamp } = canvas.snapshot();
+  console.log(`Canvas loaded up to event ${eventId} (${new Date(timestamp).toISOString()})`);
 } catch (e) {
   db.close();
   throw e;
@@ -45,8 +52,8 @@ const app = createApp({
   canvasSize,
   palette,
   checkHealth: () => mifDb.checkHealth(),
-  getCanvasState: () => getCanvasState(mifDb, canvasSize),
-  appendEvent: (eventObject) => mifDb.appendEvent(eventObject),
+  getCanvasState: () => canvas.snapshot(),
+  appendEvent: (eventObject) => placePixel(mifDb, canvas, eventObject),
 });
 
 let server: Server;

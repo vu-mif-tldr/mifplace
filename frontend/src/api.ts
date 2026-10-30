@@ -45,12 +45,12 @@ export async function getCanvas(): Promise<CanvasState> {
   return state.data;
 }
 
-// Save one pixel on the server (colorIndex = palette color id)
-export async function placePixel(x: number, y: number, colorIndex: number) {
+// Save one pixel on the server (pos = toPosition(size, x, y), colorIndex = palette color id)
+export async function placePixel(pos: number, colorIndex: number) {
   const response = await fetch('/api/pixels', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ x, y, colorIndex } satisfies PlacePixelRequest),
+    body: JSON.stringify({ pos, colorIndex } satisfies PlacePixelRequest),
   });
   if (!response.ok) throw new Error('Could not place the pixel');
 }

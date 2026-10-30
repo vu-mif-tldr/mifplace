@@ -15,6 +15,13 @@ export function drawCanvas(
   state: CanvasState,
   palette: PaletteColor[]
 ) {
+  // A snapshot of another size would shift every row, so it is not drawn at all
+  if (state.pixels.length !== size.width * size.height) {
+    throw new Error(
+      `The canvas has ${state.pixels.length} cells, expected ${size.width}x${size.height}`
+    );
+  }
+
   // Setting the size also clears the canvas
   canvas.width = size.width;
   canvas.height = size.height;
@@ -29,14 +36,15 @@ export function drawCanvas(
   // Color ids can have gaps, so look colors up by id, not by index in the list
   const colorById = new Map(palette.map(({ id, color }) => [id, color]));
 
-  for (const [position, colorId] of state.pixels) {
+  // The index of a cell in pixels is its position
+  state.pixels.forEach((colorId, position) => {
     // Negative (unpainted) and unknown ids keep the background
     const color = colorById.get(colorId);
-    if (!color) continue;
+    if (!color) return;
 
     const { x, y } = fromPosition(size, position);
     paintCell(canvas, x, y, color);
-  }
+  });
 }
 
 // Paint one cell (x = column, y = row)

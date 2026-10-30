@@ -36,7 +36,7 @@ The canvas size does not change while the server runs. The backend reads it from
 { "width": 3, "height": 2 }
 ```
 
-`position = y * width + x`, starting at the top-left; valid positions are `0 <= position < width * height`.
+A cell is addressed by its position `pos = y * width + x`, starting at the top-left; valid positions are `0 <= pos < width * height`.
 
 **Error:** `500 Internal Server Error` if the size cannot be retrieved:
 
@@ -59,7 +59,7 @@ The frontend requests the **full canvas snapshot once during initial page load**
 ```
 
 - The snapshot does **not** contain the canvas dimensions: the frontend already has them from `GET /api/canvas/size`.
-- `pixels`: **flat array of color IDs**. Array index is the pixel `position`; the array length is exactly `width * height` (dimensions from `GET /api/canvas/size`).
+- `pixels`: **flat array of color IDs**. Array index is the pixel `pos`; the array length is exactly `width * height` (dimensions from `GET /api/canvas/size`).
 - Any negative value (`colorId < 0`) represents an unpainted pixel, rendered with the canvas background. Palette color IDs must be non-negative; `0` is a valid color ID.
 - `eventId`, `timestamp`: identify the **last event included in this snapshot**. `timestamp` is a Unix timestamp in milliseconds. For an empty event log both are `0`.
 
@@ -75,15 +75,15 @@ The server must not return a partial snapshot with `200 OK`.
 
 ### `POST /api/pixels`
 
-The frontend computes `position` using the canvas width obtained from `GET /api/canvas/size`. It sends **`position`, not `x` and `y`**. `colorIndex` is a palette `id`, not its index in the palette array.
+The frontend computes `pos` using the canvas width obtained from `GET /api/canvas/size`. It sends **`pos`, not `x` and `y`**. `colorIndex` is a palette `id`, not its index in the palette array.
 
 **Request:** `Content-Type: application/json`
 
 ```json
-{ "position": 4, "colorIndex": 12 }
+{ "pos": 4, "colorIndex": 12 }
 ```
 
-The backend validates that `position` is an integer in `0 <= position < width * height`, and that `colorIndex` is an integer matching an existing palette ID. The server must not trust client-side calculations without validation.
+The backend validates that `pos` is an integer in `0 <= pos < width * height`, and that `colorIndex` is an integer matching an existing palette ID. The server must not trust client-side calculations without validation.
 
 **201 Created:**
 
@@ -96,13 +96,11 @@ The backend validates that `position` is an integer in `0 <= position < width * 
 | Status | Case                                             | JSON response                                                                             |
 | ------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
 | `400`  | Malformed body, a field missing or of wrong type | `{"success":false,"error":"colorIndex: Invalid input: expected number, received string"}` |
-| `400`  | Cell outside the canvas                          | `{"success":false,"error":"x: x must be less than canvas width (128)"}`                   |
+| `400`  | Position outside the canvas                      | `{"success":false,"error":"pos: pos must be less than 16384 (canvas 128x128)"}`           |
 | `400`  | Integer that is not a palette ID                 | `{"success":false,"error":"Color not in palette"}`                                        |
 | `500`  | Database insert failure                          | `{"success":false,"error":"Insert failed"}`                                               |
 
-The body is checked with the request schema from `@mifplace/shared` (`PlacePixelRequestSchema`, then the cell check `cellSchema`). A `400` from that check carries the schema's message as one line, `field: message`, several problems joined with `; ` (`zodErrorMessage`). The exact wording comes from the schema and may change with it; clients show it, they do not parse it. `Color not in palette` and `Insert failed` are fixed strings of the backend.
-
-**Implementation change:** The current backend accepts `{x, y, colorIndex}` and validates `colorIndex` against the actual palette IDs. It must be updated to accept `{position, colorIndex}`; the position will then be checked by a schema in `@mifplace/shared` in the same way.
+The body is checked with the request schema from `@mifplace/shared` (`PlacePixelRequestSchema`, then the position check `positionSchema`). A `400` from that check carries the schema's message as one line, `field: message`, several problems joined with `; ` (`zodErrorMessage`). The exact wording comes from the schema and may change with it; clients show it, they do not parse it. `Color not in palette` and `Insert failed` are fixed strings of the backend.
 
 ## 2. WebSocket — `/api/ws`
 
@@ -140,7 +138,7 @@ When a client reconnects after being offline, the server replays events it misse
 }
 ```
 
-Each entry is `[eventId, position, colorId]`. The client applies events in order and saves `eventId` and `timestamp` **only after successfully applying** the batch. The server must not create a gap between catch-up and live delivery. The client must not apply the same event twice.
+Each entry is `[eventId, pos, colorId]`. The client applies events in order and saves `eventId` and `timestamp` **only after successfully applying** the batch. The server must not create a gap between catch-up and live delivery. The client must not apply the same event twice.
 
 ### `pixels` — live updates for all connected clients
 
@@ -180,7 +178,7 @@ The **backend starts a heartbeat timer for each WebSocket connection**. When no 
 
 1. **Initial page load:** frontend requests `GET /api/palette`, `GET /api/canvas/size` and `GET /api/canvas` once, stores the palette, dimensions, full flat color array, `eventId`, and `timestamp`.
 2. **Subscribe:** frontend opens `/api/ws?afterEventId=<eventId>&afterTimestamp=<timestamp>`; backend sends any events missed since the snapshot, then streams live updates.
-3. **Place pixel:** frontend calculates `position = y * width + x` and sends `POST /api/pixels` with `position` and `colorIndex`; backend validates, saves, and broadcasts the event to all connected clients.
+3. **Place pixel:** frontend calculates `pos = y * width + x` and sends `POST /api/pixels` with `pos` and `colorIndex`; backend validates, saves, and broadcasts the event to all connected clients.
 4. **Apply updates:** frontend changes only the positions specified by incoming `pixels` events; it does not fetch the full canvas again after each update.
 5. **Recover:** after a disconnect, frontend reconnects using its last applied checkpoint. If it receives `reset`, it fetches a new full canvas snapshot and subscribes again. It keeps the existing palette and canvas size unless it needs a full reinitialization.
 6. **Connection health:** backend sends WebSocket ping frames after 15 seconds of inactivity; clients respond with pong; dead connections are closed to free server resources.

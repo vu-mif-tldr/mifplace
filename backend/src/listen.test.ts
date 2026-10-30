@@ -7,7 +7,7 @@ const app = createApp({
   canvasSize: { width: 10, height: 10 },
   palette: [{ id: 0, color: '#000000' }],
   checkHealth: () => {},
-  getCanvasState: () => ({ pixels: [] }),
+  getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
   appendEvent: () => 1,
 });
 
