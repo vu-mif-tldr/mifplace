@@ -54,6 +54,9 @@ const app = createApp({
   checkHealth: () => mifDb.checkHealth(),
   getCanvasState: () => canvas.snapshot(),
   appendEvent: (eventObject) => placePixel(mifDb, canvas, eventObject),
+  rateLimitPerMinute: 120,
+  canvasRateLimitPerMinute: 20,
+  pixelRateLimitPerMinute: 10,
 });
 
 let server: Server;

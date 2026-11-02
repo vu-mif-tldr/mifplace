@@ -24,6 +24,8 @@ const app = createApp({
     return SNAPSHOT;
   },
   appendEvent: () => 1,
+  rateLimitPerMinute: 120,
+  canvasRateLimitPerMinute: 20,
 });
 
 let testServer: Server;

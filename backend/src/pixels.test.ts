@@ -18,6 +18,9 @@ const app = createApp({
   checkHealth: () => {},
   getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
   appendEvent: () => 42,
+  rateLimitPerMinute: 120,
+  canvasRateLimitPerMinute: 20,
+  pixelRateLimitPerMinute: 120,
 });
 
 beforeAll(async () => {
@@ -40,6 +43,21 @@ interface PixelResponse {
   eventId?: number;
   error?: string;
 }
+
+test('POST /api/pixels - a few normal requests still pass with the default rate limit', async () => {
+  for (let i = 0; i < 3; i += 1) {
+    const response = await fetch(`${BASE_URL}/api/pixels`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pos: 2010 + i, colorIndex: 0 }),
+    });
+
+    assert.strictEqual(response.status, 201);
+    const data = (await response.json()) as PixelResponse;
+    assert.strictEqual(data.success, true);
+    assert.strictEqual(data.eventId, 42);
+  }
+});
 
 test('POST /api/pixels - valid input returns 201', async () => {
   const response = await fetch(`${BASE_URL}/api/pixels`, {

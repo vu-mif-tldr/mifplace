@@ -14,14 +14,6 @@ import {
 } from '@mifplace/shared';
 import type { NewEvent } from '@mifplace/db';
 
-const limiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 20, // limit each IP to 20 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many requests, please try again later.',
-});
-
 export interface AppConfig {
   // Read once at start: the canvas size does not change while the server runs.
   canvasSize: CanvasSize;
@@ -34,6 +26,14 @@ export interface AppConfig {
   checkHealth: () => void;
   // Saves a new pixel and returns its event id
   appendEvent: (event: NewEvent) => number;
+  // Shared public IPs such as campus Wi‑Fi can burst together, so the general limit is set high enough
+  // to avoid false positives while still protecting the app from abuse.
+  rateLimitPerMinute?: number;
+  // The canvas snapshot is the costliest read, so it gets a stricter cap.
+  canvasRateLimitPerMinute?: number;
+  // Pixel writes are limited separately to protect the event log.
+  pixelRateLimitPerMinute?: number;
+  trustProxy?: boolean;
 }
 
 type HealthResponse = {
@@ -53,16 +53,59 @@ export function createApp({
   checkHealth,
   getCanvasState,
   appendEvent,
+  rateLimitPerMinute = 120,
+  canvasRateLimitPerMinute = 20,
+  pixelRateLimitPerMinute = 10,
+  trustProxy = false,
 }: AppConfig) {
   const app = express();
+  app.set('trust proxy', trustProxy);
+
+  const generalLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: rateLimitPerMinute,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: 'Too many requests, please try again later.' },
+  });
+
+  const canvasLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: canvasRateLimitPerMinute,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      error: 'Too many requests for /api/canvas, please try again later.',
+    },
+  });
+
+  const pixelLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: pixelRateLimitPerMinute,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      error: 'Too many pixel submissions, please try again later.',
+    },
+  });
+
+  // we keep a generous general cap for shared public IPs while protecting the expensive
+  // canvas snapshot and pixel writes with stricter limits. /health is omitted so the liveness check stays available.
+  app.use((req, res, next) => {
+    if (req.path === '/health') return next();
+    if (req.path === '/api/canvas') return canvasLimiter(req, res, next);
+    if (req.path === '/api/pixels' && req.method === 'POST') {
+      return pixelLimiter(req, res, next);
+    }
+    return generalLimiter(req, res, next);
+  });
+
   // Holds only palette ids, so any other colorIndex (missing, string, fraction, null...) is rejected.
   const paletteIds = new Set(palette.map(({ id }) => id));
   // The size does not change while the server runs, so the position check is built once
   const cell = positionSchema(canvasSize);
-
-  app.get('/', limiter, (req, res) => {
-    res.sendFile(path.join(STATIC_PATH, 'index.html'));
-  });
 
   app.get('/api/palette', (_req, res: Response<PaletteColor[]>) => {
     res.json(palette);
