@@ -10,6 +10,12 @@ on:
     #   - "src/**/*.js"
     #   - "src/**/*.jsx"
 
+# The review covers the whole pull request, not one commit, so a new push cancels the running
+# review and the next one sees all the changes.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   claude-review:
     # Optional: Filter by PR author
