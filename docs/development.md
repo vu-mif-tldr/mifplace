@@ -117,7 +117,7 @@ VS Code with the Prettier (`esbenp.prettier-vscode`), ESLint (`dbaeumer.vscode-e
 
 ## Pull requests and CI
 
-`main` is protected: work on a branch and open a pull request. CI runs `npm run check`, the build and the tests with coverage on every pull request, plus `npm audit`, CodeQL, the Docker image build and an automatic Claude code review.
+`main` is protected: work on a branch and open a pull request. CI runs `npm run check`, the build and the tests with coverage on every pull request, plus `npm audit`, CodeQL and an automatic Claude code review. The Docker image is built only when a pull request changes the Dockerfile or the dependencies (see [deploy/README.md](../deploy/README.md)).
 
 - **Coverage** goes to [Codecov](https://codecov.io/gh/vu-mif-tldr/mifplace), one flag per workspace. Components and ignored entry points are in `codecov.yml`. The checks are informational and do not block merging.
 - **Test results** (JUnit) go to Codecov Test Analytics, which shows failed, flaky and slow tests.

@@ -11,9 +11,10 @@ browser ── HTTPS ──> Caddy on the host ── 127.0.0.1:3001 ──> con
 - **Image.** [`Dockerfile`](../Dockerfile) in the repository root. The backend serves the built
   frontend itself, so there is one container and one port; the Vite dev server (5173) is for local
   development only.
-- **Build.** [`docker.yml`](../.github/workflows/docker.yml) builds the image on every pull request
-  and publishes it on merge to `main` as `ghcr.io/vu-mif-tldr/mifplace:main` and
-  `:sha-<commit>`. The server only pulls images, it never builds them.
+- **Build.** [`docker.yml`](../.github/workflows/docker.yml) publishes the image on every merge to
+  `main` as `ghcr.io/vu-mif-tldr/mifplace:main` and `:sha-<commit>`. Pull requests only build it, and
+  only when they change the Dockerfile or the dependencies. A rebuild by hand: Actions → "Docker
+  image" → Run workflow on `main`. The server only pulls images, it never builds them.
 - **Database.** The SQLite file lives in the named volume `data`. The container creates it on the
   first start and applies pending migrations on every start.
 - **Caddy** runs on the host as a system service, the same one that serves `vu.place`.
