@@ -19,6 +19,8 @@ const app = createApp({
   checkHealth: () => {},
   getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
   appendEvent: () => 42,
+  rateLimitPerMinute: 120,
+  canvasRateLimitPerMinute: 20,
 });
 
 // Port 0: the OS picks a free port, so this file can run in parallel with pixels.test.ts.

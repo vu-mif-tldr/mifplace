@@ -9,6 +9,8 @@ const app = createApp({
   checkHealth: () => {},
   getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
   appendEvent: () => 1,
+  rateLimitPerMinute: 120,
+  canvasRateLimitPerMinute: 20,
 });
 
 const servers: Server[] = [];
