@@ -22,6 +22,8 @@ const loading = ref(true);
 const loadError = ref('');
 const pixelError = ref('');
 
+const hoveredCell = ref<{ x: number; y: number } | null>(null);
+
 // Get the palette, the canvas size (only the first time) and the pixels from the server
 // (all at once) and draw the canvas
 async function loadCanvas() {
@@ -73,6 +75,19 @@ function clampPosition() {
   y.value = clampOffset(y.value, height, VIEWPORT_SIZE);
 }
 
+function getCellFromMouse(event: MouseEvent) {
+  if (!canvasEl.value || !canvasSize) return null;
+
+  const rect = canvasEl.value.getBoundingClientRect();
+
+  const cx = Math.floor(((event.clientX - rect.left) / rect.width) * canvasSize.width);
+  const cy = Math.floor(((event.clientY - rect.top) / rect.height) * canvasSize.height);
+
+  if (cx < 0 || cy < 0 || cx >= canvasSize.width || cy >= canvasSize.height) return null;
+
+  return { x: cx, y: cy };
+}
+
 function onWheel(event: WheelEvent) {
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
   const mouseX = event.clientX - rect.left;
@@ -103,6 +118,8 @@ function onMouseDown(event: MouseEvent) {
 }
 
 function onMouseMove(event: MouseEvent) {
+  hoveredCell.value = getCellFromMouse(event);
+
   if (!dragging) return;
 
   if (Math.hypot(event.clientX - startX, event.clientY - startY) > 4) moved = true;
@@ -154,7 +171,10 @@ async function onCanvasClick(event: MouseEvent) {
         @mousedown="onMouseDown"
         @mousemove="onMouseMove"
         @mouseup="dragging = false"
-        @mouseleave="dragging = false"
+        @mouseleave="
+          dragging = false;
+          hoveredCell = null;
+        "
       >
         <canvas
           id="canvas"
@@ -164,6 +184,11 @@ async function onCanvasClick(event: MouseEvent) {
         ></canvas>
       </div>
       <p v-if="pixelError" class="error">{{ pixelError }}</p>
+    </section>
+
+    <section id="pixel-info-section">
+      <span v-if="hoveredCell">Cell: ({{ hoveredCell.x }}, {{ hoveredCell.y }})</span>
+      <span v-else>Hover over the canvas</span>
     </section>
 
     <section id="color-picker-section">
