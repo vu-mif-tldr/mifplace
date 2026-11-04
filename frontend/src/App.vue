@@ -170,7 +170,10 @@ async function onCanvasClick(event: MouseEvent) {
         @mousedown="onMouseDown"
         @mousemove="onMouseMove"
         @mouseup="dragging = false"
-        @mouseleave="dragging = false"
+        @mouseleave="
+          dragging = false;
+          hoveredCell = null;
+        "
       >
         <canvas
           id="canvas"
