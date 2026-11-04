@@ -4,6 +4,7 @@ import { createApp, listen } from './app.js';
 import type { CanvasStore } from './canvas-state.js';
 import { loadCanvas, placePixel } from './canvas-log.js';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
+import { attachLiveTransport } from './live/transport.js';
 
 // Settings come from the environment, then from .env in the repository root (see .env.example).
 loadDotEnv();
@@ -70,12 +71,34 @@ try {
 }
 console.log(`Server running at http://${hostname}:${PORT}/`);
 
-// Stop accepting connections, then close the database so the WAL is checkpointed.
-// The database is closed in the callback: it is not needed until open connections are done.
+const live = attachLiveTransport(server, {
+  path: '/api/ws',
+  maxConnections: 100,
+  allowedOrigins: [],
+  maxPayload: 1024,
+  maxBufferedBytes: 1024 * 1024,
+});
+
+console.log('WebSocket gateway ready at /api/ws');
+
+let shuttingDown = false;
+
 const shutdown = () => {
-  server.close(() => mifDb.close());
-  // Idle keep-alive connections would keep server.close waiting.
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  // Stop WebSocket upgrades and heartbeat checks.
+  // Disconnect existing WebSocket clients.
+  live.close();
+
+  // Stop HTTP server and then close the database.
+  server.close(() => {
+    mifDb.close();
+  });
+
+  // Close idle HTTP keep-alive connections.
   server.closeIdleConnections();
 };
+
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
