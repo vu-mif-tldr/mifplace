@@ -1,0 +1,50 @@
+# The production app behind https://vu.place, see README.md next to this file.
+# Before launch Caddy forwards only /api/waitlist* here; the rest of vu.place is the static
+# landing page (landing/). Separate from the demo: own project name, port and database.
+#
+# On the server: /srv/mifplace-prod/compose.yaml (this file) and app.env next to it with the
+# mail settings (not in git):
+#
+#   SMTP_HOST=smtp-pulse.com
+#   SMTP_PORT=587
+#   SMTP_USER=...
+#   SMTP_PASS=...
+#   MAIL_FROM=vu.place <noreply@vu.place>
+
+name: mifplace-prod
+
+services:
+  app:
+    image: ghcr.io/vu-mif-tldr/mifplace:${MIFPLACE_TAG:-main}
+    restart: unless-stopped
+    ports:
+      # Loopback only, see compose.yaml
+      - '127.0.0.1:3002:3000'
+    environment:
+      # The email links point here. Setting it turns the waitlist on; without SMTP_HOST in
+      # app.env the app then refuses to start.
+      PUBLIC_URL: https://vu.place
+      # See compose.yaml
+      TRUST_PROXY: uniquelocal
+    env_file:
+      - app.env
+    volumes:
+      - data:/data
+    mem_limit: 512m
+    # Hardening, see compose.yaml
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+volumes:
+  # The production database: the waitlist now, the canvas after launch.
+  data:

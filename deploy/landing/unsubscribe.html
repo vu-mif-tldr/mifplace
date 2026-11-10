@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Remove my address · vu.place</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1 class="small">Remove your <span class="accent">address</span></h1>
+      <p>We will delete your email from the vu.place waitlist and not write to you again.</p>
+      <button id="action" type="button">Remove my address</button>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <p class="fine"><a href="/">vu.place</a></p>
+    </main>
+    <script src="/waitlist.js"></script>
+    <script>
+      tokenButton('/api/waitlist/unsubscribe', 'Removed. Sorry to see you go!');
+    </script>
+  </body>
+</html>

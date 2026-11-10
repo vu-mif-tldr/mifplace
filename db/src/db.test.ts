@@ -166,3 +166,69 @@ describe('openDb / MifDb', () => {
     mif.close();
   });
 });
+
+describe('MifDb waitlist', () => {
+  function waitlistDb(): MifDb {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    migrate(db, loadMigrations(MIGRATIONS_DIR));
+    return new MifDb(db);
+  }
+  const tokenA = 'a'.repeat(43);
+  const tokenB = 'b'.repeat(43);
+
+  it('keeps the token of an address that signs up again', () => {
+    const mif = waitlistDb();
+    const first = mif.addToWaitlist('jonas@mif.stud.vu.lt', tokenA, 1000);
+    assert.equal(first.token, tokenA);
+    assert.equal(first.confirmed_at, null);
+
+    // Pending: the token stays, the confirmation period restarts
+    const again = mif.addToWaitlist('jonas@mif.stud.vu.lt', tokenB, 2000);
+    assert.equal(again.token, tokenA);
+    assert.equal(again.created_at, 2000);
+
+    // Confirmed: nothing changes
+    assert.equal(mif.confirmWaitlist(tokenA, 0, 3000), true);
+    const confirmed = mif.addToWaitlist('jonas@mif.stud.vu.lt', tokenB, 4000);
+    assert.equal(confirmed.token, tokenA);
+    assert.equal(confirmed.created_at, 2000);
+    assert.equal(confirmed.confirmed_at, 3000);
+    mif.close();
+  });
+
+  it('confirms by token once and not after the link expires', () => {
+    const mif = waitlistDb();
+    mif.addToWaitlist('a@vu.lt', tokenA, 1000);
+    mif.addToWaitlist('b@vu.lt', tokenB, 1000);
+
+    assert.equal(mif.confirmWaitlist('x'.repeat(43), 0, 2000), false);
+    // b was created before the cutoff: expired
+    assert.equal(mif.confirmWaitlist(tokenB, 1500, 2000), false);
+    assert.equal(mif.confirmWaitlist(tokenA, 1000, 2000), true);
+    // A second click is fine and keeps the first time, even after the cutoff
+    assert.equal(mif.confirmWaitlist(tokenA, 5000, 6000), true);
+    assert.equal(mif.addToWaitlist('a@vu.lt', tokenB, 7000).confirmed_at, 2000);
+    mif.close();
+  });
+
+  it('removes by token and drops expired pending rows only', () => {
+    const mif = waitlistDb();
+    mif.addToWaitlist('a@vu.lt', tokenA, 1000);
+    mif.addToWaitlist('b@vu.lt', tokenB, 1000);
+    mif.confirmWaitlist(tokenA, 0, 1100);
+
+    assert.equal(mif.removeExpiredWaitlist(2000), 1);
+    assert.equal(mif.removeFromWaitlist(tokenB), false);
+    assert.equal(mif.removeFromWaitlist(tokenA), true);
+    assert.equal(mif.removeFromWaitlist(tokenA), false);
+    mif.close();
+  });
+
+  it('rejects addresses that are not lower case and short tokens', () => {
+    const mif = waitlistDb();
+    assert.throws(() => mif.addToWaitlist('Jonas@vu.lt', tokenA), /CHECK constraint failed/);
+    assert.throws(() => mif.addToWaitlist('a@vu.lt', 'short'), /CHECK constraint failed/);
+    mif.close();
+  });
+});

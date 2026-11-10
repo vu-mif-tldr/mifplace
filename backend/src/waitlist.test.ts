@@ -1,0 +1,258 @@
+import assert from 'node:assert/strict';
+import type { AddressInfo } from 'node:net';
+import type { Server } from 'node:http';
+import { afterEach, describe, it } from 'vitest';
+import Database from 'better-sqlite3';
+import { MIGRATIONS_DIR, MifDb, loadMigrations, migrate } from '@mifplace/db';
+import { createApp } from './app.js';
+import { ConsoleMailer, mailerFromEnv, SmtpMailer, type Mail, type Mailer } from './mailer.js';
+import { EmailBudget, type WaitlistOptions } from './waitlist.js';
+
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+
+let server: Server | undefined;
+let mif: MifDb | undefined;
+
+afterEach(() => {
+  server?.close();
+  server = undefined;
+  mif?.close();
+  mif = undefined;
+});
+
+interface Setup {
+  url: string;
+  mailer: ConsoleMailer;
+  db: MifDb;
+  clock: { now: number };
+}
+
+// A real MifDb on an in-memory database, a ConsoleMailer that keeps the emails and a clock
+// the test moves by hand.
+async function start(
+  options: Partial<WaitlistOptions> = {},
+  mailer: Mailer = new ConsoleMailer(() => {})
+): Promise<Setup> {
+  const db = new Database(':memory:');
+  migrate(db, loadMigrations(MIGRATIONS_DIR));
+  mif = new MifDb(db);
+  const clock = { now: 1_000_000_000_000 };
+  const app = createApp({
+    canvasSize: { width: 4, height: 4 },
+    palette: [{ id: 0, color: '#000000' }],
+    checkHealth: () => {},
+    getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
+    appendEvent: () => 1,
+    waitlist: {
+      store: mif,
+      mailer,
+      publicUrl: 'https://vu.place/',
+      now: () => clock.now,
+      ...options,
+    },
+  });
+  server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server!.once('listening', resolve));
+  const { port } = server.address() as AddressInfo;
+  return {
+    url: `http://127.0.0.1:${port}/api/waitlist`,
+    mailer: mailer as ConsoleMailer,
+    db: mif,
+    clock,
+  };
+}
+
+async function post(url: string, body: unknown) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  // A body that is not a JSON object fails in express.json(), which answers with an HTML page
+  const json = res.headers.get('content-type')?.includes('json');
+  const parsed = json ? ((await res.json()) as { success: boolean; error?: string }) : undefined;
+  return { status: res.status, body: parsed ?? { success: false } };
+}
+
+function tokenOf(mail: Mail): string {
+  const match = /confirm\.html\?t=([A-Za-z0-9_-]+)/.exec(mail.text);
+  assert.ok(match, mail.text);
+  return match[1]!;
+}
+
+describe('POST /api/waitlist', () => {
+  it('sends a confirmation email with confirm and unsubscribe links', async () => {
+    const { url, mailer } = await start();
+    const res = await post(url, { email: '  Jonas@MIF.stud.vu.lt ' });
+    assert.deepEqual(res, { status: 202, body: { success: true } });
+
+    assert.equal(mailer.sent.length, 1);
+    const mail = mailer.sent[0]!;
+    assert.equal(mail.to, 'jonas@mif.stud.vu.lt');
+    const token = tokenOf(mail);
+    assert.match(token, /^[A-Za-z0-9_-]{43}$/);
+    // The trailing slash of publicUrl does not double
+    assert.ok(mail.text.includes(`https://vu.place/confirm.html?t=${token}`));
+    assert.ok(mail.html.includes(`https://vu.place/confirm.html?t=${token}`));
+    assert.equal(mail.unsubscribeUrl, `https://vu.place/unsubscribe.html?t=${token}`);
+  });
+
+  it('rejects other domains and broken bodies with 400', async () => {
+    const { url, mailer } = await start();
+    for (const body of [{ email: 'a@gmail.com' }, { email: 'not an email' }, {}, 'a@vu.lt']) {
+      const res = await post(url, body);
+      assert.equal(res.status, 400, JSON.stringify(body));
+      assert.equal(res.body.success, false);
+    }
+    assert.equal(mailer.sent.length, 0);
+  });
+
+  it('answers the same for a confirmed address and sends nothing', async () => {
+    const { url, mailer } = await start();
+    await post(url, { email: 'a@vu.lt' });
+    const confirm = await post(`${url}/confirm`, { token: tokenOf(mailer.sent[0]!) });
+    assert.equal(confirm.status, 200);
+
+    const again = await post(url, { email: 'a@vu.lt' });
+    assert.deepEqual(again, { status: 202, body: { success: true } });
+    assert.equal(mailer.sent.length, 1);
+  });
+
+  it('resends the same link at most every 10 minutes and 3 times a day', async () => {
+    const { url, mailer, clock } = await start();
+    await post(url, { email: 'a@vu.lt' });
+    // Too soon: same answer, no email
+    clock.now += 5 * MINUTE;
+    assert.equal((await post(url, { email: 'a@vu.lt' })).status, 202);
+    assert.equal(mailer.sent.length, 1);
+
+    clock.now += 6 * MINUTE;
+    await post(url, { email: 'a@vu.lt' });
+    clock.now += 11 * MINUTE;
+    await post(url, { email: 'a@vu.lt' });
+    assert.equal(mailer.sent.length, 3);
+    assert.equal(tokenOf(mailer.sent[2]!), tokenOf(mailer.sent[0]!));
+
+    // Fourth within a day: skipped
+    clock.now += 11 * MINUTE;
+    assert.equal((await post(url, { email: 'a@vu.lt' })).status, 202);
+    assert.equal(mailer.sent.length, 3);
+
+    // Next day it works again
+    clock.now += 24 * HOUR;
+    await post(url, { email: 'a@vu.lt' });
+    assert.equal(mailer.sent.length, 4);
+  });
+
+  it('answers 503 when the hourly email quota is used up', async () => {
+    const { url, mailer, clock } = await start({ emailsPerHour: 2 });
+    await post(url, { email: 'a@vu.lt' });
+    await post(url, { email: 'b@vu.lt' });
+    const third = await post(url, { email: 'c@vu.lt' });
+    assert.equal(third.status, 503);
+    assert.equal(mailer.sent.length, 2);
+
+    clock.now += HOUR;
+    assert.equal((await post(url, { email: 'c@vu.lt' })).status, 202);
+    assert.equal(mailer.sent.length, 3);
+  });
+
+  it('answers 503 when the email cannot be sent', async () => {
+    const failing: Mailer = { send: () => Promise.reject(new Error('SMTP down')) };
+    const { url } = await start({}, failing);
+    const res = await post(url, { email: 'a@vu.lt' });
+    assert.equal(res.status, 503);
+    assert.match(res.body.error ?? '', /could not send/i);
+  });
+
+  it('limits signups per IP', async () => {
+    const { url } = await start({ signupsPerIpPerHour: 2 });
+    assert.equal((await post(url, { email: 'a@vu.lt' })).status, 202);
+    assert.equal((await post(url, { email: 'b@vu.lt' })).status, 202);
+    assert.equal((await post(url, { email: 'c@vu.lt' })).status, 429);
+  });
+});
+
+describe('POST /api/waitlist/confirm', () => {
+  it('confirms by token, twice is fine', async () => {
+    const { url, mailer } = await start();
+    await post(url, { email: 'a@vu.lt' });
+    const token = tokenOf(mailer.sent[0]!);
+    assert.deepEqual(await post(`${url}/confirm`, { token }), {
+      status: 200,
+      body: { success: true },
+    });
+    assert.equal((await post(`${url}/confirm`, { token })).status, 200);
+  });
+
+  it('answers 404 for an unknown or expired link and 400 for a malformed one', async () => {
+    const { url, mailer, clock } = await start();
+    assert.equal((await post(`${url}/confirm`, { token: 'x'.repeat(43) })).status, 404);
+    assert.equal((await post(`${url}/confirm`, { token: 'short' })).status, 400);
+    assert.equal((await post(`${url}/confirm`, {})).status, 400);
+
+    await post(url, { email: 'a@vu.lt' });
+    clock.now += 8 * 24 * HOUR;
+    const res = await post(`${url}/confirm`, { token: tokenOf(mailer.sent[0]!) });
+    assert.equal(res.status, 404);
+    assert.match(res.body.error ?? '', /expired/);
+  });
+});
+
+describe('POST /api/waitlist/unsubscribe', () => {
+  it('deletes the address, also a confirmed one; repeating is fine', async () => {
+    const { url, mailer, db } = await start();
+    await post(url, { email: 'a@vu.lt' });
+    const token = tokenOf(mailer.sent[0]!);
+    await post(`${url}/confirm`, { token });
+
+    assert.deepEqual(await post(`${url}/unsubscribe`, { token }), {
+      status: 200,
+      body: { success: true },
+    });
+    assert.equal(db.removeFromWaitlist(token), false);
+    assert.equal((await post(`${url}/unsubscribe`, { token })).status, 200);
+    assert.equal((await post(`${url}/unsubscribe`, { token: 'bad' })).status, 400);
+  });
+});
+
+describe('createApp without waitlist', () => {
+  it('has no waitlist routes', async () => {
+    const app = createApp({
+      canvasSize: { width: 4, height: 4 },
+      palette: [{ id: 0, color: '#000000' }],
+      checkHealth: () => {},
+      getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
+      appendEvent: () => 1,
+    });
+    server = app.listen(0, '127.0.0.1');
+    await new Promise((resolve) => server!.once('listening', resolve));
+    const { port } = server.address() as AddressInfo;
+    const res = await fetch(`http://127.0.0.1:${port}/api/waitlist`, { method: 'POST' });
+    assert.equal(res.status, 404);
+  });
+});
+
+describe('EmailBudget', () => {
+  it('forgets addresses after a day', () => {
+    const budget = new EmailBudget(10 * MINUTE, 1, 100);
+    budget.record('a@vu.lt', 0);
+    assert.equal(budget.check('a@vu.lt', 20 * MINUTE), 'address');
+    assert.equal(budget.check('a@vu.lt', 24 * HOUR), 'ok');
+  });
+});
+
+describe('mailerFromEnv', () => {
+  it('prints emails in development and refuses to start without SMTP in production', () => {
+    assert.ok(mailerFromEnv({}) instanceof ConsoleMailer);
+    assert.throws(() => mailerFromEnv({ NODE_ENV: 'production' }), /SMTP_HOST must be set/);
+  });
+
+  it('builds an SMTP mailer and checks its settings', () => {
+    const env = { SMTP_HOST: 'smtp.example.com', MAIL_FROM: 'vu.place <noreply@vu.place>' };
+    assert.ok(mailerFromEnv(env) instanceof SmtpMailer);
+    assert.throws(() => mailerFromEnv({ SMTP_HOST: 'smtp.example.com' }), /MAIL_FROM/);
+    assert.throws(() => mailerFromEnv({ ...env, SMTP_PORT: 'abc' }), /Invalid SMTP_PORT/);
+  });
+});
