@@ -4,6 +4,7 @@ import { toPosition, type CanvasSize, type PaletteColor } from '@mifplace/shared
 import { getCanvas, getCanvasSize, getPalette, placePixel } from './api';
 import { drawCanvas, getClickedCell, paintCell } from './canvas';
 import { clampOffset, fitCellSize } from './view';
+import PixelBand from './PixelBand.vue';
 
 // Colors from the server, loaded together with the canvas
 const palette = ref<PaletteColor[]>([]);
@@ -153,9 +154,10 @@ async function onCanvasClick(event: MouseEvent) {
 </script>
 
 <template>
+  <PixelBand :color="selectedColor?.color" />
   <main>
     <section id="canvas-section">
-      <h2>MIF PLACE</h2>
+      <h2>VU Place</h2>
 
       <p v-if="loading">Kraunama…</p>
       <div v-else-if="loadError">
