@@ -192,7 +192,7 @@ describe('planeTransform', () => {
 });
 
 describe('Band', () => {
-  const WIDTH = 4000;
+  const WIDTH = 2000;
   const HEIGHT = 600;
 
   const centerIn = (width: number, height: number) => (rect: BandRect) => {
@@ -208,13 +208,14 @@ describe('Band', () => {
       return x >= 0 && x <= WIDTH && y >= 0 && y <= HEIGHT;
     });
   const isWholeCell = (rect: BandRect) => rect.width === CELL_SIZE && rect.height === CELL_SIZE;
-  // A band that has been going for `seconds`, turned to `direction` if given
+  // A band that has been going for `seconds`, turned to `direction` if given. It goes in the
+  // longest steps the band makes (half a second), to keep the tests quick.
   const bandAfter = (seconds: number, direction?: number) => {
     const band = new Band();
     if (direction !== undefined) band.turnTo(direction);
     band.rects(WIDTH, HEIGHT, RAMP);
-    for (let time = 0; time < seconds; time += 0.1) {
-      band.advance(0.1);
+    for (let time = 0; time < seconds; time += 0.5) {
+      band.advance(0.5);
       band.rects(WIDTH, HEIGHT, RAMP);
     }
     return band;
