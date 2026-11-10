@@ -84,6 +84,15 @@ export class EmailBudget {
     this.perAddress.set(email, times);
   }
 
+  // Takes back a record() whose email was not sent, so a retry is not counted against the limits.
+  release(email: string, time: number): void {
+    const g = this.global.lastIndexOf(time);
+    if (g >= 0) this.global.splice(g, 1);
+    const times = this.perAddress.get(email);
+    const i = times ? times.lastIndexOf(time) : -1;
+    if (times && i >= 0) times.splice(i, 1);
+  }
+
   // Drops addresses without emails in the last day, at most every 10 minutes.
   private prune(now: number): void {
     if (now - this.lastPrune < 10 * MINUTE) return;
@@ -181,6 +190,7 @@ export function createWaitlistRouter({
       await mailer.send(confirmationEmail(email, publicUrl, row.token));
     } catch (error) {
       console.error('Waitlist email failed:', error);
+      budget.release(email, time);
       return res
         .status(503)
         .json({ success: false, error: 'Could not send the email, please try again later.' });

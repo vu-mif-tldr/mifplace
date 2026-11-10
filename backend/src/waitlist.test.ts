@@ -32,7 +32,8 @@ interface Setup {
 // the test moves by hand.
 async function start(
   options: Partial<WaitlistOptions> = {},
-  mailer: Mailer = new ConsoleMailer(() => {})
+  mailer: Mailer = new ConsoleMailer(() => {}),
+  trustProxy: string | boolean = false
 ): Promise<Setup> {
   const db = new Database(':memory:');
   migrate(db, loadMigrations(MIGRATIONS_DIR));
@@ -44,6 +45,7 @@ async function start(
     checkHealth: () => {},
     getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
     appendEvent: () => 1,
+    trustProxy,
     waitlist: {
       store: mif,
       mailer,
@@ -166,11 +168,52 @@ describe('POST /api/waitlist', () => {
     assert.match(res.body.error ?? '', /could not send/i);
   });
 
+  it('does not count a failed email, so an immediate retry sends', async () => {
+    let fail = true;
+    const sent: Mail[] = [];
+    const flaky: Mailer = {
+      send: (mail) => {
+        if (fail) return Promise.reject(new Error('SMTP down'));
+        sent.push(mail);
+        return Promise.resolve();
+      },
+    };
+    const { url } = await start({ emailsPerHour: 1 }, flaky);
+    assert.equal((await post(url, { email: 'a@vu.lt' })).status, 503);
+    fail = false;
+    assert.equal((await post(url, { email: 'a@vu.lt' })).status, 202);
+    assert.equal(sent.length, 1);
+  });
+
   it('limits signups per IP', async () => {
     const { url } = await start({ signupsPerIpPerHour: 2 });
     assert.equal((await post(url, { email: 'a@vu.lt' })).status, 202);
     assert.equal((await post(url, { email: 'b@vu.lt' })).status, 202);
     assert.equal((await post(url, { email: 'c@vu.lt' })).status, 429);
+  });
+});
+
+describe('client IP behind a proxy', () => {
+  async function postFrom(url: string, ip: string, email: string) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip },
+      body: JSON.stringify({ email }),
+    });
+    return res.status;
+  }
+
+  it('limits each forwarded client separately when the proxy is trusted', async () => {
+    const { url } = await start({ signupsPerIpPerHour: 1 }, undefined, 'loopback');
+    assert.equal(await postFrom(url, '203.0.113.1', 'a@vu.lt'), 202);
+    assert.equal(await postFrom(url, '203.0.113.2', 'b@vu.lt'), 202);
+    assert.equal(await postFrom(url, '203.0.113.1', 'c@vu.lt'), 429);
+  });
+
+  it('ignores X-Forwarded-For without TRUST_PROXY', async () => {
+    const { url } = await start({ signupsPerIpPerHour: 1 });
+    assert.equal(await postFrom(url, '203.0.113.1', 'a@vu.lt'), 202);
+    assert.equal(await postFrom(url, '203.0.113.2', 'b@vu.lt'), 429);
   });
 });
 

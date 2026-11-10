@@ -3,7 +3,7 @@
 # landing page (landing/). Separate from the demo: own project name, port and database.
 #
 # On the server: /srv/mifplace-prod/compose.yaml (this file) and app.env next to it with the
-# mail settings (not in git):
+# mail settings (not in git); host, port and login as SendPulse → SMTP → Settings shows them:
 #
 #   SMTP_HOST=smtp-pulse.com
 #   SMTP_PORT=587
