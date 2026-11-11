@@ -141,6 +141,9 @@ database.
    SendPulse shows in Cloudflare → DNS, and a DMARC record: `TXT`, name `_dmarc`,
    `v=DMARC1; p=none`. Wait until SendPulse shows the domain as verified. Take the SMTP login and
    password from the same page. The free plan sends at most 50 emails per hour; the app stops at 40.
+   Use port **2525** (STARTTLS): outgoing connections to 25, 465 and 587 are dropped outside the
+   VPS, most likely by netcup (ufw allows all outgoing traffic, nftables has no rules for these
+   ports), with any mail provider. Check from the server: `timeout 6 bash -c '</dev/tcp/smtp-pulse.com/2525' && echo open`.
 
 2. **The app.**
 
@@ -178,13 +181,24 @@ database.
    Signups from two networks show two different addresses in
    `sudo docker compose logs | grep "Waitlist signup"`; one address for all means `TRUST_PROXY` is wrong.
 
-**Reading the list** (read-only while the app runs):
+**Reading the list** (read-only, safe while the app runs). How many:
 
 ```sh
 cd /srv/mifplace-prod
 sudo docker compose exec app node -e "
   const db = require('better-sqlite3')('/data/mifplace.db', { readonly: true });
   console.log(db.prepare('SELECT count(*) AS all_, count(confirmed_at) AS confirmed FROM waitlist').get());"
+```
+
+Who, with the times in UTC (`null` in `confirmed` is still pending):
+
+```sh
+cd /srv/mifplace-prod
+sudo docker compose exec app node -e "
+  const db = require('better-sqlite3')('/data/mifplace.db', { readonly: true });
+  const sql = \"SELECT email, datetime(created_at/1000,'unixepoch') AS signed_up, \" +
+    \"datetime(confirmed_at/1000,'unixepoch') AS confirmed FROM waitlist ORDER BY id\";
+  console.table(db.prepare(sql).all());"
 ```
 
 The list is personal data: export it only to send the launch email, and drop the table one month

@@ -383,6 +383,9 @@ describe('SmtpMailer', () => {
       secure: false,
       requireTLS: true,
       auth: undefined,
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
     });
     const tls = smtpTransportOptions({ ...config, port: 465, user: 'u', pass: 'p' });
     assert.equal(tls.secure, true);

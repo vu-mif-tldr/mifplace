@@ -23,7 +23,7 @@
         <input
           type="email"
           name="email"
-          placeholder="name.surname@mif.stud.vu.lt"
+          placeholder="Your VU email"
           autocomplete="email"
           aria-label="Your VU email"
           required
@@ -50,7 +50,7 @@
         if (!/^[^@\s]+@([^@\s]+\.)?vu\.lt$/i.test(email)) {
           showStatus(status, {
             ok: false,
-            error: 'Please use your VU address (…@vu.lt or …@mif.stud.vu.lt).',
+            error: 'Sorry, only VU emails can join.',
           });
           return;
         }

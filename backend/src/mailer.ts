@@ -23,8 +23,10 @@ export interface SmtpConfig {
   from: string;
 }
 
-// Connection settings for nodemailer. Port 465 uses TLS from the start, other ports (587)
+// Connection settings for nodemailer. Port 465 uses TLS from the start, other ports (2525, 587)
 // switch to TLS with STARTTLS; requireTLS makes nodemailer refuse to send without it.
+// Short timeouts: the signup form waits for the send, and nodemailer's defaults (up to two
+// minutes) leave it hanging when the port is blocked.
 export function smtpTransportOptions(config: SmtpConfig): SMTPTransport.Options {
   return {
     host: config.host,
@@ -32,6 +34,9 @@ export function smtpTransportOptions(config: SmtpConfig): SMTPTransport.Options 
     secure: config.port === 465,
     requireTLS: config.port !== 465,
     auth: config.user ? { user: config.user, pass: config.pass } : undefined,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   };
 }
 

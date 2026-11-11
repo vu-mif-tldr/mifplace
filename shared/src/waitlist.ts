@@ -17,7 +17,7 @@ export const VuEmailSchema = z
   .toLowerCase()
   .max(254)
   .pipe(z.email('not a valid email address'))
-  .refine(isVuEmail, { error: 'only vu.lt addresses can sign up' });
+  .refine(isVuEmail, { error: 'only VU emails can join' });
 
 // Body of POST /api/waitlist
 export const WaitlistSignupRequestSchema = z.object({ email: VuEmailSchema });
