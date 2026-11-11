@@ -173,13 +173,24 @@ database.
    Signups from two networks show two different addresses in
    `sudo docker compose logs | grep "Waitlist signup"`; one address for all means `TRUST_PROXY` is wrong.
 
-**Reading the list** (read-only while the app runs):
+**Reading the list** (read-only, safe while the app runs). How many:
 
 ```sh
 cd /srv/mifplace-prod
 sudo docker compose exec app node -e "
   const db = require('better-sqlite3')('/data/mifplace.db', { readonly: true });
   console.log(db.prepare('SELECT count(*) AS all_, count(confirmed_at) AS confirmed FROM waitlist').get());"
+```
+
+Who, with the times in UTC (`null` in `confirmed` is still pending):
+
+```sh
+cd /srv/mifplace-prod
+sudo docker compose exec app node -e "
+  const db = require('better-sqlite3')('/data/mifplace.db', { readonly: true });
+  const sql = \"SELECT email, datetime(created_at/1000,'unixepoch') AS signed_up, \" +
+    \"datetime(confirmed_at/1000,'unixepoch') AS confirmed FROM waitlist ORDER BY id\";
+  console.table(db.prepare(sql).all());"
 ```
 
 The list is personal data: export it only to send the launch email, and drop the table one month
