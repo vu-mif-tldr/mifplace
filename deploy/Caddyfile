@@ -31,7 +31,7 @@ demo.vu.place {
 }
 
 # Before launch: the static landing page with the waitlist form (landing/ in this directory,
-# copied to /srv/vu.place). Only the waitlist API goes to the production app (compose.prod.yaml):
+# copied to /var/www/vu.place). Only the waitlist API goes to the production app (compose.prod.yaml):
 # the app has no sign-in yet, so /api/pixels and the rest must not be reachable here.
 # "/api/waitlist*" with the star right after the name also matches /api/waitlist itself.
 vu.place {
@@ -41,7 +41,11 @@ vu.place {
 		reverse_proxy 127.0.0.1:3002
 	}
 	handle {
-		root * /srv/vu.place
+		root * /var/www/vu.place
 		file_server
 	}
+}
+
+www.vu.place {
+	redir https://vu.place{uri} permanent
 }

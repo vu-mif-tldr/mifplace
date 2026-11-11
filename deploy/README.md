@@ -128,7 +128,7 @@ Backups are not set up yet (MP-73).
 
 ```text
 browser ── HTTPS ──> Caddy ── /api/waitlist* ── 127.0.0.1:3002 ──> container "mifplace-prod" ──> SMTP (SendPulse)
-                       └──── everything else ──> /srv/vu.place (landing/)
+                       └──── everything else ──> /var/www/vu.place (landing/)
 ```
 
 The production app runs the same image as the demo with its own database. Caddy forwards only the
@@ -157,11 +157,12 @@ database.
 
    ```sh
    rsync -av --delete deploy/landing/ <user>@vu.place:/tmp/landing/
-   ssh <user>@vu.place 'sudo rsync -a --delete /tmp/landing/ /srv/vu.place/'
+   ssh <user>@vu.place 'sudo rsync -a --delete /tmp/landing/ /var/www/vu.place/'
    ```
 
 4. **Caddy.** Replace the `vu.place` block in `/etc/caddy/Caddyfile` with the one from
-   [`Caddyfile`](Caddyfile), then `caddy validate` and `sudo systemctl reload caddy` (as in First setup).
+   [`Caddyfile`](Caddyfile) (it adds `import security` and the waitlist route; the server already
+   has the `www.vu.place` redirect), then `caddy validate` and `sudo systemctl reload caddy` (as in First setup).
 
 5. **Check.** Sign up on <https://vu.place> with your VU address: the email arrives in Inbox, not
    Junk, the confirm button answers "Done!", the unsubscribe link removes the address.
