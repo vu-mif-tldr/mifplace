@@ -141,6 +141,8 @@ database.
    SendPulse shows in Cloudflare → DNS, and a DMARC record: `TXT`, name `_dmarc`,
    `v=DMARC1; p=none`. Wait until SendPulse shows the domain as verified. Take the SMTP login and
    password from the same page. The free plan sends at most 50 emails per hour; the app stops at 40.
+   Use port **2525** (STARTTLS): the VPS cannot open outgoing connections to 25, 465 and 587, with
+   any provider. Check from the server: `timeout 6 bash -c '</dev/tcp/smtp-pulse.com/2525' && echo open`.
 
 2. **The app.**
 

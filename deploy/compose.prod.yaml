@@ -6,7 +6,7 @@
 # mail settings (not in git); host, port and login as SendPulse → SMTP → Settings shows them:
 #
 #   SMTP_HOST=smtp-pulse.com
-#   SMTP_PORT=587
+#   SMTP_PORT=2525          # the VPS cannot reach 465 and 587, see README.md
 #   SMTP_USER=...
 #   SMTP_PASS=...
 #   MAIL_FROM=vu.place <noreply@vu.place>
