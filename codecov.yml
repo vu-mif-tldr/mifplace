@@ -78,6 +78,12 @@ component_management:
       paths:
         - shared/src/api.ts
         - shared/src/position.ts
+    - component_id: waitlist
+      name: Waitlist
+      paths:
+        - backend/src/waitlist.ts
+        - backend/src/mailer.ts
+        - shared/src/waitlist.ts
     - component_id: frontend_canvas
       name: Canvas UI
       paths:

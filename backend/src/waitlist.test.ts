@@ -5,8 +5,16 @@ import { afterEach, describe, it } from 'vitest';
 import Database from 'better-sqlite3';
 import { MIGRATIONS_DIR, MifDb, loadMigrations, migrate } from '@mifplace/db';
 import { createApp } from './app.js';
-import { ConsoleMailer, mailerFromEnv, SmtpMailer, type Mail, type Mailer } from './mailer.js';
-import { EmailBudget, type WaitlistOptions } from './waitlist.js';
+import nodemailer, { type SendMailOptions } from 'nodemailer';
+import {
+  ConsoleMailer,
+  mailerFromEnv,
+  SmtpMailer,
+  smtpTransportOptions,
+  type Mail,
+  type Mailer,
+} from './mailer.js';
+import { EmailBudget, type WaitlistOptions, type WaitlistStore } from './waitlist.js';
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -185,6 +193,33 @@ describe('POST /api/waitlist', () => {
     assert.equal(sent.length, 1);
   });
 
+  it('answers 500 without details when the database fails, and sends nothing', async () => {
+    const broken: WaitlistStore = {
+      addToWaitlist: () => {
+        throw new Error('disk I/O error');
+      },
+      confirmWaitlist: () => {
+        throw new Error('disk I/O error');
+      },
+      removeFromWaitlist: () => {
+        throw new Error('disk I/O error');
+      },
+    };
+    const { url, mailer } = await start({ store: broken });
+    const token = 'A'.repeat(43);
+    for (const [path, body] of [
+      ['', { email: 'a@vu.lt' }],
+      ['/confirm', { token }],
+      ['/unsubscribe', { token }],
+    ] as const) {
+      assert.deepEqual(await post(`${url}${path}`, body), {
+        status: 500,
+        body: { success: false, error: 'Internal server error' },
+      });
+    }
+    assert.equal(mailer.sent.length, 0);
+  });
+
   it('limits signups per IP', async () => {
     const { url } = await start({ signupsPerIpPerHour: 2 });
     assert.equal((await post(url, { email: 'a@vu.lt' })).status, 202);
@@ -283,6 +318,76 @@ describe('EmailBudget', () => {
     budget.record('a@vu.lt', 0);
     assert.equal(budget.check('a@vu.lt', 20 * MINUTE), 'address');
     assert.equal(budget.check('a@vu.lt', 24 * HOUR), 'ok');
+  });
+});
+
+describe('EmailBudget.release', () => {
+  it('ignores what was never recorded and keeps other records', () => {
+    const budget = new EmailBudget(10 * MINUTE, 3, 1);
+    budget.release('a@vu.lt', 0);
+    budget.record('a@vu.lt', 0);
+    budget.release('b@vu.lt', 0);
+    budget.release('a@vu.lt', 5);
+    // a@vu.lt is still counted, and so is the one email of the hourly quota
+    assert.equal(budget.check('a@vu.lt', MINUTE), 'address');
+    assert.equal(budget.check('c@vu.lt', MINUTE), 'global');
+    budget.release('a@vu.lt', 0);
+    assert.equal(budget.check('a@vu.lt', MINUTE), 'ok');
+  });
+});
+
+describe('SmtpMailer', () => {
+  const config = { host: 'smtp.example.com', port: 587, from: 'vu.place <noreply@vu.place>' };
+
+  // nodemailer's JSON transport builds the message without a server, sendMail returns it.
+  function jsonMailer() {
+    const transport = nodemailer.createTransport({ jsonTransport: true });
+    const messages: Record<string, unknown>[] = [];
+    const sendMail = transport.sendMail.bind(transport);
+    transport.sendMail = (async (options: SendMailOptions) => {
+      const info = await sendMail(options);
+      messages.push(JSON.parse(info.message as unknown as string) as Record<string, unknown>);
+      return info;
+    }) as typeof transport.sendMail;
+    return { mailer: new SmtpMailer(config, transport), messages };
+  }
+
+  it('sends from MAIL_FROM with both bodies and the List-Unsubscribe header', async () => {
+    const { mailer, messages } = jsonMailer();
+    await mailer.send({
+      to: 'a@vu.lt',
+      subject: 'Hi',
+      text: 'plain',
+      html: '<p>html</p>',
+      unsubscribeUrl: 'https://vu.place/unsubscribe.html?t=abc',
+    });
+    const message = messages[0]!;
+    assert.deepEqual(message.from, { address: 'noreply@vu.place', name: 'vu.place' });
+    assert.deepEqual(message.to, [{ address: 'a@vu.lt', name: '' }]);
+    assert.equal(message.subject, 'Hi');
+    assert.equal(message.text, 'plain');
+    assert.equal(message.html, '<p>html</p>');
+    assert.deepEqual(message.list, { unsubscribe: 'https://vu.place/unsubscribe.html?t=abc' });
+  });
+
+  it('has no List-Unsubscribe header without an unsubscribe link', async () => {
+    const { mailer, messages } = jsonMailer();
+    await mailer.send({ to: 'a@vu.lt', subject: 'Hi', text: 'plain', html: '<p>html</p>' });
+    assert.equal(messages[0]!.list, undefined);
+  });
+
+  it('uses TLS on 465, STARTTLS elsewhere, and logs in only with a user', () => {
+    assert.deepEqual(smtpTransportOptions(config), {
+      host: 'smtp.example.com',
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      auth: undefined,
+    });
+    const tls = smtpTransportOptions({ ...config, port: 465, user: 'u', pass: 'p' });
+    assert.equal(tls.secure, true);
+    assert.equal(tls.requireTLS, false);
+    assert.deepEqual(tls.auth, { user: 'u', pass: 'p' });
   });
 });
 

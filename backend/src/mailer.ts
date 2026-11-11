@@ -1,4 +1,5 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter } from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
 
 export interface Mail {
   to: string;
@@ -22,20 +23,27 @@ export interface SmtpConfig {
   from: string;
 }
 
-// Any SMTP provider (SendPulse now, Brevo works the same). Port 465 uses TLS from the start,
-// other ports (587) switch to TLS with STARTTLS; nodemailer refuses to send without it.
-export class SmtpMailer implements Mailer {
-  private readonly transport;
+// Connection settings for nodemailer. Port 465 uses TLS from the start, other ports (587)
+// switch to TLS with STARTTLS; requireTLS makes nodemailer refuse to send without it.
+export function smtpTransportOptions(config: SmtpConfig): SMTPTransport.Options {
+  return {
+    host: config.host,
+    port: config.port,
+    secure: config.port === 465,
+    requireTLS: config.port !== 465,
+    auth: config.user ? { user: config.user, pass: config.pass } : undefined,
+  };
+}
 
-  constructor(private readonly config: SmtpConfig) {
-    this.transport = nodemailer.createTransport({
-      host: config.host,
-      port: config.port,
-      secure: config.port === 465,
-      requireTLS: config.port !== 465,
-      auth: config.user ? { user: config.user, pass: config.pass } : undefined,
-    });
-  }
+// Any SMTP provider (SendPulse now, Brevo works the same). The transport is a parameter only
+// for tests, which pass nodemailer's JSON transport to see the message without a server.
+export class SmtpMailer implements Mailer {
+  constructor(
+    private readonly config: SmtpConfig,
+    private readonly transport: Transporter = nodemailer.createTransport(
+      smtpTransportOptions(config)
+    )
+  ) {}
 
   async send(mail: Mail): Promise<void> {
     await this.transport.sendMail({

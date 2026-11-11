@@ -86,11 +86,11 @@ export class EmailBudget {
 
   // Takes back a record() whose email was not sent, so a retry is not counted against the limits.
   release(email: string, time: number): void {
-    const g = this.global.lastIndexOf(time);
-    if (g >= 0) this.global.splice(g, 1);
     const times = this.perAddress.get(email);
-    const i = times ? times.lastIndexOf(time) : -1;
-    if (times && i >= 0) times.splice(i, 1);
+    const i = times?.lastIndexOf(time) ?? -1;
+    if (i < 0) return;
+    times!.splice(i, 1);
+    this.global.splice(this.global.lastIndexOf(time), 1);
   }
 
   // Drops addresses without emails in the last day, at most every 10 minutes.
