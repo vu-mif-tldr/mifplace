@@ -153,12 +153,20 @@ database.
    sudo docker compose logs | grep Waitlist   # "Waitlist: on, email links point to https://vu.place"
    ```
 
-3. **Landing pages.** From a checkout of the repository:
+3. **Landing pages.** On the server, straight from `main` (no checkout needed; the server has no
+   `rsync`, `install` is always there and leaves the files owned by root):
 
    ```sh
-   rsync -av --delete deploy/landing/ <user>@vu.place:/tmp/landing/
-   ssh <user>@vu.place 'sudo rsync -a --delete /tmp/landing/ /var/www/vu.place/'
+   rm -rf /tmp/landing && mkdir /tmp/landing
+   curl -fsSL https://codeload.github.com/vu-mif-tldr/mifplace/tar.gz/refs/heads/main \
+     | tar -xz -C /tmp/landing --strip-components=3 mifplace-main/deploy/landing
+   sudo install -d -m 755 /var/www/vu.place
+   sudo install -m 644 /tmp/landing/* /var/www/vu.place/
+   rm -rf /tmp/landing
    ```
+
+   Repeat after a merge that changes `deploy/landing/`. `install` does not delete anything: when a
+   page is removed from the repository, delete it from `/var/www/vu.place` by hand.
 
 4. **Caddy.** Replace the `vu.place` block in `/etc/caddy/Caddyfile` with the one from
    [`Caddyfile`](Caddyfile) (it adds `import security` and the waitlist route; the server already
