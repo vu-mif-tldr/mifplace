@@ -5,6 +5,8 @@ import type { CanvasStore } from './canvas-state.js';
 import { loadCanvas, placePixel } from './canvas-log.js';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
 import { attachLiveTransport } from './live/transport.js';
+import { mailerFromEnv } from './mailer.js';
+import { CONFIRM_WITHIN_MS, type WaitlistOptions } from './waitlist.js';
 
 // Settings come from the environment, then from .env in the repository root (see .env.example).
 loadDotEnv();
@@ -14,6 +16,24 @@ if (!Number.isInteger(PORT) || PORT < 0 || PORT > 65535) {
   throw new Error(`Invalid PORT: ${process.env.PORT}`);
 }
 const hostname: string = process.env.HOST ?? '127.0.0.1';
+
+// Express "trust proxy" (see .env.example): "true", a number of hops, or addresses/subnets
+// such as "loopback" or "uniquelocal". Unset: the app is reached directly, no proxy is trusted.
+function parseTrustProxy(value: string | undefined): boolean | number | string {
+  if (value === undefined || value === '' || value === 'false') return false;
+  if (value === 'true') return true;
+  if (/^\d+$/.test(value)) return Number(value);
+  return value;
+}
+const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+
+// The waitlist runs where PUBLIC_URL is set (the email links point there). In development it
+// defaults to this server; in production it stays off unless set, so the demo has none.
+const publicUrl =
+  process.env.PUBLIC_URL ||
+  (process.env.NODE_ENV === 'production' ? undefined : `http://localhost:${PORT}`);
+// Fails here, before the database is opened, if production has no SMTP settings.
+const mailer = publicUrl ? mailerFromEnv() : undefined;
 
 // Fails loudly if DB_PATH is not set or the file does not exist (run db:setup first).
 const dbPath = resolveDbPath();
@@ -42,6 +62,12 @@ try {
 
   // Reads the whole event log once; after that GET /api/canvas is served from memory
   canvas = loadCanvas(mifDb, canvasSize);
+
+  if (publicUrl) {
+    // Pending addresses whose link has expired are of no use, see confirmWithinMs.
+    const removed = mifDb.removeExpiredWaitlist(Date.now() - CONFIRM_WITHIN_MS);
+    if (removed > 0) console.log(`Waitlist: removed ${removed} expired unconfirmed addresses`);
+  }
   const { eventId, timestamp } = canvas.snapshot();
   console.log(`Canvas loaded up to event ${eventId} (${new Date(timestamp).toISOString()})`);
 } catch (e) {
@@ -58,7 +84,18 @@ const app = createApp({
   rateLimitPerMinute: 120,
   canvasRateLimitPerMinute: 20,
   pixelRateLimitPerMinute: 10,
+  trustProxy,
+  waitlist: waitlistOptions(),
 });
+
+function waitlistOptions(): WaitlistOptions | undefined {
+  if (!publicUrl || !mailer) {
+    console.log('Waitlist: off (PUBLIC_URL is not set)');
+    return undefined;
+  }
+  console.log(`Waitlist: on, email links point to ${publicUrl}`);
+  return { store: mifDb, mailer, publicUrl };
+}
 
 let server: Server;
 try {

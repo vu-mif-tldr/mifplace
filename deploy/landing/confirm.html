@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Confirm · vu.place</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1 class="small">One click and you are on the <span class="accent">list</span></h1>
+      <p>Confirm that you want to hear from vu.place when it opens.</p>
+      <button id="action" type="button">Confirm my address</button>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <p class="fine"><a href="/">vu.place</a></p>
+    </main>
+    <script src="/waitlist.js"></script>
+    <script>
+      tokenButton('/api/waitlist/confirm', 'Done! We will email you when vu.place opens.');
+    </script>
+  </body>
+</html>

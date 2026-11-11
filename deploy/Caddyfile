@@ -1,4 +1,4 @@
-# Parts of /etc/caddy/Caddyfile on the server, see README.md next to this file.
+# /etc/caddy/Caddyfile on the server, see README.md next to this file.
 # The (security) snippet goes at the top of the file, after the global options block if there is
 # one, and every site imports it, vu.place too. Caddy gets the certificate for demo.vu.place itself
 # once the name points to the server.
@@ -28,4 +28,24 @@ demo.vu.place {
 	# Express does not compress responses.
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:3001
+}
+
+# Before launch: the static landing page with the waitlist form (landing/ in this directory,
+# copied to /var/www/vu.place). Only the waitlist API goes to the production app (compose.prod.yaml):
+# the app has no sign-in yet, so /api/pixels and the rest must not be reachable here.
+# "/api/waitlist*" with the star right after the name also matches /api/waitlist itself.
+vu.place {
+	import security
+	encode zstd gzip
+	handle /api/waitlist* {
+		reverse_proxy 127.0.0.1:3002
+	}
+	handle {
+		root * /var/www/vu.place
+		file_server
+	}
+}
+
+www.vu.place {
+	redir https://vu.place{uri} permanent
 }

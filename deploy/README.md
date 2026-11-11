@@ -1,6 +1,8 @@
 # Deployment
 
 The demo runs at <https://demo.vu.place> on the team VPS (netcup), behind a password.
+Before launch <https://vu.place> is a static landing page with the waitlist form; only
+`/api/waitlist*` goes to a separate production container (see [Waitlist on vu.place](#waitlist-on-vuplace)).
 
 ```text
 browser ── HTTPS ──> Caddy on the host ── 127.0.0.1:3001 ──> container "app" ──> SQLite in volume "data"
@@ -19,8 +21,10 @@ browser ── HTTPS ──> Caddy on the host ── 127.0.0.1:3001 ──> con
   first start and applies pending migrations on every start.
 - **Caddy** runs on the host as a system service, the same one that serves `vu.place`.
 
-Files in this directory: [`compose.yaml`](compose.yaml) (the app container),
-[`Caddyfile`](Caddyfile) (security headers and the site block for Caddy).
+Files in this directory: [`compose.yaml`](compose.yaml) (the demo container),
+[`compose.prod.yaml`](compose.prod.yaml) (the production container, waitlist only for now),
+[`Caddyfile`](Caddyfile) (security headers and the site blocks for Caddy),
+[`landing/`](landing/) (the static pages of vu.place).
 
 ## First setup
 
@@ -119,3 +123,61 @@ sudo docker compose down -v     # stop and DELETE the database: an empty canvas 
 ```
 
 Backups are not set up yet (MP-73).
+
+## Waitlist on vu.place
+
+```text
+browser ── HTTPS ──> Caddy ── /api/waitlist* ── 127.0.0.1:3002 ──> container "mifplace-prod" ──> SMTP (SendPulse)
+                       └──── everything else ──> /var/www/vu.place (landing/)
+```
+
+The production app runs the same image as the demo with its own database. Caddy forwards only the
+waitlist API to it: the app has no sign-in yet, so `/api/pixels` must not be reachable. At launch
+the `vu.place` block becomes a full `reverse_proxy` and the waitlist is already in the right
+database.
+
+1. **Mail sender (do this first, DNS takes time).** SendPulse → SMTP → Settings: add the sender
+   domain `vu.place` and the sender address (e.g. `noreply@vu.place`). Add the SPF and DKIM records
+   SendPulse shows in Cloudflare → DNS, and a DMARC record: `TXT`, name `_dmarc`,
+   `v=DMARC1; p=none`. Wait until SendPulse shows the domain as verified. Take the SMTP login and
+   password from the same page. The free plan sends at most 50 emails per hour; the app stops at 40.
+
+2. **The app.**
+
+   ```sh
+   sudo mkdir -p /srv/mifplace-prod && cd /srv/mifplace-prod
+   sudo curl -fsSLo compose.yaml https://raw.githubusercontent.com/vu-mif-tldr/mifplace/main/deploy/compose.prod.yaml
+   sudo nano app.env               # SMTP_* and MAIL_FROM, see the comment in compose.yaml
+   sudo chmod 600 app.env
+   sudo docker compose up -d
+   sudo docker compose logs | grep Waitlist   # "Waitlist: on, email links point to https://vu.place"
+   ```
+
+3. **Landing pages.** From a checkout of the repository:
+
+   ```sh
+   rsync -av --delete deploy/landing/ <user>@vu.place:/tmp/landing/
+   ssh <user>@vu.place 'sudo rsync -a --delete /tmp/landing/ /var/www/vu.place/'
+   ```
+
+4. **Caddy.** Replace the `vu.place` block in `/etc/caddy/Caddyfile` with the one from
+   [`Caddyfile`](Caddyfile) (it adds `import security` and the waitlist route; the server already
+   has the `www.vu.place` redirect), then `caddy validate` and `sudo systemctl reload caddy` (as in First setup).
+
+5. **Check.** Sign up on <https://vu.place> with your VU address: the email arrives in Inbox, not
+   Junk, the confirm button answers "Done!", the unsubscribe link removes the address.
+   `curl -si -X POST https://vu.place/api/pixels` must not reach the app (Caddy answers, not Express).
+   Signups from two networks show two different addresses in
+   `sudo docker compose logs | grep "Waitlist signup"`; one address for all means `TRUST_PROXY` is wrong.
+
+**Reading the list** (read-only while the app runs):
+
+```sh
+cd /srv/mifplace-prod
+sudo docker compose exec app node -e "
+  const db = require('better-sqlite3')('/data/mifplace.db', { readonly: true });
+  console.log(db.prepare('SELECT count(*) AS all_, count(confirmed_at) AS confirmed FROM waitlist').get());"
+```
+
+The list is personal data: export it only to send the launch email, and drop the table one month
+after launch, as the landing page promises.

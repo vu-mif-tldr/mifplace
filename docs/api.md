@@ -102,6 +102,28 @@ The backend validates that `pos` is an integer in `0 <= pos < width * height`, a
 
 The body is checked with the request schema from `@mifplace/shared` (`PlacePixelRequestSchema`, then the position check `positionSchema`). A `400` from that check carries the schema's message as one line, `field: message`, several problems joined with `; ` (`zodErrorMessage`). The exact wording comes from the schema and may change with it; clients show it, they do not parse it. `Color not in palette` and `Insert failed` are fixed strings of the backend.
 
+### Waitlist: `POST /api/waitlist`, `/confirm`, `/unsubscribe`
+
+Collects addresses of people who want to play, before launch, with double opt-in. The routes exist only where `PUBLIC_URL` is set (production on vu.place; in development always). The landing pages that call them are in [`deploy/landing/`](../deploy/landing/).
+
+1. `POST /api/waitlist` with `{ "email": "jonas@mif.stud.vu.lt" }` stores the address and emails a link `PUBLIC_URL/confirm.html?t=<token>`. Only `vu.lt` and `*.vu.lt` addresses (`VuEmailSchema` in `@mifplace/shared`); the address is trimmed and lower-cased.
+2. The confirm page has a button that sends `POST /api/waitlist/confirm` with `{ "token": "..." }`. A button and not the link itself, because mail scanners (Outlook Safe Links) open every link in an email. The link expires after 7 days; unconfirmed addresses are deleted then.
+3. Every email also has `PUBLIC_URL/unsubscribe.html?t=<token>`; its button sends `POST /api/waitlist/unsubscribe` with the same token, which deletes the address.
+
+**Signup answers `202 {"success":true}`** for a new, a pending and an already confirmed address alike, so the form does not tell who is on the list. A confirmed address gets no email. One address gets at most one email per 10 minutes and 3 per day; above that the answer is still `202`, without an email.
+
+| Route          | Status | Case                                                    |
+| -------------- | ------ | ------------------------------------------------------- |
+| `/`            | `400`  | Not an email or not a VU address (schema message)       |
+| `/`            | `429`  | More than 30 signups per hour from one IP               |
+| `/`            | `503`  | All emails together reached 40 per hour, or SMTP failed |
+| `/confirm`     | `200`  | Confirmed (again is fine)                               |
+| `/confirm`     | `404`  | Unknown token or the link has expired                   |
+| `/unsubscribe` | `200`  | Deleted, or there was nothing to delete                 |
+| both           | `400`  | Malformed token                                         |
+
+Errors have the usual body `{"success":false,"error":"..."}`.
+
 ## 2. WebSocket — `/api/ws`
 
 WebSocket delivers **pixel updates from server to client**. Clients place pixels through HTTP `POST /api/pixels`. The connection also uses standard WebSocket **ping/pong control frames** for connection health; those are not application JSON pixel messages.

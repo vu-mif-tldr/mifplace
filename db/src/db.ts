@@ -25,6 +25,14 @@ export interface NewEvent {
   position: number;
 }
 
+export interface WaitlistRow {
+  id: number;
+  email: string;
+  token: string;
+  created_at: number;
+  confirmed_at: number | null;
+}
+
 // DB_PATH is required, there is no default. A relative value is resolved against the
 // repository root (not the cwd), so the backend, the db scripts, the tools and the MCP
 // server open the same file whichever directory they start from.
@@ -77,6 +85,11 @@ export class MifDb {
   private readonly selectPalette;
   private readonly healthQuery;
   private readonly appendTx;
+  private readonly upsertWaitlist;
+  private readonly selectWaitlistByEmail;
+  private readonly updateWaitlistConfirmed;
+  private readonly deleteWaitlistToken;
+  private readonly deletePendingWaitlist;
 
   constructor(private readonly db: Db) {
     this.insertEvent = db.prepare(
@@ -91,6 +104,25 @@ export class MifDb {
     this.selectCanvasSize = db.prepare('SELECT width, height FROM canvas');
     this.selectPalette = db.prepare('SELECT color_id AS id, text AS color FROM palette');
     this.healthQuery = db.prepare('SELECT 1');
+
+    // A repeated signup keeps the token (the link in an earlier email still works) and, while
+    // the address is pending, restarts the confirmation period.
+    this.upsertWaitlist = db.prepare(
+      `INSERT INTO waitlist (email, token, created_at) VALUES (?, ?, ?)
+         ON CONFLICT (email) DO UPDATE SET created_at = excluded.created_at
+           WHERE confirmed_at IS NULL
+         RETURNING *`
+    );
+    this.selectWaitlistByEmail = db.prepare('SELECT * FROM waitlist WHERE email = ?');
+    // Confirming twice keeps the first time. A pending row older than the cutoff is not confirmed.
+    this.updateWaitlistConfirmed = db.prepare(
+      `UPDATE waitlist SET confirmed_at = COALESCE(confirmed_at, ?)
+         WHERE token = ? AND (confirmed_at IS NOT NULL OR created_at >= ?)`
+    );
+    this.deleteWaitlistToken = db.prepare('DELETE FROM waitlist WHERE token = ?');
+    this.deletePendingWaitlist = db.prepare(
+      'DELETE FROM waitlist WHERE confirmed_at IS NULL AND created_at < ?'
+    );
 
     // The event and the cooldown timestamp must change together.
     this.appendTx = db.transaction((event: NewEvent, now: number): number => {
@@ -138,6 +170,31 @@ export class MifDb {
   // without loading the whole log into memory.
   iterateEvents(afterId: number): IterableIterator<EventRow> {
     return this.selectEventsAfter.iterate(afterId) as IterableIterator<EventRow>;
+  }
+
+  // Adds an address to the waitlist, or returns the existing row (token unchanged). A pending
+  // row gets created_at = now again. RETURNING gives no row when a confirmed address is
+  // signed up again (the update is skipped), so that row is read separately.
+  addToWaitlist(email: string, token: string, now: number = Date.now()): WaitlistRow {
+    const row = this.upsertWaitlist.get(email, token, now) as WaitlistRow | undefined;
+    if (row) return row;
+    return this.selectWaitlistByEmail.get(email) as WaitlistRow;
+  }
+
+  // Marks the address with this token as confirmed. False for an unknown token and for a
+  // pending row created before notBefore (the link has expired).
+  confirmWaitlist(token: string, notBefore: number, now: number = Date.now()): boolean {
+    return this.updateWaitlistConfirmed.run(now, token, notBefore).changes > 0;
+  }
+
+  // Deletes the address with this token. False if there was none.
+  removeFromWaitlist(token: string): boolean {
+    return this.deleteWaitlistToken.run(token).changes > 0;
+  }
+
+  // Deletes pending rows created before the cutoff and returns how many.
+  removeExpiredWaitlist(before: number): number {
+    return this.deletePendingWaitlist.run(before).changes;
   }
 
   // Online backup that is safe while the server is running.

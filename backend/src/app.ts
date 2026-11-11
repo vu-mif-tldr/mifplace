@@ -13,6 +13,7 @@ import {
   type PlacePixelResponse,
 } from '@mifplace/shared';
 import type { NewEvent } from '@mifplace/db';
+import { createWaitlistRouter, type WaitlistOptions } from './waitlist.js';
 
 export interface AppConfig {
   // Read once at start: the canvas size does not change while the server runs.
@@ -33,7 +34,11 @@ export interface AppConfig {
   canvasRateLimitPerMinute?: number;
   // Pixel writes are limited separately to protect the event log.
   pixelRateLimitPerMinute?: number;
-  trustProxy?: boolean;
+  // Express "trust proxy": which proxies may set X-Forwarded-For. Behind Caddy it must be set,
+  // otherwise every request has the proxy's address and the per-IP limits become global.
+  trustProxy?: boolean | number | string;
+  // The waitlist on vu.place (POST /api/waitlist...). Left out, the routes do not exist.
+  waitlist?: WaitlistOptions;
 }
 
 type HealthResponse = {
@@ -57,6 +62,7 @@ export function createApp({
   canvasRateLimitPerMinute = 20,
   pixelRateLimitPerMinute = 10,
   trustProxy = false,
+  waitlist,
 }: AppConfig) {
   const app = express();
   app.set('trust proxy', trustProxy);
@@ -188,6 +194,8 @@ export function createApp({
       return res.status(500).json({ success: false, error: 'Insert failed' });
     }
   });
+
+  if (waitlist) app.use('/api/waitlist', createWaitlistRouter(waitlist));
 
   const STATIC_PATH = path.join(process.cwd(), '../frontend/dist');
 

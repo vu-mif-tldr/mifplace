@@ -16,6 +16,10 @@ services:
       # Loopback only: a port published on all interfaces bypasses ufw and would be reachable
       # from the internet without TLS and without the password.
       - '127.0.0.1:3001:3000'
+    environment:
+      # Caddy reaches the container through the Docker bridge (a private address), so the app
+      # trusts X-Forwarded-For from there and sees the real client addresses.
+      TRUST_PROXY: uniquelocal
     volumes:
       - data:/data
     mem_limit: 1024m

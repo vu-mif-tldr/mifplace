@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>vu.place</title>
+    <meta
+      name="description"
+      content="A shared pixel canvas for Vilnius University. Join the waitlist."
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1><span class="accent">TL;DR:</span> Buckle up!</h1>
+      <p>
+        Team <span class="accent">TLDR</span> here. Something big is coming: one canvas for the
+        whole of VU.
+      </p>
+      <p>Leave your VU email and we will tell you when it opens.</p>
+
+      <form id="signup" novalidate>
+        <input
+          type="email"
+          name="email"
+          placeholder="name.surname@mif.stud.vu.lt"
+          autocomplete="email"
+          aria-label="Your VU email"
+          required
+        />
+        <button type="submit">Join</button>
+      </form>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+
+      <p class="fine">
+        Only <b>vu.lt</b> addresses. We use your address for one thing: to tell you when vu.place
+        opens and invite you to the beta. The emails go out through SendPulse; nobody else gets it.
+        We delete the list one month after launch, and every email has a link to remove your address
+        sooner.
+      </p>
+    </main>
+    <script src="/waitlist.js"></script>
+    <script>
+      const form = document.getElementById('signup');
+      const status = document.getElementById('status');
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = form.querySelector('button');
+        const email = form.email.value.trim();
+        if (!/^[^@\s]+@([^@\s]+\.)?vu\.lt$/i.test(email)) {
+          showStatus(status, {
+            ok: false,
+            error: 'Please use your VU address (…@vu.lt or …@mif.stud.vu.lt).',
+          });
+          return;
+        }
+        button.disabled = true;
+        const result = await waitlistPost('/api/waitlist', { email });
+        showStatus(
+          status,
+          result,
+          'Almost done: check your inbox (and Junk) for a confirmation link.'
+        );
+        if (result.ok) form.reset();
+        button.disabled = false;
+      });
+    </script>
+  </body>
+</html>
