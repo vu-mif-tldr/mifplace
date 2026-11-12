@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   CanvasSizeSchema,
   CanvasStateSchema,
+  LiveMessageSchema,
   PaletteSchema,
+  PixelsMessageSchema,
   PlacePixelRequestSchema,
   zodErrorMessage,
 } from './api.js';
@@ -77,5 +79,37 @@ describe('zodErrorMessage', () => {
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(zodErrorMessage(result.error)).not.toMatch(/^: /);
+  });
+});
+
+describe('LiveMessageSchema', () => {
+  it('accepts a pixels message as docs/api.md shows it', () => {
+    const message = {
+      type: 'pixels',
+      pixels: [
+        [103, 4, 12],
+        [104, 5, 5],
+      ],
+      eventId: 104,
+      timestamp: 1760000000100,
+    };
+    expect(LiveMessageSchema.parse(message)).toEqual(message);
+    expect(PixelsMessageSchema.safeParse({ ...message, pixels: [] }).success).toBe(true);
+  });
+
+  it('accepts a reset message', () => {
+    expect(LiveMessageSchema.parse({ type: 'reset' })).toEqual({ type: 'reset' });
+  });
+
+  it.each([
+    ['an unknown type', { type: 'hb' }],
+    ['no type', { pixels: [], eventId: 1, timestamp: 1 }],
+    ['an entry with two numbers', { type: 'pixels', pixels: [[1, 2]], eventId: 1, timestamp: 1 }],
+    ['a negative position', { type: 'pixels', pixels: [[1, -2, 3]], eventId: 1, timestamp: 1 }],
+    ['a fractional id', { type: 'pixels', pixels: [[1.5, 2, 3]], eventId: 1, timestamp: 1 }],
+    ['no checkpoint', { type: 'pixels', pixels: [[1, 2, 3]] }],
+    ['a string instead of an object', '{"type":"reset"}'],
+  ])('rejects %s', (_case, data) => {
+    expect(LiveMessageSchema.safeParse(data).success).toBe(false);
   });
 });

@@ -63,7 +63,6 @@ component_management:
         - backend/src/app.ts
     - component_id: live
       name: Live updates
-      # WebSocket server (MP-93), not written yet
       paths:
         - backend/src/live/**
     - component_id: storage
@@ -73,6 +72,7 @@ component_management:
         - db/src/env.ts
         - db/src/migrate.ts
         - backend/src/canvas-state.ts
+        - backend/src/canvas-log.ts
     - component_id: shared
       name: Shared API and geometry
       paths:
@@ -94,6 +94,7 @@ component_management:
       name: API client
       paths:
         - frontend/src/api.ts
+        - frontend/src/live.ts
     - component_id: mcp
       name: MCP server
       paths:

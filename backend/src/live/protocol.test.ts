@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { LiveMessageSchema } from '@mifplace/shared';
 import { RESET, encodePixels, parseResumeRequest } from './protocol.js';
 
 const parse = (query: string) => parseResumeRequest(new URLSearchParams(query));
@@ -82,5 +83,19 @@ describe('encodePixels', () => {
 describe('RESET', () => {
   it('is the reset message', () => {
     expect(RESET).toBe('{"type":"reset"}');
+  });
+});
+
+describe('the encoded messages match the schemas of @mifplace/shared', () => {
+  it('encodePixels', () => {
+    const encoded = encodePixels([{ eventId: 103, pos: 4, colorId: 12 }], {
+      eventId: 103,
+      timestamp: 1760000000000,
+    });
+    expect(LiveMessageSchema.safeParse(JSON.parse(encoded)).success).toBe(true);
+  });
+
+  it('RESET', () => {
+    expect(LiveMessageSchema.parse(JSON.parse(RESET))).toEqual({ type: 'reset' });
   });
 });
