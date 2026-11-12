@@ -11,6 +11,8 @@ export function liveOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): LiveSe
     maxPayload: 1024,
     batchMs: positiveInt(env, 'WS_BATCH_MS', 100),
     maxConnections: positiveInt(env, 'WS_MAX_CONNECTIONS', 2000),
+    // A client more events behind than this reloads the snapshot instead of catching up
+    maxBacklog: positiveInt(env, 'WS_MAX_BACKLOG', 10000),
     // A client that cannot keep up with this many unsent bytes is dropped (ADR-0003)
     maxBufferedBytes: positiveInt(env, 'WS_MAX_BUFFERED_BYTES', 256 * 1024),
     // The page's own host is always allowed; this is for other origins, comma-separated

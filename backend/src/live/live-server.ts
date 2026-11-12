@@ -1,13 +1,26 @@
 import type { Server } from 'node:http';
 import { Broadcaster, type LiveEvent } from './broadcaster.js';
-import { RESET, parseResumeRequest, type Checkpoint } from './protocol.js';
+import { catchUp } from './catch-up.js';
+import { RESET, parseResumeRequest, type Checkpoint, type PixelEvent } from './protocol.js';
 import type { Connection } from './registry.js';
 import { attachLiveTransport, type LiveTransportOptions } from './transport.js';
 
 export type LiveServerOptions = Omit<LiveTransportOptions, 'onConnect' | 'onMessage'> & {
   // Pixels stored within this many ms go out as one message (docs/api.md: 100)
   batchMs: number;
+  // A client more events behind than this gets reset instead of the missed events
+  maxBacklog: number;
 };
+
+// What the live server reads from the event log: the canvas in memory and MifDb in production
+export interface LiveLog {
+  // The last stored event: where the stream begins at start
+  checkpoint(): Checkpoint;
+  // The timestamp of a stored event, undefined for an unknown id
+  timestampOf(eventId: number): number | undefined;
+  // The stored events with ids in (afterId, toId], in order
+  eventsBetween(afterId: number, toId: number): PixelEvent[];
+}
 
 // What GET /health reports under WS
 export type LiveStats = { open: number; slowDropped: number; terminated: number };
@@ -21,12 +34,12 @@ export interface LiveServer {
 }
 
 // The live side of the server (docs/api.md, section 2): the transport (gateway, registry,
-// liveness check) and the broadcaster together. checkpoint gives the last stored event: at start
-// it is where the stream begins, later it tells whether a client's checkpoint is from this log.
+// liveness check) and the broadcaster together. A client that connects with a checkpoint gets
+// the events it missed from the log first (catchUp), then the batches like everyone else.
 export function startLiveServer(
   server: Server,
-  checkpoint: () => Checkpoint,
-  { batchMs, ...transportOptions }: LiveServerOptions
+  log: LiveLog,
+  { batchMs, maxBacklog, ...transportOptions }: LiveServerOptions
 ): LiveServer {
   const transport = attachLiveTransport(server, {
     ...transportOptions,
@@ -40,21 +53,14 @@ export function startLiveServer(
         reset(connection);
         return;
       }
-      // A checkpoint ahead of the last stored event, or the same id with another time, is not
-      // from this log (a restored database, ADR-0003 R2): the client has to start over.
-      const { after } = request;
-      const last = checkpoint();
-      if (
-        after.eventId > last.eventId ||
-        (after.eventId === last.eventId && after.timestamp !== last.timestamp)
-      ) {
-        reset(connection);
-        return;
-      }
-      // TODO(MP-89): catch up from the checkpoint. Until then a client behind the last stored
-      // event gets only the next batches, and misses the events between its snapshot and now.
-      // Events stored but not yet sent are in the next batch anyway (the client skips the ones
-      // up to its checkpoint).
+      const result = catchUp(request.after, {
+        lastSent: broadcaster.lastSent,
+        timestampOf: log.timestampOf,
+        eventsBetween: log.eventsBetween,
+        maxBacklog,
+      });
+      if (result.kind === 'reset') reset(connection);
+      else if (result.kind === 'events') transport.registry.send(connection, result.message);
     },
 
     // Clients send nothing over the socket (docs/api.md), placements go through POST /api/pixels
@@ -73,7 +79,7 @@ export function startLiveServer(
   const broadcaster = new Broadcaster(
     { batchMs },
     (data) => transport.registry.broadcast(data),
-    checkpoint()
+    log.checkpoint()
   );
 
   return {

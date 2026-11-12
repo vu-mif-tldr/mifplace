@@ -120,7 +120,18 @@ function waitlistOptions(): WaitlistOptions | undefined {
 // The live server is attached before the port opens, so no upgrade request can arrive first.
 // Everything in the log up to the loaded checkpoint is in the snapshot; later events go out live.
 const server = http.createServer(app);
-const live = startLiveServer(server, () => canvas.checkpoint, liveOptions);
+const live = startLiveServer(
+  server,
+  {
+    checkpoint: () => canvas.checkpoint,
+    timestampOf: (id) => mifDb.getEventTimestamp(id),
+    eventsBetween: (afterId, toId) =>
+      mifDb
+        .getEventsBetween(afterId, toId)
+        .map((row) => ({ eventId: row.id, pos: row.position, colorId: row.color_id })),
+  },
+  liveOptions
+);
 
 try {
   await listen(server, PORT, hostname);

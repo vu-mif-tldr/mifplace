@@ -15,7 +15,8 @@ const clients: WebSocket[] = [];
 
 async function start(options: Partial<LiveServerOptions> = {}) {
   const canvas = new CanvasStore({ width: 10, height: 10 });
-  let nextId = 1;
+  // The event log of this test server, what MifDb holds in production
+  const events: { eventId: number; pos: number; colorId: number; timestamp: number }[] = [];
   let now = 1_760_000_000_000;
 
   const app = createApp({
@@ -28,11 +29,12 @@ async function start(options: Partial<LiveServerOptions> = {}) {
     getCanvasState: () => canvas.snapshot(),
     appendEvent(event) {
       const placed = {
-        eventId: nextId++,
+        eventId: events.length + 1,
         pos: event.position,
         colorId: event.color_id,
         timestamp: now++,
       };
+      events.push(placed);
       canvas.apply(placed);
       live.publish(placed);
       return placed.eventId;
@@ -43,15 +45,24 @@ async function start(options: Partial<LiveServerOptions> = {}) {
 
   const server = http.createServer(app);
   servers.push(server);
-  const live = startLiveServer(server, () => canvas.checkpoint, {
-    path: '/api/ws',
-    maxConnections: 10,
-    allowedOrigins: [],
-    maxPayload: 1024,
-    maxBufferedBytes: 1024 * 1024,
-    batchMs: 20,
-    ...options,
-  });
+  const live = startLiveServer(
+    server,
+    {
+      checkpoint: () => canvas.checkpoint,
+      timestampOf: (id) => events[id - 1]?.timestamp,
+      eventsBetween: (afterId, toId) => events.slice(afterId, toId),
+    },
+    {
+      path: '/api/ws',
+      maxConnections: 10,
+      allowedOrigins: [],
+      maxPayload: 1024,
+      maxBufferedBytes: 1024 * 1024,
+      batchMs: 20,
+      maxBacklog: 100,
+      ...options,
+    }
+  );
   liveServers.push(live);
 
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -183,6 +194,57 @@ describe('live server', () => {
         ]),
       { timeout: 1000 }
     );
+  });
+
+  it('sends the missed events to a reconnecting client, then the live batches', async () => {
+    const { http, ws } = await start();
+    await place(http, 1, 5);
+    await place(http, 2, 12);
+    await place(http, 3, 5);
+    // All three batches went out
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    // A page that applied event 1 and lost the connection
+    const { messages } = await connect(`${ws}?afterEventId=1&afterTimestamp=1760000000000`);
+    await vi.waitFor(() =>
+      expect(messages).toEqual([
+        {
+          type: 'pixels',
+          pixels: [
+            [2, 2, 12],
+            [3, 3, 5],
+          ],
+          eventId: 3,
+          timestamp: 1_760_000_000_002,
+        },
+      ])
+    );
+
+    await place(http, 4, 12);
+    await vi.waitFor(() => expect(messages).toHaveLength(2));
+    expect(messages[1]).toEqual({
+      type: 'pixels',
+      pixels: [[4, 4, 12]],
+      eventId: 4,
+      timestamp: 1_760_000_000_003,
+    });
+  });
+
+  it('answers reset to a checkpoint further behind than maxBacklog', async () => {
+    const { http, ws } = await start({ maxBacklog: 1 });
+    await place(http, 1, 5);
+    await place(http, 2, 12);
+    await place(http, 3, 5);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    const behind = await connect(`${ws}?afterEventId=1&afterTimestamp=1760000000000`);
+    expect(await behind.closed).toBe(1000);
+    expect(behind.messages).toEqual([{ type: 'reset' }]);
+
+    // One behind is within the backlog
+    const near = await connect(`${ws}?afterEventId=2&afterTimestamp=1760000000001`);
+    await vi.waitFor(() => expect(near.messages).toHaveLength(1));
+    expect(near.messages[0]).toMatchObject({ type: 'pixels', pixels: [[3, 3, 5]] });
   });
 
   it('answers reset to a client with only one resume parameter and closes it', async () => {

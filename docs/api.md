@@ -140,7 +140,7 @@ The two optional resume parameters form one logical checkpoint:
 
 - **Both provided:** the server validates the event ID and timestamp, sends events strictly **after** that checkpoint (catch-up), then continues with new live events.
 - **Neither provided:** the server sends **only new events** after connection; it does not replay history.
-- **Only one provided, invalid values, unknown ID, mismatched timestamp, or checkpoint too old:** the server sends `reset`.
+- **Only one provided, invalid values, unknown ID, mismatched timestamp, or checkpoint too old** (more than `WS_MAX_BACKLOG` events behind, 10,000 by default)**:** the server sends `reset`.
 
 Keeping `eventId` and `timestamp` separate replaces the previous combined `cursor` field. The timestamp remains necessary to detect reused IDs after a database restore (ADR-0003, R2).
 

@@ -8,6 +8,7 @@ describe('liveOptionsFromEnv', () => {
       maxPayload: 1024,
       batchMs: 100,
       maxConnections: 2000,
+      maxBacklog: 10000,
       maxBufferedBytes: 262144,
       allowedOrigins: [],
       liveness: { idleMs: 15000, pongTimeoutMs: 10000, intervalMs: 5000 },
@@ -29,6 +30,7 @@ describe('liveOptionsFromEnv', () => {
         WS_PONG_TIMEOUT_MS: '2000',
         WS_LIVENESS_CHECK_MS: '500',
         WS_MAX_CONNECTIONS: '10',
+        WS_MAX_BACKLOG: '500',
         WS_MAX_BUFFERED_BYTES: '4096',
         WS_ALLOWED_ORIGINS: ' https://vu.place, http://localhost:5173 ,',
       })
@@ -37,6 +39,7 @@ describe('liveOptionsFromEnv', () => {
       maxPayload: 1024,
       batchMs: 50,
       maxConnections: 10,
+      maxBacklog: 500,
       maxBufferedBytes: 4096,
       allowedOrigins: ['https://vu.place', 'http://localhost:5173'],
       liveness: { idleMs: 1000, pongTimeoutMs: 2000, intervalMs: 500 },
