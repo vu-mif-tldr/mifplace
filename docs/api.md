@@ -160,7 +160,7 @@ When a client reconnects after being offline, the server replays events it misse
 }
 ```
 
-Each entry is `[eventId, pos, colorId]`. The client applies events in order and saves `eventId` and `timestamp` **only after successfully applying** the batch. The server must not create a gap between catch-up and live delivery. The client must not apply the same event twice.
+Each entry is `[eventId, pos, colorId]`. The client applies events in order and saves `eventId` and `timestamp` **only after successfully applying** the batch. The server must not create a gap between catch-up and live delivery. The client must not apply the same event twice: a live batch is one message for every client and may repeat events up to the client's checkpoint (stored before it connected, sent after), so the client skips every event whose `eventId` is not greater than its checkpoint.
 
 ### `pixels` — live updates for all connected clients
 
@@ -183,14 +183,14 @@ The server batches live changes every **100 ms**, sending a JSON text message **
 { "type": "reset" }
 ```
 
-Sent when the resume checkpoint is malformed, unknown, mismatched, or too far behind. The client requests a fresh `GET /api/canvas` snapshot and reconnects using the new `eventId` and `timestamp`. The palette and the canvas size need not be reloaded.
+Sent when the resume checkpoint is malformed, unknown, mismatched, or too far behind; the server then closes the connection (code 1000). The client requests a fresh `GET /api/canvas` snapshot and reconnects using the new `eventId` and `timestamp`. The palette and the canvas size need not be reloaded.
 
 ### Ping/pong — connection heartbeat
 
 The **backend starts a heartbeat timer for each WebSocket connection**. When no other activity has occurred for **15 seconds**, it sends a standard WebSocket **ping control frame**. The client replies with a **pong control frame**; browser WebSocket implementations normally handle this automatically, without application JavaScript.
 
 - **Server → client:** WebSocket `ping` control frame (not JSON).
-- **Client → server:** WebSocket `pong` control frame (not JSON).
+- **Client → server:** WebSocket `pong` control frame (not JSON). The client sends no application messages; the server closes a connection that sends one (code 1003).
 - **If no pong arrives:** the server marks the connection as unresponsive, closes it, and releases its connection resources. (suggested: 10 seconds after ping).
 - The client can detect a closed connection and reconnect with increasing delay and jitter. Neither ping nor pong changes pixel data or the saved event checkpoint.
 

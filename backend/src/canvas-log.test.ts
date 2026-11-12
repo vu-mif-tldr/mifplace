@@ -38,11 +38,16 @@ describe('loadCanvas', () => {
 });
 
 describe('placePixel', () => {
-  it('saves the event to the log, then to memory, and returns its id', () => {
+  it('saves the event to the log, then to memory, and returns it with its id', () => {
     const mif = openMifDb();
     const canvas = loadCanvas(mif, size);
 
-    assert.equal(placePixel(mif, canvas, { user_id: 0, color_id: 6, position: 6 }, 5000), 1);
+    assert.deepEqual(placePixel(mif, canvas, { user_id: 0, color_id: 6, position: 6 }, 5000), {
+      eventId: 1,
+      pos: 6,
+      colorId: 6,
+      timestamp: 5000,
+    });
 
     const snapshot = canvas.snapshot();
     assert.equal(snapshot.pixels[6], 6);

@@ -18,7 +18,7 @@ let failing = false;
 const app = createApp({
   canvasSize: { width: 3, height: 2 },
   palette: [{ id: 0, color: '#000000' }],
-  checkHealth: () => {},
+  checkDbHealth: () => {},
   getCanvasState: () => {
     if (failing) throw new Error('canvas is broken');
     return SNAPSHOT;

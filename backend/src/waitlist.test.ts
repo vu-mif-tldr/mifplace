@@ -50,7 +50,7 @@ async function start(
   const app = createApp({
     canvasSize: { width: 4, height: 4 },
     palette: [{ id: 0, color: '#000000' }],
-    checkHealth: () => {},
+    checkDbHealth: () => {},
     getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
     appendEvent: () => 1,
     trustProxy,
@@ -300,7 +300,7 @@ describe('createApp without waitlist', () => {
     const app = createApp({
       canvasSize: { width: 4, height: 4 },
       palette: [{ id: 0, color: '#000000' }],
-      checkHealth: () => {},
+      checkDbHealth: () => {},
       getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
       appendEvent: () => 1,
     });

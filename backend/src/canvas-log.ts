@@ -13,7 +13,8 @@ export function loadCanvas(mifDb: MifDb, size: CanvasSize): CanvasStore {
   return canvas;
 }
 
-// Saves a new pixel and returns its event id. The database goes first: if the insert
+// Saves a new pixel and returns it as stored: with its event id and the one timestamp that
+// went into the log, into memory and to the live stream. The database goes first: if the insert
 // throws, memory is not changed and still matches the log. There is no rollback the other
 // way: the log is append-only, and apply cannot fail for a position already on the canvas;
 // if it ever did, memory would be rebuilt from the log at the next start.
@@ -22,10 +23,11 @@ export function placePixel(
   canvas: CanvasStore,
   event: NewEvent,
   now: number = Date.now()
-): number {
+): CanvasEvent {
   const id = mifDb.appendEvent(event, now);
-  canvas.apply(toCanvasEvent({ ...event, id, timestamp: now }));
-  return id;
+  const placed = toCanvasEvent({ ...event, id, timestamp: now });
+  canvas.apply(placed);
+  return placed;
 }
 
 function toCanvasEvent(row: EventRow): CanvasEvent {

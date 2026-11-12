@@ -1,4 +1,4 @@
-import express, { type Express, type Response } from 'express';
+import express, { type Response } from 'express';
 import type { Server } from 'node:http';
 import * as path from 'node:path';
 import rateLimit from 'express-rate-limit';
@@ -14,6 +14,7 @@ import {
 } from '@mifplace/shared';
 import type { NewEvent } from '@mifplace/db';
 import { createWaitlistRouter, type WaitlistOptions } from './waitlist.js';
+import type { LiveStats } from './live/live-server.js';
 
 export interface AppConfig {
   // Read once at start: the canvas size does not change while the server runs.
@@ -24,9 +25,11 @@ export interface AppConfig {
   getCanvasState: () => CanvasState;
 
   // Throws if the database is not reachable. Injected so the app can be built without a database.
-  checkHealth: () => void;
-  // Saves a new pixel and returns its event id
+  checkDbHealth: () => void;
+  // Saves a new pixel, sends it to the open pages and returns its event id
   appendEvent: (event: NewEvent) => number;
+  // The WebSocket connections for GET /health. Left out, WS is empty (tests without a live server).
+  getLiveStats?: () => LiveStats;
   // Shared public IPs such as campus Wi‑Fi can burst together, so the general limit is set high enough
   // to avoid false positives while still protecting the app from abuse.
   rateLimitPerMinute?: number;
@@ -47,7 +50,7 @@ type HealthResponse = {
     status: 'ok' | 'down';
     latencyMs?: string;
   };
-  WS: Record<string, never>;
+  WS: LiveStats | Record<string, never>;
 };
 
 // Builds the Express app from plain values: it does not read .env or open the database,
@@ -55,9 +58,10 @@ type HealthResponse = {
 export function createApp({
   canvasSize,
   palette,
-  checkHealth,
+  checkDbHealth: checkHealth,
   getCanvasState,
   appendEvent,
+  getLiveStats,
   rateLimitPerMinute = 120,
   canvasRateLimitPerMinute = 20,
   pixelRateLimitPerMinute = 10,
@@ -143,7 +147,7 @@ export function createApp({
           status: 'ok',
           latencyMs: latencyMs.toFixed(2),
         },
-        WS: {},
+        WS: getLiveStats?.() ?? {},
       };
 
       res.status(200).json(response);
@@ -155,7 +159,7 @@ export function createApp({
         DB: {
           status: 'down',
         },
-        WS: {},
+        WS: getLiveStats?.() ?? {},
       };
 
       res.status(503).json(response);
@@ -211,14 +215,15 @@ export function createApp({
   return app;
 }
 
-// Starts the server. Resolves once it listens, rejects if it cannot (e.g. EADDRINUSE when
-// another backend has the port). Express 5 does not throw in that case, it passes the error
-// to the listen callback, and the server would stay without a port.
-export function listen(app: Express, port: number, host: string): Promise<Server> {
+// Starts the server (http.createServer(app), so the WebSocket transport can be attached to it
+// first). Resolves once it listens, rejects if it cannot (e.g. EADDRINUSE when another backend
+// has the port): the server emits that as an error event, which would otherwise crash the process.
+export function listen(server: Server, port: number, host: string): Promise<Server> {
   return new Promise((resolve, reject) => {
-    const server = app.listen(port, host, (error?: Error) => {
-      if (error) reject(error);
-      else resolve(server);
+    server.once('error', reject);
+    server.listen(port, host, () => {
+      server.off('error', reject);
+      resolve(server);
     });
   });
 }

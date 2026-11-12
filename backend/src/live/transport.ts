@@ -16,6 +16,11 @@ export interface LiveTransportOptions extends GatewayOptions {
     pongTimeoutMs: number;
     intervalMs: number;
   };
+  // Called right after a connection is registered, with the URL of the upgrade request.
+  // Runs in the same synchronous step as the registration, so no broadcast comes in between.
+  onConnect?(connection: Connection, url: URL): void;
+  // Called for every text message a client sends
+  onMessage?(connection: Connection, data: string): void;
 }
 
 export function attachLiveTransport(
@@ -43,6 +48,10 @@ export function attachLiveTransport(
     {
       onActivity(connection) {
         tracker.touch(connection.id, Date.now());
+      },
+
+      onMessage(connection, data) {
+        options.onMessage?.(connection, data);
       },
 
       onClose(connection) {
@@ -89,6 +98,7 @@ export function attachLiveTransport(
 
       connections.set(connection.id, connection);
       tracker.touch(connection.id, Date.now());
+      options.onConnect?.(connection, request.url);
     }
   );
 
