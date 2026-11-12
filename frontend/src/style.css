@@ -91,6 +91,14 @@ main {
   color: #c00;
 }
 
+/* Shown under the canvas while the live connection is being restored */
+.live-status {
+  background: rgb(255 255 255 / 85%);
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: #664d03;
+}
+
 /* Decoration behind the page content, it must not catch the mouse */
 .pixel-band {
   position: fixed;

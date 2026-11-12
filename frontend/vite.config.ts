@@ -13,9 +13,10 @@ export default defineConfig({
     // IPv4 explicitly: "localhost" may resolve to ::1 only (e.g. in the dev container),
     // and the port forwarding of VS Code and Codespaces connects to 127.0.0.1
     host: '127.0.0.1',
-    // Forward /api requests to the backend to avoid CORS errors
+    // Forward /api requests to the backend to avoid CORS errors. ws: also the WebSocket
+    // upgrade of /api/ws; a plain string target proxies HTTP only.
     proxy: {
-      '/api': 'http://127.0.0.1:3000',
+      '/api': { target: 'http://127.0.0.1:3000', ws: true },
     },
   },
   test: {

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
-// The HTTP API (see docs/api.md) as zod schemas. Each type is inferred from its schema, so the
-// TypeScript type and the run-time check cannot drift apart: the backend checks requests and
-// the frontend checks responses with the same definitions.
+// The API (see docs/api.md), HTTP and the WebSocket messages, as zod schemas. Each type is
+// inferred from its schema, so the TypeScript type and the run-time check cannot drift apart:
+// the backend checks requests and the frontend checks responses and live messages with the
+// same definitions.
 
 // What GET /api/canvas/size returns. The size does not change while the server runs,
 // so the frontend asks for it once and keeps it.
@@ -54,6 +55,33 @@ export const PlacePixelResponseSchema = z.object({
   eventId: z.int(),
 });
 export type PlacePixelResponse = z.infer<typeof PlacePixelResponseSchema>;
+
+// The messages of the WebSocket /api/ws (docs/api.md, section 2), server to client only.
+// The backend encodes them in backend/src/live/protocol.ts, the frontend checks what it
+// receives with these schemas, like the HTTP responses.
+
+// One entry of a pixels message: [eventId, pos, colorId]
+export const PixelEntrySchema = z.tuple([z.int().nonnegative(), z.int().nonnegative(), z.int()]);
+
+// Pixels placed since the last message (live) or since the client's checkpoint (catch-up).
+// eventId and timestamp are the checkpoint the client saves once it has applied them all.
+export const PixelsMessageSchema = z.object({
+  type: z.literal('pixels'),
+  pixels: z.array(PixelEntrySchema),
+  eventId: z.int().nonnegative(),
+  timestamp: z.int().nonnegative(),
+});
+export type PixelsMessage = z.infer<typeof PixelsMessageSchema>;
+
+// The client cannot resume from its checkpoint: new snapshot, then connect again
+export const ResetMessageSchema = z.object({ type: z.literal('reset') });
+export type ResetMessage = z.infer<typeof ResetMessageSchema>;
+
+export const LiveMessageSchema = z.discriminatedUnion('type', [
+  PixelsMessageSchema,
+  ResetMessageSchema,
+]);
+export type LiveMessage = z.infer<typeof LiveMessageSchema>;
 
 // Body of every API error response
 export const ErrorResponseSchema = z.object({

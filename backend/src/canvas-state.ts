@@ -27,6 +27,11 @@ export class CanvasStore {
     this.last = { eventId, timestamp };
   }
 
+  // The last applied event, what the live stream has to continue from
+  get checkpoint(): Checkpoint {
+    return this.last;
+  }
+
   // The whole canvas with the checkpoint of its last event. Everything here is synchronous,
   // so no event can come between the copy of the pixels and the checkpoint.
   snapshot(): CanvasState {

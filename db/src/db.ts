@@ -79,6 +79,8 @@ export function getDbVersion(db: Db): number {
 export class MifDb {
   private readonly insertEvent;
   private readonly selectEventsAfter;
+  private readonly selectEventsBetween;
+  private readonly selectEventTimestamp;
   private readonly selectPixelHistory;
   private readonly selectLastEventId;
   private readonly selectCanvasSize;
@@ -97,6 +99,10 @@ export class MifDb {
             VALUES (?, ?, ?, ?)`
     );
     this.selectEventsAfter = db.prepare(`SELECT * FROM events WHERE id > ? ORDER BY id`);
+    this.selectEventsBetween = db.prepare(
+      `SELECT * FROM events WHERE id > ? AND id <= ? ORDER BY id`
+    );
+    this.selectEventTimestamp = db.prepare(`SELECT timestamp FROM events WHERE id = ?`);
     this.selectPixelHistory = db.prepare(
       'SELECT * FROM events WHERE position = ? ORDER BY id DESC LIMIT ?'
     );
@@ -158,6 +164,18 @@ export class MifDb {
   // Events with id greater than afterId, used for catching up after a reconnect.
   getEventsAfter(afterId: number): EventRow[] {
     return this.selectEventsAfter.all(afterId) as EventRow[];
+  }
+
+  // Events with ids in (afterId, toId], in order: what a reconnecting client missed up to the
+  // last event the server has sent (catch-up, docs/api.md).
+  getEventsBetween(afterId: number, toId: number): EventRow[] {
+    return this.selectEventsBetween.all(afterId, toId) as EventRow[];
+  }
+
+  // The timestamp of one event, undefined when there is no event with that id. A client's
+  // checkpoint is valid only when both match (ADR-0003: ids can be reused after a restore).
+  getEventTimestamp(id: number): number | undefined {
+    return (this.selectEventTimestamp.get(id) as { timestamp: number } | undefined)?.timestamp;
   }
 
   // Events of one cell (see toPosition), newest first. There is no index on position,

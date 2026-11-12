@@ -1,10 +1,18 @@
-import { MifDb, getDbVersion, loadDotEnv, openDb, resolveDbPath } from '@mifplace/db';
-import type { Server } from 'node:http';
+import {
+  MifDb,
+  type NewEvent,
+  getDbVersion,
+  loadDotEnv,
+  openDb,
+  resolveDbPath,
+} from '@mifplace/db';
+import http from 'node:http';
 import { createApp, listen } from './app.js';
 import type { CanvasStore } from './canvas-state.js';
 import { loadCanvas, placePixel } from './canvas-log.js';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
-import { attachLiveTransport } from './live/transport.js';
+import { liveOptionsFromEnv } from './live/config.js';
+import { startLiveServer } from './live/live-server.js';
 import { mailerFromEnv } from './mailer.js';
 import { CONFIRM_WITHIN_MS, type WaitlistOptions } from './waitlist.js';
 
@@ -26,6 +34,9 @@ function parseTrustProxy(value: string | undefined): boolean | number | string {
   return value;
 }
 const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+
+// Fails here, before the database is opened, if a WS_* setting is not a positive integer.
+const liveOptions = liveOptionsFromEnv();
 
 // The waitlist runs where PUBLIC_URL is set (the email links point there). In development it
 // defaults to this server; in production it stays off unless set, so the demo has none.
@@ -78,15 +89,24 @@ try {
 const app = createApp({
   canvasSize,
   palette,
-  checkHealth: () => mifDb.checkHealth(),
+  checkDbHealth: () => mifDb.checkHealth(),
   getCanvasState: () => canvas.snapshot(),
-  appendEvent: (eventObject) => placePixel(mifDb, canvas, eventObject),
+  appendEvent: placeAndPublish,
+  getLiveStats: () => live.stats(),
   rateLimitPerMinute: 120,
   canvasRateLimitPerMinute: 20,
   pixelRateLimitPerMinute: 10,
   trustProxy,
   waitlist: waitlistOptions(),
 });
+
+// The log, memory and the live stream get the same event with the same timestamp, in one
+// synchronous step: nothing can read memory or connect between the three.
+function placeAndPublish(event: NewEvent): number {
+  const placed = placePixel(mifDb, canvas, event);
+  live.publish(placed);
+  return placed.eventId;
+}
 
 function waitlistOptions(): WaitlistOptions | undefined {
   if (!publicUrl || !mailer) {
@@ -97,26 +117,35 @@ function waitlistOptions(): WaitlistOptions | undefined {
   return { store: mifDb, mailer, publicUrl };
 }
 
-let server: Server;
+// The live server is attached before the port opens, so no upgrade request can arrive first.
+// Everything in the log up to the loaded checkpoint is in the snapshot; later events go out live.
+const server = http.createServer(app);
+const live = startLiveServer(
+  server,
+  {
+    checkpoint: () => canvas.checkpoint,
+    timestampOf: (id) => mifDb.getEventTimestamp(id),
+    eventsBetween: (afterId, toId) =>
+      mifDb
+        .getEventsBetween(afterId, toId)
+        .map((row) => ({ eventId: row.id, pos: row.position, colorId: row.color_id })),
+  },
+  liveOptions
+);
+
 try {
-  server = await listen(app, PORT, hostname);
+  await listen(server, PORT, hostname);
 } catch (error) {
   // Usually the port is taken by another backend (EADDRINUSE)
   console.error(`Cannot listen on http://${hostname}:${PORT}/: ${(error as Error).message}`);
+  live.close();
   db.close();
   process.exit(1);
 }
 console.log(`Server running at http://${hostname}:${PORT}/`);
-
-const live = attachLiveTransport(server, {
-  path: '/api/ws',
-  maxConnections: 100,
-  allowedOrigins: [],
-  maxPayload: 1024,
-  maxBufferedBytes: 1024 * 1024,
-});
-
-console.log('WebSocket gateway ready at /api/ws');
+console.log(
+  `Live updates at ws://${hostname}:${PORT}${liveOptions.path}: batches every ${liveOptions.batchMs} ms, up to ${liveOptions.maxConnections} connections`
+);
 
 let shuttingDown = false;
 
@@ -124,8 +153,8 @@ const shutdown = () => {
   if (shuttingDown) return;
   shuttingDown = true;
 
-  // Stop WebSocket upgrades and heartbeat checks.
-  // Disconnect existing WebSocket clients.
+  // Stop the batches, the upgrades and the liveness check, close every client with 1001.
+  // Without this server.close() would wait for the open WebSockets until Docker kills the process.
   live.close();
 
   // Stop HTTP server and then close the database.

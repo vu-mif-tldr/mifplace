@@ -16,7 +16,7 @@ let baseUrl: string;
 const app = createApp({
   canvasSize: { width: 100, height: 100 },
   palette: PALETTE,
-  checkHealth: () => {},
+  checkDbHealth: () => {},
   getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
   appendEvent: () => 42,
   rateLimitPerMinute: 120,

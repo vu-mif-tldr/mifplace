@@ -1,8 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { toPosition, type CanvasSize, type PaletteColor } from '@mifplace/shared';
+import { onMounted, onUnmounted, ref } from 'vue';
+import {
+  fromPosition,
+  toPosition,
+  type CanvasSize,
+  type CanvasState,
+  type PaletteColor,
+} from '@mifplace/shared';
 import { getCanvas, getCanvasSize, getPalette, placePixel } from './api';
 import { drawCanvas, getClickedCell, paintCell } from './canvas';
+import { connectLive, type LiveConnection, type LivePixel, type LiveState } from './live';
 import { clampOffset, fitCellSize } from './view';
 import PixelBand from './PixelBand.vue';
 
@@ -25,8 +32,13 @@ const pixelError = ref('');
 
 const hoveredCell = ref<{ x: number; y: number } | null>(null);
 
+// The live connection to /api/ws: other people's pixels arrive here (docs/api.md, section 3).
+// While it is reconnecting the updates are paused, and the page says so.
+let live: LiveConnection | null = null;
+const liveState = ref<LiveState>('connecting');
+
 // Get the palette, the canvas size (only the first time) and the pixels from the server
-// (all at once) and draw the canvas
+// (all at once), draw the canvas and follow the live updates from its checkpoint
 async function loadCanvas() {
   loading.value = true;
   loadError.value = '';
@@ -44,7 +56,7 @@ async function loadCanvas() {
     palette.value = colors;
     // After "try again" keep the selected color if the server still has it
     selectedColor.value = colors.find((c) => c.id === selectedColor.value?.id) ?? colors[0];
-    if (canvasEl.value) drawCanvas(canvasEl.value, size, state, colors);
+    showSnapshot(size, state);
   } catch (error) {
     console.error(error);
     loadError.value = 'Nepavyko užkrauti drobės';
@@ -53,8 +65,50 @@ async function loadCanvas() {
   }
 }
 
-// Load the canvas when the page opens
+// After a reset: a new snapshot with the palette, the size and the view kept
+async function reloadSnapshot() {
+  if (!canvasSize) return loadCanvas();
+  try {
+    showSnapshot(canvasSize, await getCanvas());
+  } catch (error) {
+    console.error(error);
+    loadError.value = 'Nepavyko užkrauti drobės';
+  }
+}
+
+// Draws the snapshot and connects from its checkpoint, so nothing between the two is lost.
+// The old connection, if any, is closed first: one socket per page.
+function showSnapshot(size: CanvasSize, state: CanvasState) {
+  if (canvasEl.value) drawCanvas(canvasEl.value, size, state, palette.value);
+  live?.close();
+  // Only the checkpoint: the connection does not need to keep the pixels of the snapshot alive
+  live = connectLive(
+    { eventId: state.eventId, timestamp: state.timestamp },
+    {
+      onPixels: paintLivePixels,
+      onReset: reloadSnapshot,
+      onState: (state) => (liveState.value = state),
+    }
+  );
+}
+
+// Paints the pixels of one live batch. Our own pixel comes back too, painting it twice is
+// fine. A negative color id is an unpainted cell (the background), an id the palette does not
+// have is skipped, as drawCanvas does.
+function paintLivePixels(pixels: LivePixel[]) {
+  if (!canvasEl.value || !canvasSize) return;
+  const colorById = new Map(palette.value.map(({ id, color }) => [id, color]));
+  for (const { pos, colorId } of pixels) {
+    const color = colorId < 0 ? '#ffffff' : colorById.get(colorId);
+    if (!color) continue;
+    const { x, y } = fromPosition(canvasSize, pos);
+    paintCell(canvasEl.value, x, y, color);
+  }
+}
+
+// Load the canvas when the page opens, stop following it when the page goes
 onMounted(loadCanvas);
+onUnmounted(() => live?.close());
 
 // The viewport is a VIEWPORT_SIZE x VIEWPORT_SIZE px square
 const VIEWPORT_SIZE = 640;
@@ -186,6 +240,9 @@ async function onCanvasClick(event: MouseEvent) {
         ></canvas>
       </div>
       <p v-if="pixelError" class="error">{{ pixelError }}</p>
+      <p v-if="liveState === 'reconnecting'" class="live-status" role="status">
+        Ryšys nutrūko, jungiamasi iš naujo…
+      </p>
     </section>
 
     <section id="pixel-info-section">

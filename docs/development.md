@@ -73,6 +73,9 @@ There is one `.env` in the root (copy of `.env.example`). The backend, `db:setup
 | `DB_PATH` | none        | SQLite file, required. A relative path is taken from the repository root |
 | `PORT`    | `3000`      | Backend port                                                             |
 | `HOST`    | `127.0.0.1` | Backend address; `0.0.0.0` in Docker                                     |
+| `WS_*`    | see below   | Live updates over WebSocket                                              |
+
+The WebSocket settings (`WS_BATCH_MS`, `WS_IDLE_PING_MS`, `WS_PONG_TIMEOUT_MS`, `WS_LIVENESS_CHECK_MS`, `WS_MAX_CONNECTIONS`, `WS_MAX_BACKLOG`, `WS_MAX_BUFFERED_BYTES`, `WS_ALLOWED_ORIGINS`) are described in `.env.example`; the defaults are those of [api.md](api.md). A value that is not a positive integer stops the server at start. `TRUST_PROXY`, `PUBLIC_URL` and the SMTP settings are described there too.
 
 ## Database
 

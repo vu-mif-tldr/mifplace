@@ -92,6 +92,18 @@ describe('openDb / MifDb', () => {
       ]
     );
 
+    // Catch-up reads: ids in (afterId, toId], and the timestamp of one event
+    assert.deepEqual(
+      mif.getEventsBetween(id, id + 2).map((e) => [e.id, e.timestamp]),
+      [
+        [id + 1, 2000],
+        [id + 2, 3000],
+      ]
+    );
+    assert.deepEqual(mif.getEventsBetween(id + 3, id + 3), []);
+    assert.equal(mif.getEventTimestamp(id + 2), 3000);
+    assert.equal(mif.getEventTimestamp(id + 99), undefined);
+
     assert.throws(() => mif.appendEvent({ user_id: -1, color_id: 7, position: 256 * 256 }, 1000));
     assert.throws(() => mif.appendEvent({ user_id: 0, color_id: -1, position: 256 * 256 }, 1000));
     assert.throws(() => mif.appendEvent({ user_id: 0, color_id: 7, position: -1 }, 1000));

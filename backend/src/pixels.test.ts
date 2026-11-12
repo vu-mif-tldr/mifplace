@@ -15,7 +15,7 @@ const app = createApp({
     { id: 5, color: '#FFFFFF' },
     { id: 12, color: '#FF0000' },
   ],
-  checkHealth: () => {},
+  checkDbHealth: () => {},
   getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
   appendEvent: () => 42,
   rateLimitPerMinute: 120,

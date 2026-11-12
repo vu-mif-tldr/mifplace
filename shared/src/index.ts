@@ -1,4 +1,4 @@
-// What every workspace agrees on: the HTTP API as zod schemas with their types (api.ts)
+// What every workspace agrees on: the API as zod schemas with their types (api.ts),
 // the canvas geometry (position.ts) and the waitlist rules (waitlist.ts).
 export * from './api.js';
 export * from './position.js';
