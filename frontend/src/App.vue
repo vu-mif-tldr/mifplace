@@ -9,7 +9,7 @@ import {
 } from '@mifplace/shared';
 import { getCanvas, getCanvasSize, getPalette, placePixel } from './api';
 import { drawCanvas, getClickedCell, paintCell } from './canvas';
-import { connectLive, type LiveConnection, type LivePixel } from './live';
+import { connectLive, type LiveConnection, type LivePixel, type LiveState } from './live';
 import { clampOffset, fitCellSize } from './view';
 import PixelBand from './PixelBand.vue';
 
@@ -32,8 +32,10 @@ const pixelError = ref('');
 
 const hoveredCell = ref<{ x: number; y: number } | null>(null);
 
-// The live connection to /api/ws: other people's pixels arrive here (docs/api.md, section 3)
+// The live connection to /api/ws: other people's pixels arrive here (docs/api.md, section 3).
+// While it is reconnecting the updates are paused, and the page says so.
 let live: LiveConnection | null = null;
+const liveState = ref<LiveState>('connecting');
 
 // Get the palette, the canvas size (only the first time) and the pixels from the server
 // (all at once), draw the canvas and follow the live updates from its checkpoint
@@ -85,8 +87,7 @@ function showSnapshot(size: CanvasSize, state: CanvasState) {
     {
       onPixels: paintLivePixels,
       onReset: reloadSnapshot,
-      // Reconnecting after a drop is MP-90; until then the page stays as it is
-      onClose: () => console.warn('Live updates stopped, reload the page to continue'),
+      onState: (state) => (liveState.value = state),
     }
   );
 }
@@ -239,6 +240,9 @@ async function onCanvasClick(event: MouseEvent) {
         ></canvas>
       </div>
       <p v-if="pixelError" class="error">{{ pixelError }}</p>
+      <p v-if="liveState === 'reconnecting'" class="live-status" role="status">
+        Ryšys nutrūko, jungiamasi iš naujo…
+      </p>
     </section>
 
     <section id="pixel-info-section">
