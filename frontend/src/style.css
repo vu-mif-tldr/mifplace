@@ -9,11 +9,19 @@
   initial-value: #8a93c4;
 }
 
+/* How busy the canvas is, 0 to 1; registered so the light brightens and dims smoothly */
+@property --energy {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
 :root {
   color-scheme: dark;
   --ink: #0c1030;
   --text: #eef0fa;
   --muted: #c8cdea;
+  --ok: #5fd68a;
   --error: #ff8a8a;
   --warn: #ffd27a;
   font-family:

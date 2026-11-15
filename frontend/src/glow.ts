@@ -30,3 +30,9 @@ export function glowColor(hex: string | undefined): string {
 export function readableOn(hex: string): string {
   return (luma(hex) ?? 0) > 150 ? INK : '#ffffff';
 }
+
+// Outline for a small colour dot, so its edge shows on any background: white around dark
+// colours, dark around light ones
+export function outlineFor(hex: string): string {
+  return (luma(hex) ?? 0) < 128 ? '#ffffff' : INK;
+}

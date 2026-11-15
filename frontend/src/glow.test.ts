@@ -1,4 +1,15 @@
-import { INK, NEUTRAL_GLOW, glowColor, luma, readableOn } from './glow';
+import { INK, NEUTRAL_GLOW, glowColor, luma, outlineFor, readableOn } from './glow';
+
+describe('outlineFor', () => {
+  it('outlines dark colours in white and light ones in dark', () => {
+    expect(outlineFor('#000000')).toBe('#ffffff');
+    expect(outlineFor('#3F48CC')).toBe('#ffffff');
+    expect(outlineFor('#880015')).toBe('#ffffff');
+    expect(outlineFor('#FFFFFF')).toBe(INK);
+    expect(outlineFor('#FFF200')).toBe(INK);
+    expect(outlineFor('#99D9EA')).toBe(INK);
+  });
+});
 
 describe('luma', () => {
   it('is 0 for black and 255 for white', () => {

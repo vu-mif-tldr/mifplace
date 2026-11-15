@@ -3,11 +3,14 @@ import { flushPromises, mount } from '@vue/test-utils';
 import App from './App.vue';
 import { getCanvas, getCanvasSize, getPalette, placePixel } from './api';
 import { connectLive, type LiveHandlers } from './live';
+import { NEUTRAL_GLOW } from './glow';
 import { texts } from './texts';
+import ActivityTicker from './components/ActivityTicker.vue';
 import CanvasView from './components/CanvasView.vue';
 import LoadState from './components/LoadState.vue';
 import PaletteDock from './components/PaletteDock.vue';
 import SelectionRing from './components/SelectionRing.vue';
+import TopLights from './components/TopLights.vue';
 
 // The page against a fake server: the API calls and the live connection are mocked
 vi.mock('./api', () => ({
@@ -133,6 +136,37 @@ describe('App', () => {
     const view = wrapper.getComponent(CanvasView);
     expect(view.props('blooms')).toMatchObject([{ x: 1, y: 0, color: '#00a2e8' }]);
     expect(view.props('paused')).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('lights the page from the top in the colours of live pixels', async () => {
+    const wrapper = await page();
+    handlers.onPixels([
+      { pos: 1, colorId: 9 },
+      { pos: 2, colorId: 0 },
+    ]);
+    await flushPromises();
+    // Black shines in the neutral light, as its bloom does
+    expect(wrapper.getComponent(TopLights).props('lights')).toMatchObject([
+      { color: '#00a2e8' },
+      { color: NEUTRAL_GLOW },
+    ]);
+    wrapper.unmount();
+  });
+
+  it('announces live pixels in the ticker, in their real colour', async () => {
+    const wrapper = await page();
+    handlers.onPixels([
+      { pos: 0, colorId: 9 },
+      { pos: 1, colorId: 0 },
+    ]);
+    await flushPromises();
+    const ticker = wrapper.getComponent(ActivityTicker);
+    const items = ticker.findAll('li');
+    expect(items.map((li) => li.text())).toEqual(['0, 0', '1, 0']);
+    // Black stays black here; only its bloom on the canvas is the neutral light
+    expect(items[1].get('.dot').attributes('style')).toContain('background: #000000');
+    expect(ticker.props('selectedColor')).toBe('#000000');
     wrapper.unmount();
   });
 });

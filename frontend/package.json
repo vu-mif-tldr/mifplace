@@ -27,6 +27,7 @@
     "vue-tsc": "^3.3.13"
   },
   "dependencies": {
+    "@fontsource/saira-semi-condensed": "^5.3.0",
     "@mifplace/shared": "*",
     "vue": "^3.5.43"
   }

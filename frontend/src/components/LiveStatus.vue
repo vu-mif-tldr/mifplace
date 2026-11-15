@@ -2,7 +2,8 @@
 import type { LiveState } from '../live';
 import { texts } from '../texts';
 
-// The state of the live connection to /api/ws: a dot and a word
+// The state of the live connection to /api/ws (other people's pixels come through it):
+// green while connected, yellow while connecting, red after a drop until it is back
 defineProps<{ state: LiveState }>();
 
 const LABELS: Record<LiveState, string> = {
@@ -31,21 +32,21 @@ const LABELS: Record<LiveState, string> = {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--glow);
-  box-shadow: 0 0 10px var(--glow);
+  background: var(--ok);
+  box-shadow: 0 0 8px var(--ok);
 }
 
 .connecting .dot {
-  background: #7f86ad;
+  background: var(--warn);
   box-shadow: none;
 }
 
 .reconnecting {
-  color: var(--warn);
+  color: var(--error);
 }
 
 .reconnecting .dot {
-  background: var(--warn);
+  background: var(--error);
   box-shadow: none;
 }
 </style>

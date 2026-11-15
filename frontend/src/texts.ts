@@ -18,6 +18,9 @@ export const texts = {
   place: (x: number, y: number) => `Dėti pikselį į (${x}, ${y})`,
   placeNothing: 'Pirma pasirink langelį',
   coordinates: (x: number, y: number) => `${x}, ${y}`,
+  activity: 'Kas vyksta drobėje',
+  quiet: 'Dabar ramu',
+  yours: 'Tavo:',
 };
 
 // Names of the colours of the default palette. The palette comes from the server, so a colour

@@ -12,12 +12,16 @@ import type { NewBloom } from './blooms';
 import { glowColor } from './glow';
 import { connectLive, type LiveConnection, type LivePixel, type LiveState } from './live';
 import { colorName, texts } from './texts';
+import { useActivity } from './useActivity';
 import { useBlooms } from './useBlooms';
+import { useTopLights } from './useTopLights';
 import { clickAction, type Cell } from './view';
+import ActivityTicker from './components/ActivityTicker.vue';
 import CanvasView from './components/CanvasView.vue';
 import LoadState from './components/LoadState.vue';
 import PaletteDock from './components/PaletteDock.vue';
 import TopBar from './components/TopBar.vue';
+import TopLights from './components/TopLights.vue';
 
 // The canvas page: loads the canvas, follows the live updates and places pixels. How things
 // look is up to the components; this file holds the state and wires them together.
@@ -37,6 +41,7 @@ const selectedCell = ref<Cell | null>(null);
 const hoveredCell = ref<Cell | null>(null);
 
 const canvasView = ref<InstanceType<typeof CanvasView> | null>(null);
+const ticker = ref<InstanceType<typeof ActivityTicker> | null>(null);
 
 // Is the canvas still loading? Did loading or the last pixel fail?
 const loading = ref(true);
@@ -54,6 +59,12 @@ const cooldownProgress = ref<number | null>(null);
 
 // Flashes where other people's pixels have just arrived (MP-117)
 const { blooms, add: addBlooms } = useBlooms();
+
+// Lights from the top of the page in the colours of new pixels, at most three at once
+const { lights: topLights, add: addTopLights } = useTopLights();
+
+// How busy the canvas is, for the light of the page
+const { summary: activity, record: recordActivity } = useActivity();
 
 // The live connection to /api/ws: other people's pixels arrive here (docs/api.md, section 3).
 // While it is reconnecting the updates are paused, and the page says so.
@@ -125,9 +136,15 @@ function paintLivePixels(pixels: LivePixel[]) {
     if (!color) continue;
     const cell = fromPosition(size, pos);
     canvasView.value?.paint(cell, color);
-    if (colorId >= 0) arrived.push({ ...cell, color: glowColor(color) });
+    if (colorId >= 0) arrived.push({ ...cell, color });
   }
-  addBlooms(arrived);
+  // Blooms and top lights are light: a dark pixel shines in the neutral light. The ticker shows
+  // the real colour.
+  const lights = arrived.map((pixel) => ({ ...pixel, color: glowColor(pixel.color) }));
+  addBlooms(lights);
+  addTopLights(lights.map((pixel) => pixel.color));
+  recordActivity(arrived);
+  ticker.value?.announce(arrived);
 }
 
 // A click picks the cell; a second click on the picked cell places the pixel
@@ -196,8 +213,10 @@ const placeLabel = computed(() =>
     :style="{
       '--glow': glowColor(selectedColor?.color),
       '--progress': `${cooldownProgress ?? 100}%`,
+      '--energy': activity.energy,
     }"
   >
+    <TopLights :lights="topLights" />
     <TopBar :hovered-cell="hoveredCell" :live-state="ready ? liveState : null" />
 
     <main class="stage">
@@ -228,29 +247,42 @@ const placeLabel = computed(() =>
       @select="selectedColor = $event"
       @place="place"
     />
+
+    <ActivityTicker
+      v-show="ready"
+      ref="ticker"
+      :selected-color="selectedColor?.color"
+      :selected-cell="selectedCell"
+    />
   </div>
 </template>
 
 <style scoped>
-/* A dark night lit by the colour the user holds (--glow) */
+/* A dark night lit by the colour the user holds (--glow). The light is brighter while many
+   people paint (--energy, 0 to 1) and dims when the canvas is quiet. New pixels light it
+   from the top for a moment (TopLights, behind the content: hence the own stacking context). */
 .page {
+  position: relative;
+  isolation: isolate;
   height: 100dvh;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   overflow: hidden;
   background:
     radial-gradient(
       60% 55% at 50% 100%,
-      color-mix(in srgb, var(--glow) 38%, transparent),
+      color-mix(in srgb, var(--glow) calc(28% + var(--energy) * 24%), transparent),
       transparent
     ),
     radial-gradient(
       45% 45% at 50% 45%,
-      color-mix(in srgb, var(--glow) 14%, transparent),
+      color-mix(in srgb, var(--glow) calc(10% + var(--energy) * 10%), transparent),
       transparent
     ),
     var(--ink);
-  transition: --glow 1.5s ease;
+  transition:
+    --glow 1.5s ease,
+    --energy 2s ease;
 }
 
 .stage {

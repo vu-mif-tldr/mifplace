@@ -95,6 +95,11 @@ component_management:
         - frontend/src/blooms.ts
         - frontend/src/texts.ts
         - frontend/src/useBlooms.ts
+        - frontend/src/topLights.ts
+        - frontend/src/useTopLights.ts
+        - frontend/src/activity.ts
+        - frontend/src/useActivity.ts
+        - frontend/src/belt.ts
         - frontend/src/App.vue
         - frontend/src/components/**
     - component_id: frontend_api
