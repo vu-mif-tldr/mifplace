@@ -2,9 +2,14 @@ name: Docker image
 
 # Publishes the production image to GitHub Container Registry on every merge to main.
 # The server pulls it from there, see deploy/README.md.
+# Every merge to main is a new version X.Y.Z (tools/src/release-version.ts): Z goes up, or Y with
+# the label "minor" on the pull request, or X with "major". The image gets the version as tags and
+# as APP_VERSION (GET /health), and the version becomes a git tag vX.Y.Z with a GitHub release
+# once the image is published.
 # Pull requests only build it, and only when they touch what the image build depends on, so a
 # broken Dockerfile shows up before the merge. Code changes are already built by CI.
-# workflow_dispatch: rebuild by hand, e.g. for a fresh base image.
+# workflow_dispatch: rebuild by hand, e.g. for a fresh base image; on a commit of main that
+# already has a version it keeps that version.
 
 on:
   pull_request:
@@ -23,17 +28,51 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
+# Runs on main wait for each other instead of being cancelled, so a version that is being
+# released is never cut off halfway. A waiting run can still be replaced by a newer one; the
+# newer one counts the labels of every pull request since the last version, so none is lost.
 concurrency:
   group: docker-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  version:
+    name: Version
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      new: ${{ steps.next.outputs.new }}
+    steps:
+      # The whole history with tags: the last version and the merges since
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - id: next
+        run: node tools/src/release-version.ts
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   image:
     name: Build and publish
+    needs: version
+    # Pull requests and other branches skip the version and build without one
+    if: ${{ !cancelled() && (needs.version.result == 'success' || needs.version.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v7
 
@@ -52,6 +91,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # main: the latest build of main. sha-<commit>: a fixed version to roll back to.
+      # 0.4.1 and 0.4: the version and the latest of its X.Y.
       - id: meta
         uses: docker/metadata-action@v6
         with:
@@ -59,15 +99,37 @@ jobs:
           tags: |
             type=ref,event=branch
             type=sha
+            type=semver,pattern={{version}},value=${{ needs.version.outputs.version }},enable=${{ needs.version.outputs.version != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.version.outputs.version }},enable=${{ needs.version.outputs.version != '' }}
 
       - uses: docker/build-push-action@v7
         with:
           context: .
           # The server is x86_64.
           platforms: linux/amd64
-          build-args: NODE_VERSION=${{ steps.node.outputs.version }}
+          build-args: |
+            NODE_VERSION=${{ steps.node.outputs.version }}
+            APP_VERSION=${{ needs.version.outputs.version || 'dev' }}
           push: ${{ github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  release:
+    name: Release
+    needs: [version, image]
+    # Only a new version, and only once its image is published
+    if: needs.version.outputs.new == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      # Creates the tag vX.Y.Z on the built commit, with the merged pull requests as notes
+      - run: >-
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA"
+          --title "v$VERSION" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
