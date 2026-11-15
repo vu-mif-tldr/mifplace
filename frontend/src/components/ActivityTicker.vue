@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, shallowRef, watch } from 'vue';
+import { onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import { addItem, emptyBelt, screenX, step, type Belt } from '../belt';
 import { MAX_BATCH_FOR_BLOOMS, type NewBloom } from '../blooms';
 import { outlineFor } from '../glow';
@@ -10,7 +10,8 @@ import type { Cell } from '../view';
 // - every new pixel: "● x, y", shown at once, pushing the belt if there is no room;
 // - the selected cell: "Tavo: ● x, y", one message that follows the selection; it waits its
 //   turn behind the right edge and never pushes;
-// - "Dabar ramu..." when nothing has happened for a while.
+// "Dabar ramu..." is not on the belt: it comes out from the left edge once the canvas has been
+// quiet for a while and stays there until the next new pixel sends it away.
 // Places only, never people (NFR-11).
 const props = defineProps<{
   selectedCell: Cell | null;
@@ -20,13 +21,13 @@ const props = defineProps<{
 
 type Message = {
   id: number;
-  kind: 'pixel' | 'you' | 'quiet';
+  kind: 'pixel' | 'you';
   x: number;
   y: number;
   color: string;
 };
 
-// "Dabar ramu..." comes when the belt is empty and no pixel has arrived for this long, ms
+// "Dabar ramu..." comes when no pixel has arrived for this long and the last one has left, ms
 const QUIET_AFTER_MS = 10_000;
 
 let nextId = 0;
@@ -35,8 +36,8 @@ const messages = new Map<number, Message>();
 // Added, waiting one frame to be measured before they go on the belt
 let pending: Message[] = [];
 let lastEvent = -Infinity;
-let quietShown = false;
 let stripWidth = 0;
+const quiet = ref(false);
 
 // What is drawn: every message with its place on the strip (pending ones out of sight)
 type Drawn = Message & { left: number; dot: string };
@@ -61,6 +62,7 @@ function enqueue(kind: Message['kind'], x = 0, y = 0, color = '') {
 function announce(pixels: NewBloom[]) {
   if (pixels.length === 0 || pixels.length > MAX_BATCH_FOR_BLOOMS) return;
   lastEvent = window.performance.now();
+  quiet.value = false;
   for (const pixel of pixels) enqueue('pixel', pixel.x, pixel.y, pixel.color);
 }
 
@@ -96,19 +98,20 @@ function redraw() {
 function frame(dt: number, now: number) {
   if (stripWidth === 0) return;
 
-  // The first "Dabar ramu..." shows at once; later ones come in from the right edge
-  if (belt.items.length === 0 && pending.length === 0 && now - lastEvent >= QUIET_AFTER_MS) {
-    enqueue('quiet');
+  // Without motion pixels stay where they are, so "Dabar ramu..." does not wait for them to go
+  if (!quiet.value && now - lastEvent >= QUIET_AFTER_MS) {
+    const pixelsInView = [...belt.items, ...pending].some(
+      (item) => messages.get(item.id)?.kind === 'pixel'
+    );
+    if (!moving || !pixelsInView) quiet.value = true;
   }
   // A message goes on the belt once it has been drawn and measured, in the order of arrival
   while (pending.length > 0) {
     const width = elements.get(pending[0].id)?.offsetWidth ?? 0;
     if (width === 0) break;
     const message = pending.shift()!;
-    // Only a new pixel pushes the belt; the first "Dabar ramu..." just starts in view
-    const important = message.kind === 'pixel' || (message.kind === 'quiet' && !quietShown);
-    if (message.kind === 'quiet') quietShown = true;
-    belt = addItem(belt, { id: message.id, width }, stripWidth, important);
+    // Only a new pixel pushes the belt
+    belt = addItem(belt, { id: message.id, width }, stripWidth, message.kind === 'pixel');
   }
 
   const widths = new Map(
@@ -156,14 +159,16 @@ onUnmounted(() => {
           <span class="dot" :style="{ background: message.color, borderColor: message.dot }"></span>
           {{ texts.coordinates(message.x, message.y) }}
         </template>
-        <template v-else-if="message.kind === 'you'">
+        <template v-else>
           {{ texts.yours }}
           <span class="dot" :style="{ background: message.color, borderColor: message.dot }"></span>
           {{ texts.coordinates(message.x, message.y) }}
         </template>
-        <template v-else>{{ texts.quiet }}</template>
       </li>
     </ul>
+    <Transition name="quiet">
+      <p v-if="quiet" class="quiet">{{ texts.quiet }}</p>
+    </Transition>
   </section>
 </template>
 
@@ -199,6 +204,48 @@ li {
   height: 36px;
   white-space: nowrap;
   will-change: transform;
+}
+
+/* Over the belt, at the left edge: "Tavo" runs under it and fades out behind its soft edge */
+.quiet {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  margin: 0;
+  padding: 0 48px 0 16px;
+  white-space: nowrap;
+  background: linear-gradient(to right, var(--ink) calc(100% - 32px), transparent);
+}
+
+/* Out from the left edge at an easy pace; away quickly when a new pixel comes */
+.quiet-enter-active {
+  transition: transform 400ms ease-out;
+}
+
+.quiet-leave-active {
+  transition: transform 180ms ease-in;
+}
+
+.quiet-enter-from,
+.quiet-leave-to {
+  transform: translateX(-100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quiet-enter-active,
+  .quiet-leave-active {
+    transition: opacity 300ms;
+  }
+
+  .quiet-enter-from,
+  .quiet-leave-to {
+    transform: none;
+    opacity: 0;
+  }
 }
 
 /* The pixel colour with an outline that shows on any background */
