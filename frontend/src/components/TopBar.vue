@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { LiveState } from '../live';
 import { texts } from '../texts';
+import { appVersion } from '../version';
 import type { Cell } from '../view';
 import BrandMark from './BrandMark.vue';
 import LiveStatus from './LiveStatus.vue';
 
-// The bar over the canvas: the logo, the cell under the mouse (FR-11), how many pages are open
-// and the connection
+// The bar over the canvas: the logo with the version, the cell under the mouse (FR-11), how many
+// pages are open and the connection
 defineProps<{
   hoveredCell: Cell | null;
   // null while there is no connection yet (loading, or loading failed)
@@ -19,6 +20,7 @@ defineProps<{
 <template>
   <header class="top-bar">
     <BrandMark />
+    <span class="version">{{ appVersion }}</span>
     <span class="spacer"></span>
     <span v-if="hoveredCell" class="coords">
       {{ texts.coordinates(hoveredCell.x, hoveredCell.y) }}
@@ -45,6 +47,16 @@ defineProps<{
 
 .spacer {
   flex-grow: 1;
+}
+
+/* Quiet: for whoever looks for it, closer to the name than the gap of the bar */
+.version {
+  margin-left: -8px;
+  padding-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
 }
 
 .coords,

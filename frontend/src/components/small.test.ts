@@ -55,6 +55,12 @@ describe('TopBar', () => {
     expect(wrapper.find('.online').exists()).toBe(false);
     expect(wrapper.findComponent(LiveStatus).exists()).toBe(false);
   });
+
+  it('shows the version next to the logo, also before the connection', () => {
+    const wrapper = mount(TopBar, { props: { hoveredCell: null, liveState: null, online: null } });
+    expect(wrapper.get('.version').text()).toBe('dev');
+    expect(wrapper.get('.version').element.previousElementSibling?.classList).toContain('brand');
+  });
 });
 
 describe('LoadState', () => {
