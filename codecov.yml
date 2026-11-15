@@ -20,6 +20,7 @@ ignore:
   - frontend/src/main.ts
   - mcp/src/server.ts
   - tools/src/export-palette.ts
+  - tools/src/pixel-rain.ts
   - tools/src/seed-png.ts
 
 flags:

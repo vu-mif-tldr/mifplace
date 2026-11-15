@@ -41,7 +41,7 @@ Then delete the `MIGRATIONS_DIR` line from `.env`. If you have a feature branch,
 | `backend`  | Express server: HTTP API, serves the built frontend in production                         |
 | `frontend` | Vue app                                                                                   |
 | `mcp`      | Read-only MCP server for Claude Code                                                      |
-| `tools`    | Development-only scripts (seed, palette export), not in the Docker image                  |
+| `tools`    | Development-only scripts (seed, palette export, pixel rain), not in the Docker image      |
 
 `scripts/` has the Node scripts behind `setup`, `setup:mcp` and `clean`; `prototypes/` holds earlier research (MP-34).
 
@@ -62,6 +62,7 @@ From the root. Commands with `-w <workspace>` can also be run for one workspace,
 | `npm run db:setup:dev -w db`                    | Creates the database and applies pending migrations (`db:setup:prod` runs `dist/`) |
 | `npm run db:palette:export -w tools -- [file]`  | Writes the palette as a `.hex` file, or to stdout                                  |
 | `npm run db:seed:dev -w tools -- <picture.png>` | Fills the canvas with a PNG, see [Seed a picture](#seed-a-picture)                 |
+| `npm run dev:pixel-rain -w tools -- [n] [s]`    | `n` random pixels a second for `s` s through the running backend (8 and 30)        |
 | `npm run setup:mcp`                             | Creates `.mcp.json` for this checkout (`-- --force` overwrites it)                 |
 
 Frontend tests run in Node. A test of a Vue component (`frontend/src/**/*.vue`) mounts it with `@vue/test-utils` and starts with `// @vitest-environment happy-dom` to get a DOM; happy-dom measures nothing, so stub `ResizeObserver` and `getBoundingClientRect` (see `CanvasView.test.ts`).

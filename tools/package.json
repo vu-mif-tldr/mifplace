@@ -9,7 +9,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "db:seed:dev": "tsx --conditions=@mifplace/source src/seed-png.ts",
-    "db:palette:export": "tsx --conditions=@mifplace/source src/export-palette.ts"
+    "db:palette:export": "tsx --conditions=@mifplace/source src/export-palette.ts",
+    "dev:pixel-rain": "tsx --conditions=@mifplace/source src/pixel-rain.ts"
   },
   "keywords": [],
   "author": "",
