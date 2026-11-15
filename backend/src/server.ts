@@ -90,6 +90,7 @@ try {
 }
 
 const app = createApp({
+  version: process.env.APP_VERSION,
   canvasSize,
   palette,
   checkDbHealth: () => mifDb.checkHealth(),

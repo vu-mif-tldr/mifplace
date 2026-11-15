@@ -95,15 +95,18 @@ sudo docker compose up -d
 The old container is stopped before the new one starts, so the demo is down for a few seconds.
 Never run two containers on the same database file.
 
+Which version runs: `curl -s http://127.0.0.1:3001/health` shows it in `version`.
+
 ## Rollback
 
-Every image is also tagged with its commit: `sha-` and the first 7 characters of the hash
-(GitHub → repository → Packages → `mifplace` lists them). Pin the version in `.env` next to
-`compose.yaml`, so that a later `up -d` keeps it:
+Every image is also tagged with its version (`0.4.1`, see
+[Versions](../docs/development.md#versions)) and its commit (`sha-` and the first 7 characters of
+the hash); GitHub → repository → Packages → `mifplace` lists them. Pin the version in `.env` next
+to `compose.yaml`, so that a later `up -d` keeps it:
 
 ```sh
 cd /srv/mifplace-demo
-echo MIFPLACE_TAG=sha-1a2b3c4 | sudo tee .env
+echo MIFPLACE_TAG=0.4.1 | sudo tee .env
 sudo docker compose up -d
 ```
 

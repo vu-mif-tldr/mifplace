@@ -4,7 +4,7 @@
 # everything to the app port below. The image is built by .github/workflows/docker.yml.
 #
 #   docker compose pull && docker compose up -d     update to the latest main
-#   MIFPLACE_TAG=sha-1a2b3c4 in .env                pin a version (rollback)
+#   MIFPLACE_TAG=0.4.1 in .env                      pin a version (rollback)
 
 name: mifplace-demo
 
