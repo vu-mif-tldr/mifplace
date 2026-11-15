@@ -15,6 +15,13 @@ describe('BrandMark', () => {
     expect(svg.attributes('aria-hidden')).toBe('true');
     expect(svg.attributes('width')).toBe('40');
   });
+
+  it('draws the 3x3 pixels of the favicon in fixed colours', () => {
+    const rects = mount(BrandMark).findAll('rect');
+    expect(rects).toHaveLength(9);
+    expect(rects[4].attributes('fill')).toBe('#d2cefd');
+    expect(rects.some((rect) => rect.attributes('fill')?.includes('var('))).toBe(false);
+  });
 });
 
 describe('LiveStatus', () => {
