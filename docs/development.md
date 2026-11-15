@@ -64,6 +64,8 @@ From the root. Commands with `-w <workspace>` can also be run for one workspace,
 | `npm run db:seed:dev -w tools -- <picture.png>` | Fills the canvas with a PNG, see [Seed a picture](#seed-a-picture)                 |
 | `npm run setup:mcp`                             | Creates `.mcp.json` for this checkout (`-- --force` overwrites it)                 |
 
+Frontend tests run in Node. A test of a Vue component (`frontend/src/**/*.vue`) mounts it with `@vue/test-utils` and starts with `// @vitest-environment happy-dom` to get a DOM; happy-dom measures nothing, so stub `ResizeObserver` and `getBoundingClientRect` (see `CanvasView.test.ts`).
+
 ## Settings (`.env`)
 
 There is one `.env` in the root (copy of `.env.example`). The backend, `db:setup`, the tools and the MCP server all read it. Variables from the shell, Docker or `.mcp.json` win over the file.
