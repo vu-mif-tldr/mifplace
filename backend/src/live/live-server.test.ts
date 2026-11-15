@@ -40,7 +40,7 @@ async function start(options: Partial<LiveServerOptions> = {}) {
       return placed.eventId;
     },
     getLiveStats: () => live.stats(),
-    pixelRateLimitPerMinute: 1000,
+    rateLimits: { pixelsPerMinute: 1000 },
   });
 
   const server = http.createServer(app);

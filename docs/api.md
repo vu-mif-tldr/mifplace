@@ -4,6 +4,21 @@
 
 ## 1. HTTP endpoints
 
+**Rate limits.** Every endpoint counts requests per client IP on its own; above the limit the answer is `429` with the usual body `{"success":false,"error":"..."}`. The limits are set in `.env` (`RATE_LIMIT_*`, see [`.env.example`](../.env.example)):
+
+| Endpoint                          | Setting                                      | Default |
+| --------------------------------- | -------------------------------------------- | ------- |
+| `GET /api/palette`                | `RATE_LIMIT_PALETTE_PER_MINUTE`              | 120/min |
+| `GET /api/canvas/size`            | `RATE_LIMIT_CANVAS_SIZE_PER_MINUTE`          | 120/min |
+| `GET /api/canvas`                 | `RATE_LIMIT_CANVAS_PER_MINUTE`               | 20/min  |
+| `POST /api/pixels`                | `RATE_LIMIT_PIXELS_PER_MINUTE`               | 10/min  |
+| `POST /api/waitlist`              | `RATE_LIMIT_WAITLIST_SIGNUP_PER_HOUR`        | 30/hour |
+| `POST /api/waitlist/confirm`      | `RATE_LIMIT_WAITLIST_CONFIRM_PER_MINUTE`     | 120/min |
+| `POST /api/waitlist/unsubscribe`  | `RATE_LIMIT_WAITLIST_UNSUBSCRIBE_PER_MINUTE` | 120/min |
+| The page, its files, the 404 page | `RATE_LIMIT_OTHER_PER_MINUTE`                | 120/min |
+
+`GET /health` has no limit. The WebSocket `/api/ws` is limited by `WS_MAX_CONNECTIONS` instead.
+
 ### `GET /api/palette`
 
 The frontend requests the palette **once during initial page load**. It keeps the palette locally and does not fetch it again for ordinary pixel updates. A page reload or an explicit full reinitialization may fetch it again.
@@ -115,7 +130,7 @@ Collects addresses of people who want to play, before launch, with double opt-in
 | Route          | Status | Case                                                    |
 | -------------- | ------ | ------------------------------------------------------- |
 | `/`            | `400`  | Not an email or not a VU address (schema message)       |
-| `/`            | `429`  | More than 30 signups per hour from one IP               |
+| `/`            | `429`  | Signup limit per IP reached (see rate limits above)     |
 | `/`            | `503`  | All emails together reached 40 per hour, or SMTP failed |
 | `/confirm`     | `200`  | Confirmed (again is fine)                               |
 | `/confirm`     | `404`  | Unknown token or the link has expired                   |

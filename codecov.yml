@@ -61,6 +61,8 @@ component_management:
       name: HTTP API
       paths:
         - backend/src/app.ts
+        - backend/src/rate-limits.ts
+        - backend/src/env-number.ts
     - component_id: live
       name: Live updates
       paths:

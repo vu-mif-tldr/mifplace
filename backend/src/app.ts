@@ -1,7 +1,6 @@
 import express, { type Response } from 'express';
 import type { Server } from 'node:http';
 import * as path from 'node:path';
-import rateLimit from 'express-rate-limit';
 import {
   PlacePixelRequestSchema,
   positionSchema,
@@ -15,6 +14,7 @@ import {
 import type { NewEvent } from '@mifplace/db';
 import { createWaitlistRouter, type WaitlistOptions } from './waitlist.js';
 import type { LiveStats } from './live/live-server.js';
+import { DEFAULT_RATE_LIMITS, limiter, type RateLimits } from './rate-limits.js';
 
 export interface AppConfig {
   // Read once at start: the canvas size does not change while the server runs.
@@ -30,13 +30,10 @@ export interface AppConfig {
   appendEvent: (event: NewEvent) => number;
   // The WebSocket connections for GET /health. Left out, WS is empty (tests without a live server).
   getLiveStats?: () => LiveStats;
-  // Shared public IPs such as campus Wi‑Fi can burst together, so the general limit is set high enough
-  // to avoid false positives while still protecting the app from abuse.
-  rateLimitPerMinute?: number;
-  // The canvas snapshot is the costliest read, so it gets a stricter cap.
-  canvasRateLimitPerMinute?: number;
-  // Pixel writes are limited separately to protect the event log.
-  pixelRateLimitPerMinute?: number;
+  // Requests per IP for every endpoint (rate-limits.ts); left out ones keep their defaults.
+  // Shared public IPs such as campus Wi-Fi can burst together, so the defaults of the reads are
+  // high enough to avoid false positives while still protecting the app from abuse.
+  rateLimits?: Partial<RateLimits>;
   // Express "trust proxy": which proxies may set X-Forwarded-For. Behind Caddy it must be set,
   // otherwise every request has the proxy's address and the per-IP limits become global.
   trustProxy?: boolean | number | string;
@@ -62,70 +59,43 @@ export function createApp({
   getCanvasState,
   appendEvent,
   getLiveStats,
-  rateLimitPerMinute = 120,
-  canvasRateLimitPerMinute = 20,
-  pixelRateLimitPerMinute = 10,
+  rateLimits,
   trustProxy = false,
   waitlist,
 }: AppConfig) {
   const app = express();
   app.set('trust proxy', trustProxy);
 
-  const generalLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    limit: rateLimitPerMinute,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, error: 'Too many requests, please try again later.' },
-  });
-
-  const canvasLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    limit: canvasRateLimitPerMinute,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-      success: false,
-      error: 'Too many requests for /api/canvas, please try again later.',
-    },
-  });
-
-  const pixelLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    limit: pixelRateLimitPerMinute,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-      success: false,
-      error: 'Too many pixel submissions, please try again later.',
-    },
-  });
-
-  // we keep a generous general cap for shared public IPs while protecting the expensive
-  // canvas snapshot and pixel writes with stricter limits. /health is omitted so the liveness check stays available.
-  app.use((req, res, next) => {
-    if (req.path === '/health') return next();
-    if (req.path === '/api/canvas') return canvasLimiter(req, res, next);
-    if (req.path === '/api/pixels' && req.method === 'POST') {
-      return pixelLimiter(req, res, next);
-    }
-    return generalLimiter(req, res, next);
-  });
+  // Every endpoint has its own limiter, counted on its own; /health has none, so the liveness
+  // check stays available. A limiter goes before the body is parsed.
+  const limits = { ...DEFAULT_RATE_LIMITS, ...rateLimits };
 
   // Holds only palette ids, so any other colorIndex (missing, string, fraction, null...) is rejected.
   const paletteIds = new Set(palette.map(({ id }) => id));
   // The size does not change while the server runs, so the position check is built once
   const cell = positionSchema(canvasSize);
 
-  app.get('/api/palette', (_req, res: Response<PaletteColor[]>) => {
-    res.json(palette);
-  });
+  app.get(
+    '/api/palette',
+    limiter(limits.palettePerMinute),
+    (_req, res: Response<PaletteColor[]>) => {
+      res.json(palette);
+    }
+  );
 
-  app.get('/api/canvas/size', (_req, res: Response<CanvasSize>) => {
-    res.json(canvasSize);
-  });
+  app.get(
+    '/api/canvas/size',
+    limiter(limits.canvasSizePerMinute),
+    (_req, res: Response<CanvasSize>) => {
+      res.json(canvasSize);
+    }
+  );
 
-  app.get('/api/canvas', (_req, res: Response<CanvasState | ErrorResponse>) => {
+  const canvasLimiter = limiter(
+    limits.canvasPerMinute,
+    'Too many requests for /api/canvas, please try again later.'
+  );
+  app.get('/api/canvas', canvasLimiter, (_req, res: Response<CanvasState | ErrorResponse>) => {
     // A failure is a 500 with the error body of the API, never a partial snapshot
     try {
       res.json(getCanvasState());
@@ -166,40 +136,50 @@ export function createApp({
     }
   });
 
-  // need this for req.body because can only hold json but without it gives string.
-  // Which req.body doesnt accept
-  app.use(express.json());
-  app.post('/api/pixels', (req, res: Response<PlacePixelResponse | ErrorResponse>) => {
-    // A missing or non-JSON body leaves req.body undefined, the schema rejects it too
-    const body = PlacePixelRequestSchema.safeParse(req.body);
-    if (!body.success) {
-      return res.status(400).json({ success: false, error: zodErrorMessage(body.error) });
-    }
-    // The client computes the position, the server checks it is on the canvas
-    const position = cell.safeParse(body.data);
-    if (!position.success) {
-      return res.status(400).json({ success: false, error: zodErrorMessage(position.error) });
-    }
-    const { colorIndex } = body.data;
-    // Which colors exist is a rule of the server, not of the request shape
-    if (!paletteIds.has(colorIndex)) {
-      return res.status(400).json({ success: false, error: 'Color not in palette' });
-    }
-    try {
-      const eventId = appendEvent({
-        user_id: 0, // dev user
-        color_id: colorIndex,
-        position: position.data,
-      });
+  const pixelLimiter = limiter(
+    limits.pixelsPerMinute,
+    'Too many pixel submissions, please try again later.'
+  );
+  // express.json() fills req.body from the JSON body; without it req.body stays undefined
+  app.post(
+    '/api/pixels',
+    pixelLimiter,
+    express.json(),
+    (req, res: Response<PlacePixelResponse | ErrorResponse>) => {
+      // A missing or non-JSON body leaves req.body undefined, the schema rejects it too
+      const body = PlacePixelRequestSchema.safeParse(req.body);
+      if (!body.success) {
+        return res.status(400).json({ success: false, error: zodErrorMessage(body.error) });
+      }
+      // The client computes the position, the server checks it is on the canvas
+      const position = cell.safeParse(body.data);
+      if (!position.success) {
+        return res.status(400).json({ success: false, error: zodErrorMessage(position.error) });
+      }
+      const { colorIndex } = body.data;
+      // Which colors exist is a rule of the server, not of the request shape
+      if (!paletteIds.has(colorIndex)) {
+        return res.status(400).json({ success: false, error: 'Color not in palette' });
+      }
+      try {
+        const eventId = appendEvent({
+          user_id: 0, // dev user
+          color_id: colorIndex,
+          position: position.data,
+        });
 
-      return res.status(201).json({ success: true, eventId });
-    } catch (error) {
-      console.error('Insert failed:', error);
-      return res.status(500).json({ success: false, error: 'Insert failed' });
+        return res.status(201).json({ success: true, eventId });
+      } catch (error) {
+        console.error('Insert failed:', error);
+        return res.status(500).json({ success: false, error: 'Insert failed' });
+      }
     }
-  });
+  );
 
-  if (waitlist) app.use('/api/waitlist', createWaitlistRouter(waitlist));
+  if (waitlist) app.use('/api/waitlist', createWaitlistRouter(waitlist, limits));
+
+  // Everything not answered above: the page itself, its files and the 404 page
+  app.use(limiter(limits.otherPerMinute));
 
   const STATIC_PATH = path.join(process.cwd(), '../frontend/dist');
 
