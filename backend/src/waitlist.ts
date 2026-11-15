@@ -1,6 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { Router, type Response } from 'express';
-import rateLimit from 'express-rate-limit';
+import express, { Router, type Response } from 'express';
 import {
   WaitlistSignupRequestSchema,
   WaitlistTokenRequestSchema,
@@ -8,6 +7,7 @@ import {
   type ErrorResponse,
 } from '@mifplace/shared';
 import type { Mailer } from './mailer.js';
+import { limiter, perHour, type RateLimits } from './rate-limits.js';
 
 // The waitlist on vu.place before launch: POST /api/waitlist (see docs/api.md).
 // Double opt-in: a signup only sends a link, the address counts once the link is confirmed.
@@ -30,9 +30,6 @@ export interface WaitlistOptions {
   // Where the landing pages are, e.g. https://vu.place; the email links point there.
   publicUrl: string;
   now?: () => number;
-  // Signup requests per IP. Campus Wi-Fi and dorms share addresses, so it is generous:
-  // the per-address and global email limits below are what protects the mail quota.
-  signupsPerIpPerHour?: number;
   // Emails to one address: not more often than this, and not more than emailsPerAddressPerDay.
   // Stops anyone from flooding a stranger's mailbox through our form.
   emailIntervalMs?: number;
@@ -135,103 +132,123 @@ export function confirmationEmail(email: string, publicUrl: string, token: strin
   };
 }
 
-export function createWaitlistRouter({
-  store,
-  mailer,
-  publicUrl,
-  now = Date.now,
-  signupsPerIpPerHour = 30,
-  emailIntervalMs = 10 * MINUTE,
-  emailsPerAddressPerDay = 3,
-  emailsPerHour = 40,
-  confirmWithinMs = CONFIRM_WITHIN_MS,
-}: WaitlistOptions): Router {
+export function createWaitlistRouter(
+  {
+    store,
+    mailer,
+    publicUrl,
+    now = Date.now,
+    emailIntervalMs = 10 * MINUTE,
+    emailsPerAddressPerDay = 3,
+    emailsPerHour = 40,
+    confirmWithinMs = CONFIRM_WITHIN_MS,
+  }: WaitlistOptions,
+  // Requests per IP for the three routes (rate-limits.ts); the email limits above are separate
+  limits: Pick<
+    RateLimits,
+    'waitlistSignupsPerHour' | 'waitlistConfirmPerMinute' | 'waitlistUnsubscribePerMinute'
+  >
+): Router {
   const router = Router();
   const budget = new EmailBudget(emailIntervalMs, emailsPerAddressPerDay, emailsPerHour);
 
-  const signupLimiter = rateLimit({
-    windowMs: HOUR,
-    limit: signupsPerIpPerHour,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, error: 'Too many signups from your network, please try later.' },
-  });
+  const signupLimiter = perHour(
+    limits.waitlistSignupsPerHour,
+    'Too many signups from your network, please try later.'
+  );
+  // Each limiter goes before the body is parsed
+  const json = express.json();
 
   // 202 for a new, a pending and an already confirmed address alike: the form must not tell
   // who is on the list. Only a bad address (400) and a used-up mail quota (503) differ.
-  router.post('/', signupLimiter, async (req, res: Response<WaitlistResponse | ErrorResponse>) => {
-    const body = WaitlistSignupRequestSchema.safeParse(req.body);
-    if (!body.success) {
-      return res.status(400).json({ success: false, error: zodErrorMessage(body.error) });
-    }
-    const { email } = body.data;
-    const time = now();
-    console.log(`Waitlist signup request from ${req.ip}`);
+  router.post(
+    '/',
+    signupLimiter,
+    json,
+    async (req, res: Response<WaitlistResponse | ErrorResponse>) => {
+      const body = WaitlistSignupRequestSchema.safeParse(req.body);
+      if (!body.success) {
+        return res.status(400).json({ success: false, error: zodErrorMessage(body.error) });
+      }
+      const { email } = body.data;
+      const time = now();
+      console.log(`Waitlist signup request from ${req.ip}`);
 
-    let row;
-    try {
-      row = store.addToWaitlist(email, randomBytes(32).toString('base64url'), time);
-    } catch (error) {
-      console.error('Waitlist insert failed:', error);
-      return res.status(500).json({ success: false, error: 'Internal server error' });
-    }
-    if (row.confirmed_at !== null) return res.status(202).json({ success: true });
+      let row;
+      try {
+        row = store.addToWaitlist(email, randomBytes(32).toString('base64url'), time);
+      } catch (error) {
+        console.error('Waitlist insert failed:', error);
+        return res.status(500).json({ success: false, error: 'Internal server error' });
+      }
+      if (row.confirmed_at !== null) return res.status(202).json({ success: true });
 
-    const verdict = budget.check(email, time);
-    if (verdict === 'address') return res.status(202).json({ success: true });
-    if (verdict === 'global') {
-      return res.status(503).json({
+      const verdict = budget.check(email, time);
+      if (verdict === 'address') return res.status(202).json({ success: true });
+      if (verdict === 'global') {
+        return res.status(503).json({
+          success: false,
+          error: 'Too many signups right now, please try again in an hour.',
+        });
+      }
+      budget.record(email, time);
+      try {
+        await mailer.send(confirmationEmail(email, publicUrl, row.token));
+      } catch (error) {
+        console.error('Waitlist email failed:', error);
+        budget.release(email, time);
+        return res
+          .status(503)
+          .json({ success: false, error: 'Could not send the email, please try again later.' });
+      }
+      return res.status(202).json({ success: true });
+    }
+  );
+
+  router.post(
+    '/confirm',
+    limiter(limits.waitlistConfirmPerMinute),
+    json,
+    (req, res: Response<WaitlistResponse | ErrorResponse>) => {
+      const body = WaitlistTokenRequestSchema.safeParse(req.body);
+      if (!body.success) {
+        return res.status(400).json({ success: false, error: zodErrorMessage(body.error) });
+      }
+      const time = now();
+      try {
+        if (store.confirmWaitlist(body.data.token, time - confirmWithinMs, time)) {
+          return res.json({ success: true });
+        }
+      } catch (error) {
+        console.error('Waitlist confirm failed:', error);
+        return res.status(500).json({ success: false, error: 'Internal server error' });
+      }
+      return res.status(404).json({
         success: false,
-        error: 'Too many signups right now, please try again in an hour.',
+        error: 'This link is unknown or has expired, please sign up again.',
       });
     }
-    budget.record(email, time);
-    try {
-      await mailer.send(confirmationEmail(email, publicUrl, row.token));
-    } catch (error) {
-      console.error('Waitlist email failed:', error);
-      budget.release(email, time);
-      return res
-        .status(503)
-        .json({ success: false, error: 'Could not send the email, please try again later.' });
-    }
-    return res.status(202).json({ success: true });
-  });
-
-  router.post('/confirm', (req, res: Response<WaitlistResponse | ErrorResponse>) => {
-    const body = WaitlistTokenRequestSchema.safeParse(req.body);
-    if (!body.success) {
-      return res.status(400).json({ success: false, error: zodErrorMessage(body.error) });
-    }
-    const time = now();
-    try {
-      if (store.confirmWaitlist(body.data.token, time - confirmWithinMs, time)) {
-        return res.json({ success: true });
-      }
-    } catch (error) {
-      console.error('Waitlist confirm failed:', error);
-      return res.status(500).json({ success: false, error: 'Internal server error' });
-    }
-    return res.status(404).json({
-      success: false,
-      error: 'This link is unknown or has expired, please sign up again.',
-    });
-  });
+  );
 
   // Always 200 for a well-formed token: removing an address that is not there is not an error.
-  router.post('/unsubscribe', (req, res: Response<WaitlistResponse | ErrorResponse>) => {
-    const body = WaitlistTokenRequestSchema.safeParse(req.body);
-    if (!body.success) {
-      return res.status(400).json({ success: false, error: zodErrorMessage(body.error) });
+  router.post(
+    '/unsubscribe',
+    limiter(limits.waitlistUnsubscribePerMinute),
+    json,
+    (req, res: Response<WaitlistResponse | ErrorResponse>) => {
+      const body = WaitlistTokenRequestSchema.safeParse(req.body);
+      if (!body.success) {
+        return res.status(400).json({ success: false, error: zodErrorMessage(body.error) });
+      }
+      try {
+        store.removeFromWaitlist(body.data.token);
+      } catch (error) {
+        console.error('Waitlist unsubscribe failed:', error);
+        return res.status(500).json({ success: false, error: 'Internal server error' });
+      }
+      return res.json({ success: true });
     }
-    try {
-      store.removeFromWaitlist(body.data.token);
-    } catch (error) {
-      console.error('Waitlist unsubscribe failed:', error);
-      return res.status(500).json({ success: false, error: 'Internal server error' });
-    }
-    return res.json({ success: true });
-  });
+  );
 
   return router;
 }

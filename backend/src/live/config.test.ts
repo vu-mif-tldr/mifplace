@@ -7,6 +7,7 @@ describe('liveOptionsFromEnv', () => {
       path: '/api/ws',
       maxPayload: 1024,
       batchMs: 100,
+      onlineMs: 2000,
       maxConnections: 2000,
       maxBacklog: 10000,
       maxBufferedBytes: 262144,
@@ -26,6 +27,7 @@ describe('liveOptionsFromEnv', () => {
     expect(
       liveOptionsFromEnv({
         WS_BATCH_MS: '50',
+        WS_ONLINE_MS: '300',
         WS_IDLE_PING_MS: '1000',
         WS_PONG_TIMEOUT_MS: '2000',
         WS_LIVENESS_CHECK_MS: '500',
@@ -38,6 +40,7 @@ describe('liveOptionsFromEnv', () => {
       path: '/api/ws',
       maxPayload: 1024,
       batchMs: 50,
+      onlineMs: 300,
       maxConnections: 10,
       maxBacklog: 500,
       maxBufferedBytes: 4096,

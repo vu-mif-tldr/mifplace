@@ -1,113 +1,56 @@
-#palette {
-  display: grid;
-  grid-template-columns: repeat(4, 32px);
-  gap: 6px;
+/* Page-wide settings: colours, the font and base styles. Each component keeps its own styles.
+   App.vue sets --glow (the light, the colour the user holds) and --progress (how full the
+   rings are) for everything inside it. */
+
+/* Registered so the light fades from one colour to the next instead of jumping */
+@property --glow {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #8a93c4;
 }
 
-.swatch {
-  width: 32px;
-  height: 32px;
-  border: 2px solid #ccc;
-  border-radius: 4px;
-  cursor: pointer;
-  padding: 0;
+/* How busy the canvas is, 0 to 1; registered so the light brightens and dims smoothly */
+@property --energy {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
 }
 
-.swatch.selected {
-  border: 3px solid #000;
-  outline: 2px solid #fff;
-  box-shadow: 0 0 0 4px #1a73e8;
+:root {
+  color-scheme: dark;
+  --ink: #0c1030;
+  --text: #eef0fa;
+  --muted: #c8cdea;
+  --ok: #5fd68a;
+  --error: #ff8a8a;
+  --warn: #ffd27a;
+  /* The live parts of the page: the ticker, the connection and the count of open pages */
+  --font-live: 'Saira Semi Condensed', system-ui, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
 }
 
-#canvas-section {
-  text-align: center;
-}
-
-main {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  /* The second row takes the spare height, so the selected color stays right under the palette */
-  grid-template-rows: auto 1fr auto;
-  grid-template-areas:
-    'palette  canvas  .'
-    'current  canvas  .'
-    'pixel    pixel   pixel';
-  align-items: start;
-  gap: 24px;
-  padding: 16px;
-}
-
-#canvas-section {
-  grid-area: canvas;
-}
-#pixel-info-section {
-  grid-area: pixel;
-  text-align: center;
-}
-
-#color-picker-section {
-  grid-area: palette;
-}
-#current-color-section {
-  grid-area: current;
-}
-
-/* These lines can end up over the pixel band */
-#pixel-info-section span,
-.error {
-  background: rgb(255 255 255 / 85%);
-  border-radius: 4px;
-  padding: 2px 8px;
-}
-
-#current-color-swatch {
-  width: 64px;
-  height: 64px;
-  border: 2px solid #000;
-  border-radius: 4px;
-}
-
-#viewport {
-  /* Shows where the canvas ends when it is smaller than the viewport */
-  background: #ddd;
-  overflow: hidden;
-  margin: 0 auto;
-  border: 2px solid #333;
-  box-sizing: content-box;
-}
-
-#canvas {
-  background: #fff;
-  cursor: crosshair;
-  display: block;
-  /* The element is one pixel per cell, so it must start at the corner of the viewport,
-     not be centered at its unscaled size */
+html,
+body,
+#app {
+  height: 100%;
   margin: 0;
-  transform-origin: 0 0;
-  image-rendering: pixelated;
 }
 
-.error {
-  color: #c00;
+body {
+  background: var(--ink);
+  color: var(--text);
 }
 
-/* Shown under the canvas while the live connection is being restored */
-.live-status {
-  background: rgb(255 255 255 / 85%);
-  border-radius: 4px;
-  padding: 2px 8px;
-  color: #664d03;
+button {
+  font: inherit;
 }
 
-/* Decoration behind the page content, it must not catch the mouse */
-.pixel-band {
-  position: fixed;
-  left: 0;
-  bottom: 0;
-  z-index: -1;
-  width: 100%;
-  height: 50vh;
-  pointer-events: none;
-  /* The moving plane is seen only here: solid at the bottom, fading out upwards */
-  mask-image: linear-gradient(to top, #000, transparent);
+button:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 3px;
 }

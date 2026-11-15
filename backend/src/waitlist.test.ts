@@ -5,6 +5,7 @@ import { afterEach, describe, it } from 'vitest';
 import Database from 'better-sqlite3';
 import { MIGRATIONS_DIR, MifDb, loadMigrations, migrate } from '@mifplace/db';
 import { createApp } from './app.js';
+import type { RateLimits } from './rate-limits.js';
 import nodemailer, { type SendMailOptions } from 'nodemailer';
 import {
   ConsoleMailer,
@@ -41,7 +42,8 @@ interface Setup {
 async function start(
   options: Partial<WaitlistOptions> = {},
   mailer: Mailer = new ConsoleMailer(() => {}),
-  trustProxy: string | boolean = false
+  trustProxy: string | boolean = false,
+  rateLimits: Partial<RateLimits> = {}
 ): Promise<Setup> {
   const db = new Database(':memory:');
   migrate(db, loadMigrations(MIGRATIONS_DIR));
@@ -54,6 +56,7 @@ async function start(
     getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
     appendEvent: () => 1,
     trustProxy,
+    rateLimits,
     waitlist: {
       store: mif,
       mailer,
@@ -221,10 +224,25 @@ describe('POST /api/waitlist', () => {
   });
 
   it('limits signups per IP', async () => {
-    const { url } = await start({ signupsPerIpPerHour: 2 });
+    const { url } = await start({}, undefined, false, { waitlistSignupsPerHour: 2 });
     assert.equal((await post(url, { email: 'a@vu.lt' })).status, 202);
     assert.equal((await post(url, { email: 'b@vu.lt' })).status, 202);
     assert.equal((await post(url, { email: 'c@vu.lt' })).status, 429);
+  });
+});
+
+describe('confirm and unsubscribe limits', () => {
+  it('limits each route on its own count', async () => {
+    const { url } = await start({}, undefined, false, {
+      waitlistConfirmPerMinute: 1,
+      waitlistUnsubscribePerMinute: 1,
+    });
+    assert.equal((await post(`${url}/confirm`, { token: 'bad' })).status, 400);
+    assert.equal((await post(`${url}/confirm`, { token: 'bad' })).status, 429);
+    assert.equal((await post(`${url}/unsubscribe`, { token: 'bad' })).status, 400);
+    assert.equal((await post(`${url}/unsubscribe`, { token: 'bad' })).status, 429);
+    // A signup is not counted with them
+    assert.equal((await post(url, { email: 'a@vu.lt' })).status, 202);
   });
 });
 
@@ -239,14 +257,14 @@ describe('client IP behind a proxy', () => {
   }
 
   it('limits each forwarded client separately when the proxy is trusted', async () => {
-    const { url } = await start({ signupsPerIpPerHour: 1 }, undefined, 'loopback');
+    const { url } = await start({}, undefined, 'loopback', { waitlistSignupsPerHour: 1 });
     assert.equal(await postFrom(url, '203.0.113.1', 'a@vu.lt'), 202);
     assert.equal(await postFrom(url, '203.0.113.2', 'b@vu.lt'), 202);
     assert.equal(await postFrom(url, '203.0.113.1', 'c@vu.lt'), 429);
   });
 
   it('ignores X-Forwarded-For without TRUST_PROXY', async () => {
-    const { url } = await start({ signupsPerIpPerHour: 1 });
+    const { url } = await start({}, undefined, false, { waitlistSignupsPerHour: 1 });
     assert.equal(await postFrom(url, '203.0.113.1', 'a@vu.lt'), 202);
     assert.equal(await postFrom(url, '203.0.113.2', 'b@vu.lt'), 429);
   });

@@ -24,6 +24,8 @@ export interface LiveHandlers {
   onReset(): void;
   // The state changed, for an indicator on the page
   onState?(state: LiveState): void;
+  // How many pages are connected now, the page itself included
+  onOnline?(count: number): void;
 }
 
 // The part of a WebSocket this module uses, so a test can pass a fake
@@ -152,6 +154,10 @@ export function connectLive(
     }
     if (!message?.success) {
       console.warn('Ignored a live message the page does not understand:', data);
+      return;
+    }
+    if (message.data.type === 'online') {
+      handlers.onOnline?.(message.data.count);
       return;
     }
     if (message.data.type === 'reset') {

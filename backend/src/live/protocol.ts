@@ -50,3 +50,8 @@ export function encodePixels(events: PixelEvent[], last: Checkpoint): string {
 
 // The checkpoint cannot be resumed: the client loads a new snapshot and connects again
 export const RESET = JSON.stringify({ type: 'reset' });
+
+// {"type":"online","count":7}: how many pages have the live connection open now
+export function encodeOnline(count: number): string {
+  return JSON.stringify({ type: 'online', count });
+}

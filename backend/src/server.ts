@@ -12,6 +12,7 @@ import type { CanvasStore } from './canvas-state.js';
 import { loadCanvas, placePixel } from './canvas-log.js';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
 import { liveOptionsFromEnv } from './live/config.js';
+import { rateLimitsFromEnv } from './rate-limits.js';
 import { startLiveServer } from './live/live-server.js';
 import { mailerFromEnv } from './mailer.js';
 import { CONFIRM_WITHIN_MS, type WaitlistOptions } from './waitlist.js';
@@ -35,8 +36,10 @@ function parseTrustProxy(value: string | undefined): boolean | number | string {
 }
 const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
 
-// Fails here, before the database is opened, if a WS_* setting is not a positive integer.
+// Fail here, before the database is opened, if a WS_* or RATE_LIMIT_* setting is not a
+// positive integer.
 const liveOptions = liveOptionsFromEnv();
+const rateLimits = rateLimitsFromEnv();
 
 // The waitlist runs where PUBLIC_URL is set (the email links point there). In development it
 // defaults to this server; in production it stays off unless set, so the demo has none.
@@ -93,9 +96,7 @@ const app = createApp({
   getCanvasState: () => canvas.snapshot(),
   appendEvent: placeAndPublish,
   getLiveStats: () => live.stats(),
-  rateLimitPerMinute: 120,
-  canvasRateLimitPerMinute: 20,
-  pixelRateLimitPerMinute: 10,
+  rateLimits,
   trustProxy,
   waitlist: waitlistOptions(),
 });

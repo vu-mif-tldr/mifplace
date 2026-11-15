@@ -20,6 +20,7 @@ ignore:
   - frontend/src/main.ts
   - mcp/src/server.ts
   - tools/src/export-palette.ts
+  - tools/src/pixel-rain.ts
   - tools/src/seed-png.ts
 
 flags:
@@ -61,6 +62,8 @@ component_management:
       name: HTTP API
       paths:
         - backend/src/app.ts
+        - backend/src/rate-limits.ts
+        - backend/src/env-number.ts
     - component_id: live
       name: Live updates
       paths:
@@ -89,7 +92,17 @@ component_management:
       paths:
         - frontend/src/canvas.ts
         - frontend/src/view.ts
+        - frontend/src/glow.ts
+        - frontend/src/blooms.ts
+        - frontend/src/texts.ts
+        - frontend/src/useBlooms.ts
+        - frontend/src/topLights.ts
+        - frontend/src/useTopLights.ts
+        - frontend/src/activity.ts
+        - frontend/src/useActivity.ts
+        - frontend/src/belt.ts
         - frontend/src/App.vue
+        - frontend/src/components/**
     - component_id: frontend_api
       name: API client
       paths:

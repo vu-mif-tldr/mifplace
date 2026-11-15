@@ -1,5 +1,6 @@
 import { DEFAULT_CHECK_INTERVAL_MS, DEFAULT_IDLE_MS, DEFAULT_PONG_TIMEOUT_MS } from './liveness.js';
 import type { LiveServerOptions } from './live-server.js';
+import { positiveInt } from '../env-number.js';
 
 // The live server settings from the environment (see .env.example), with the defaults of
 // docs/api.md. A value that is set but not a positive integer stops the server at start,
@@ -10,6 +11,8 @@ export function liveOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): LiveSe
     // Clients send nothing, so a legitimate message is never longer than this
     maxPayload: 1024,
     batchMs: positiveInt(env, 'WS_BATCH_MS', 100),
+    // The number of connected pages goes out at most this often
+    onlineMs: positiveInt(env, 'WS_ONLINE_MS', 2000),
     maxConnections: positiveInt(env, 'WS_MAX_CONNECTIONS', 2000),
     // A client more events behind than this reloads the snapshot instead of catching up
     maxBacklog: positiveInt(env, 'WS_MAX_BACKLOG', 10000),
@@ -26,14 +29,4 @@ export function liveOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): LiveSe
       intervalMs: positiveInt(env, 'WS_LIVENESS_CHECK_MS', DEFAULT_CHECK_INTERVAL_MS),
     },
   };
-}
-
-function positiveInt(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
-  const raw = env[name];
-  if (raw === undefined || raw === '') return fallback;
-  // Digits only: "1e3", "1.5" and " 1" are mistakes, not settings
-  if (!/^\d+$/.test(raw) || Number(raw) < 1 || !Number.isSafeInteger(Number(raw))) {
-    throw new Error(`Invalid ${name}: ${raw}`);
-  }
-  return Number(raw);
 }

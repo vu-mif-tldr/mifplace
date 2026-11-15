@@ -1,15 +1,27 @@
 import type { Server } from 'node:http';
 import { Broadcaster, type LiveEvent } from './broadcaster.js';
 import { catchUp } from './catch-up.js';
-import { RESET, parseResumeRequest, type Checkpoint, type PixelEvent } from './protocol.js';
+import { OnlineAnnouncer } from './online.js';
+import {
+  RESET,
+  encodeOnline,
+  parseResumeRequest,
+  type Checkpoint,
+  type PixelEvent,
+} from './protocol.js';
 import type { Connection } from './registry.js';
 import { attachLiveTransport, type LiveTransportOptions } from './transport.js';
 
-export type LiveServerOptions = Omit<LiveTransportOptions, 'onConnect' | 'onMessage'> & {
+export type LiveServerOptions = Omit<
+  LiveTransportOptions,
+  'onConnect' | 'onMessage' | 'onDisconnect'
+> & {
   // Pixels stored within this many ms go out as one message (docs/api.md: 100)
   batchMs: number;
   // A client more events behind than this gets reset instead of the missed events
   maxBacklog: number;
+  // The number of connected pages goes out at most once per this many ms
+  onlineMs: number;
 };
 
 // What the live server reads from the event log: the canvas in memory and MifDb in production
@@ -39,7 +51,7 @@ export interface LiveServer {
 export function startLiveServer(
   server: Server,
   log: LiveLog,
-  { batchMs, maxBacklog, ...transportOptions }: LiveServerOptions
+  { batchMs, maxBacklog, onlineMs, ...transportOptions }: LiveServerOptions
 ): LiveServer {
   const transport = attachLiveTransport(server, {
     ...transportOptions,
@@ -47,20 +59,15 @@ export function startLiveServer(
     // Registration and the first message happen in one synchronous step, so no batch can
     // slip in between (the broadcaster sends from a timer, never from here).
     onConnect(connection, url) {
-      const request = parseResumeRequest(url.searchParams);
-      if (request.kind === 'live') return; // only new batches, no history
-      if (request.kind === 'invalid') {
-        reset(connection);
-        return;
+      if (resume(connection, url)) {
+        // The new page learns the count at once, everyone else with the next announcement
+        transport.registry.send(connection, encodeOnline(open()));
       }
-      const result = catchUp(request.after, {
-        lastSent: broadcaster.lastSent,
-        timestampOf: log.timestampOf,
-        eventsBetween: log.eventsBetween,
-        maxBacklog,
-      });
-      if (result.kind === 'reset') reset(connection);
-      else if (result.kind === 'events') transport.registry.send(connection, result.message);
+      online.changed();
+    },
+
+    onDisconnect() {
+      online.changed();
     },
 
     // Clients send nothing over the socket (docs/api.md), placements go through POST /api/pixels
@@ -68,6 +75,30 @@ export function startLiveServer(
       transport.registry.close(connection, 1003, 'Clients send nothing');
     },
   });
+
+  // Sends what a connecting client missed. False if it was reset: that connection is closing.
+  function resume(connection: Connection, url: URL): boolean {
+    const request = parseResumeRequest(url.searchParams);
+    if (request.kind === 'live') return true; // only new batches, no history
+    if (request.kind === 'invalid') {
+      reset(connection);
+      return false;
+    }
+    const result = catchUp(request.after, {
+      lastSent: broadcaster.lastSent,
+      timestampOf: log.timestampOf,
+      eventsBetween: log.eventsBetween,
+      maxBacklog,
+    });
+    if (result.kind === 'reset') {
+      reset(connection);
+      return false;
+    }
+    if (result.kind === 'events') transport.registry.send(connection, result.message);
+    return true;
+  }
+
+  const open = () => transport.registry.stats().open;
 
   // The client loads a new snapshot and connects again (docs/api.md), so this connection is of
   // no use: closing it keeps the next batches from going to a client that would discard them.
@@ -82,11 +113,16 @@ export function startLiveServer(
     log.checkpoint()
   );
 
+  const online = new OnlineAnnouncer({ intervalMs: onlineMs }, open, (data) =>
+    transport.registry.broadcast(data)
+  );
+
   return {
     publish: (event) => broadcaster.publish(event),
     stats: () => transport.registry.stats(),
     close() {
       broadcaster.close();
+      online.close();
       transport.close();
     },
   };

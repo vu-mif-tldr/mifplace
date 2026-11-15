@@ -77,9 +77,17 @@ export type PixelsMessage = z.infer<typeof PixelsMessageSchema>;
 export const ResetMessageSchema = z.object({ type: z.literal('reset') });
 export type ResetMessage = z.infer<typeof ResetMessageSchema>;
 
+// How many pages have the live connection open now: on connect, then when it changes
+export const OnlineMessageSchema = z.object({
+  type: z.literal('online'),
+  count: z.int().nonnegative(),
+});
+export type OnlineMessage = z.infer<typeof OnlineMessageSchema>;
+
 export const LiveMessageSchema = z.discriminatedUnion('type', [
   PixelsMessageSchema,
   ResetMessageSchema,
+  OnlineMessageSchema,
 ]);
 export type LiveMessage = z.infer<typeof LiveMessageSchema>;
 

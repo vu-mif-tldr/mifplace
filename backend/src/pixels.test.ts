@@ -18,9 +18,7 @@ const app = createApp({
   checkDbHealth: () => {},
   getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
   appendEvent: () => 42,
-  rateLimitPerMinute: 120,
-  canvasRateLimitPerMinute: 20,
-  pixelRateLimitPerMinute: 120,
+  rateLimits: { pixelsPerMinute: 120 },
 });
 
 beforeAll(async () => {
