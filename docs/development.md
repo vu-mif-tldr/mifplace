@@ -133,7 +133,7 @@ VS Code with the Prettier (`esbenp.prettier-vscode`), ESLint (`dbaeumer.vscode-e
 
 Every merge to `main` is a new version `X.Y.Z`, made by the "Docker image" workflow: Z goes up by default. Put the label **`minor`** on a pull request to raise Y (Z back to 0), or **`major`** to raise X (Y and Z back to 0); the labels are read when the pull request is merged. The first version is `0.4.0`.
 
-The version is a git tag `vX.Y.Z` with a GitHub release listing the merged pull requests, a Docker tag (`0.4.1` and `0.4`) and the `version` field of `GET /health` (`dev` outside a build of `main`). Nothing in the code holds it: the `version` of every `package.json` stays `1.0.0`. The rules are in `tools/src/release-version.ts`.
+The version is a git tag `vX.Y.Z` with a GitHub release listing the merged pull requests, a Docker tag (`0.4.1` and `0.4`), the `version` field of `GET /health` and the small grey label next to the logo on the page (`dev` outside a build of `main`). Nothing in the code holds it: the `version` of every `package.json` stays `1.0.0`. The rules are in `tools/src/release-version.ts`.
 
 ## Further reading
 

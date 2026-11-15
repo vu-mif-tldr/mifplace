@@ -22,6 +22,9 @@ COPY shared shared
 COPY db db
 COPY backend backend
 COPY frontend frontend
+# The version for the page (vite.config.ts), X.Y.Z from CI on main. Declared only here, so the
+# layers above stay cached from one version to the next.
+ARG APP_VERSION=dev
 RUN npm run build
 
 # Production dependencies of the backend only (with @mifplace/db and @mifplace/shared): no frontend

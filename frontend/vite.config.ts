@@ -3,6 +3,11 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [vue()],
+  // The version of the build (docs/development.md, "Versions"): APP_VERSION from the Docker
+  // build of main, "dev" everywhere else
+  define: {
+    'import.meta.env.APP_VERSION': JSON.stringify(process.env.APP_VERSION || 'dev'),
+  },
   // @mifplace/shared from its TypeScript sources: no build of shared/dist is needed for the
   // dev server, the bundle and the tests. The rest are Vite's defaults, which these settings replace.
   resolve: { conditions: ['@mifplace/source', 'module', 'browser', 'development|production'] },
