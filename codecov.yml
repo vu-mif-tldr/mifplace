@@ -92,7 +92,9 @@ component_management:
         - frontend/src/glow.ts
         - frontend/src/blooms.ts
         - frontend/src/texts.ts
+        - frontend/src/useBlooms.ts
         - frontend/src/App.vue
+        - frontend/src/components/**
     - component_id: frontend_api
       name: API client
       paths:
