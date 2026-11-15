@@ -31,17 +31,21 @@ describe('LiveStatus', () => {
 });
 
 describe('TopBar', () => {
-  it('shows the cell under the mouse and the connection', () => {
+  it('shows the cell under the mouse, how many pages are open and the connection', () => {
     const wrapper = mount(TopBar, {
-      props: { hoveredCell: { x: 3, y: 9 }, liveState: 'connected' },
+      props: { hoveredCell: { x: 3, y: 9 }, liveState: 'connected', online: 7 },
     });
     expect(wrapper.text()).toContain('3, 9');
+    const online = wrapper.get('.online');
+    expect(online.text()).toBe('7');
+    expect(online.find('svg').exists()).toBe(true);
     expect(wrapper.findComponent(LiveStatus).exists()).toBe(true);
   });
 
-  it('shows neither without a cell or a connection', () => {
-    const wrapper = mount(TopBar, { props: { hoveredCell: null, liveState: null } });
+  it('shows none of them without a cell or a connection', () => {
+    const wrapper = mount(TopBar, { props: { hoveredCell: null, liveState: null, online: null } });
     expect(wrapper.find('.coords').exists()).toBe(false);
+    expect(wrapper.find('.online').exists()).toBe(false);
     expect(wrapper.findComponent(LiveStatus).exists()).toBe(false);
   });
 });

@@ -73,7 +73,7 @@ const left = (li: ReturnType<Wrapper['findAll']>[number]) =>
   Number(/translateX\((-?[\d.]+)px\)/.exec(li.attributes('style') ?? '')?.[1]);
 
 describe('ActivityTicker', () => {
-  it('starts with "Dabar ramu" already in view at the right edge', async () => {
+  it('starts with "Dabar ramu..." already in view at the right edge', async () => {
     const wrapper = ticker();
     await run(wrapper, 2 / 60);
     expect(texts_(wrapper)).toEqual([texts.quiet]);
@@ -156,7 +156,7 @@ describe('ActivityTicker', () => {
     expect(left(items(wrapper)[1])).toBeGreaterThanOrEqual(STRIP);
   });
 
-  it('brings "Dabar ramu" back from the right edge once everything has left', async () => {
+  it('brings "Dabar ramu..." back from the right edge once everything has left', async () => {
     const wrapper = ticker();
     await run(wrapper, (STRIP + 10) / BELT_SPEED);
     expect(texts_(wrapper)).toEqual([texts.quiet]);

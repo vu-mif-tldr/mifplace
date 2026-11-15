@@ -11,6 +11,8 @@ export function liveOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): LiveSe
     // Clients send nothing, so a legitimate message is never longer than this
     maxPayload: 1024,
     batchMs: positiveInt(env, 'WS_BATCH_MS', 100),
+    // The number of connected pages goes out at most this often
+    onlineMs: positiveInt(env, 'WS_ONLINE_MS', 2000),
     maxConnections: positiveInt(env, 'WS_MAX_CONNECTIONS', 2000),
     // A client more events behind than this reloads the snapshot instead of catching up
     maxBacklog: positiveInt(env, 'WS_MAX_BACKLOG', 10000),

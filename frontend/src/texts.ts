@@ -19,7 +19,7 @@ export const texts = {
   placeNothing: 'Pirma pasirink langelį',
   coordinates: (x: number, y: number) => `${x}, ${y}`,
   activity: 'Kas vyksta drobėje',
-  quiet: 'Dabar ramu',
+  quiet: 'Dabar ramu...',
   yours: 'Tavo:',
 };
 

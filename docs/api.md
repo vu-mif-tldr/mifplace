@@ -200,6 +200,14 @@ The server batches live changes every **100 ms**, sending a JSON text message **
 
 Sent when the resume checkpoint is malformed, unknown, mismatched, or too far behind; the server then closes the connection (code 1000). The client requests a fresh `GET /api/canvas` snapshot and reconnects using the new `eventId` and `timestamp`. The palette and the canvas size need not be reloaded.
 
+### `online` — how many pages are connected
+
+```json
+{ "type": "online", "count": 7 }
+```
+
+`count` is the number of open live connections, the receiving page included: open pages, not people (one person with two tabs counts twice; people cannot be told apart before sign-in). A page gets it right after it connects (after the catch-up `pixels`, if any; not with a `reset`), and every page gets it again when the number changes, at most once every `WS_ONLINE_MS` (2 seconds by default) and only if it differs from the last one sent. It does not touch the checkpoint. The page shows it while it is connected.
+
 ### Ping/pong — connection heartbeat
 
 The **backend starts a heartbeat timer for each WebSocket connection**. When no other activity has occurred for **15 seconds**, it sends a standard WebSocket **ping control frame**. The client replies with a **pong control frame**; browser WebSocket implementations normally handle this automatically, without application JavaScript.

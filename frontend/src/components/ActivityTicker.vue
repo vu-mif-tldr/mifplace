@@ -10,7 +10,7 @@ import type { Cell } from '../view';
 // - every new pixel: "● x, y", shown at once, pushing the belt if there is no room;
 // - the selected cell: "Tavo: ● x, y", one message that follows the selection; it waits its
 //   turn behind the right edge and never pushes;
-// - "Dabar ramu" when nothing has happened for a while.
+// - "Dabar ramu..." when nothing has happened for a while.
 // Places only, never people (NFR-11).
 const props = defineProps<{
   selectedCell: Cell | null;
@@ -26,7 +26,7 @@ type Message = {
   color: string;
 };
 
-// "Dabar ramu" comes when the belt is empty and no pixel has arrived for this long, ms
+// "Dabar ramu..." comes when the belt is empty and no pixel has arrived for this long, ms
 const QUIET_AFTER_MS = 10_000;
 
 let nextId = 0;
@@ -96,7 +96,7 @@ function redraw() {
 function frame(dt: number, now: number) {
   if (stripWidth === 0) return;
 
-  // The first "Dabar ramu" shows at once; later ones come in from the right edge
+  // The first "Dabar ramu..." shows at once; later ones come in from the right edge
   if (belt.items.length === 0 && pending.length === 0 && now - lastEvent >= QUIET_AFTER_MS) {
     enqueue('quiet');
   }
@@ -105,7 +105,7 @@ function frame(dt: number, now: number) {
     const width = elements.get(pending[0].id)?.offsetWidth ?? 0;
     if (width === 0) break;
     const message = pending.shift()!;
-    // Only a new pixel pushes the belt; the first "Dabar ramu" just starts in view
+    // Only a new pixel pushes the belt; the first "Dabar ramu..." just starts in view
     const important = message.kind === 'pixel' || (message.kind === 'quiet' && !quietShown);
     if (message.kind === 'quiet') quietShown = true;
     belt = addItem(belt, { id: message.id, width }, stripWidth, important);
@@ -174,7 +174,7 @@ onUnmounted(() => {
   overflow: hidden;
   border-top: 1px solid rgb(255 255 255 / 8%);
   background: rgb(12 16 48 / 60%);
-  font-family: 'Saira Semi Condensed', system-ui, sans-serif;
+  font-family: var(--font-live);
   font-size: 13px;
   font-weight: 500;
   /* Digits of one width, so coordinates do not jump */

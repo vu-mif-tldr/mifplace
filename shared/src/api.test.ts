@@ -101,6 +101,13 @@ describe('LiveMessageSchema', () => {
     expect(LiveMessageSchema.parse({ type: 'reset' })).toEqual({ type: 'reset' });
   });
 
+  it('accepts an online message', () => {
+    expect(LiveMessageSchema.parse({ type: 'online', count: 7 })).toEqual({
+      type: 'online',
+      count: 7,
+    });
+  });
+
   it.each([
     ['an unknown type', { type: 'hb' }],
     ['no type', { pixels: [], eventId: 1, timestamp: 1 }],
@@ -109,6 +116,8 @@ describe('LiveMessageSchema', () => {
     ['a fractional id', { type: 'pixels', pixels: [[1.5, 2, 3]], eventId: 1, timestamp: 1 }],
     ['no checkpoint', { type: 'pixels', pixels: [[1, 2, 3]] }],
     ['a string instead of an object', '{"type":"reset"}'],
+    ['a negative online count', { type: 'online', count: -1 }],
+    ['an online message without a count', { type: 'online' }],
   ])('rejects %s', (_case, data) => {
     expect(LiveMessageSchema.safeParse(data).success).toBe(false);
   });

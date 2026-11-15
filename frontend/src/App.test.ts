@@ -10,6 +10,7 @@ import CanvasView from './components/CanvasView.vue';
 import LoadState from './components/LoadState.vue';
 import PaletteDock from './components/PaletteDock.vue';
 import SelectionRing from './components/SelectionRing.vue';
+import TopBar from './components/TopBar.vue';
 import TopLights from './components/TopLights.vue';
 
 // The page against a fake server: the API calls and the live connection are mocked
@@ -136,6 +137,24 @@ describe('App', () => {
     const view = wrapper.getComponent(CanvasView);
     expect(view.props('blooms')).toMatchObject([{ x: 1, y: 0, color: '#00a2e8' }]);
     expect(view.props('paused')).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('shows how many pages are open only while connected', async () => {
+    const wrapper = await page();
+    const bar = wrapper.getComponent(TopBar);
+    handlers.onOnline?.(5);
+    await flushPromises();
+    // Still connecting: no count yet
+    expect(bar.props('online')).toBeNull();
+
+    handlers.onState?.('connected');
+    await flushPromises();
+    expect(bar.props('online')).toBe(5);
+
+    handlers.onState?.('reconnecting');
+    await flushPromises();
+    expect(bar.props('online')).toBeNull();
     wrapper.unmount();
   });
 

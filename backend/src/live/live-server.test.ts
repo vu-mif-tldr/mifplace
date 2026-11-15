@@ -60,6 +60,7 @@ async function start(options: Partial<LiveServerOptions> = {}) {
       maxBufferedBytes: 1024 * 1024,
       batchMs: 20,
       maxBacklog: 100,
+      onlineMs: 20,
       ...options,
     }
   );
@@ -72,16 +73,25 @@ async function start(options: Partial<LiveServerOptions> = {}) {
 
 // Collects the text messages and the close code from the moment the socket is created: a reset
 // and the close after it arrive right after the upgrade, before a listener added later would run.
-function connect(
-  url: string
-): Promise<{ ws: WebSocket; messages: unknown[]; closed: Promise<number> }> {
+// The online counts go to their own list, so the other tests see only pixels and resets.
+function connect(url: string): Promise<{
+  ws: WebSocket;
+  messages: unknown[];
+  online: number[];
+  closed: Promise<number>;
+}> {
   const ws = new WebSocket(url);
   clients.push(ws);
   const messages: unknown[] = [];
-  ws.on('message', (data) => messages.push(JSON.parse(data.toString())));
+  const online: number[] = [];
+  ws.on('message', (data) => {
+    const message = JSON.parse(data.toString()) as { type: string; count?: number };
+    if (message.type === 'online') online.push(message.count!);
+    else messages.push(message);
+  });
   const closed = new Promise<number>((resolve) => ws.once('close', resolve));
   return new Promise((resolve, reject) => {
-    ws.once('open', () => resolve({ ws, messages, closed }));
+    ws.once('open', () => resolve({ ws, messages, online, closed }));
     ws.once('error', reject);
   });
 }
@@ -108,6 +118,33 @@ afterEach(async () => {
 });
 
 describe('live server', () => {
+  it('tells a new page how many pages are connected, and everyone when it changes', async () => {
+    const { ws } = await start();
+    const a = await connect(ws);
+    await vi.waitFor(() => expect(a.online).toEqual([1]));
+
+    const b = await connect(ws);
+    await vi.waitFor(() => expect(b.online[0]).toBe(2));
+    await vi.waitFor(() => expect(a.online).toEqual([1, 2]));
+
+    b.ws.close();
+    await vi.waitFor(() => expect(a.online).toEqual([1, 2, 1]));
+  });
+
+  it('sends the count of a wave of connects as one message', async () => {
+    const { ws } = await start({ onlineMs: 200 });
+    const a = await connect(ws);
+    await Promise.all([connect(ws), connect(ws), connect(ws)]);
+    await vi.waitFor(() => expect(a.online).toEqual([1, 4]), { timeout: 1000 });
+  });
+
+  it('tells a page that gets a reset nothing about the others', async () => {
+    const { ws } = await start();
+    const reset = await connect(`${ws}?afterEventId=1`);
+    await reset.closed;
+    expect(reset.online).toEqual([]);
+  });
+
   it('sends a stored pixel to every connected client, the sender included', async () => {
     const { http, ws } = await start();
     const a = await connect(ws);

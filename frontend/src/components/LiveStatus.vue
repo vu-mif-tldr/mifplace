@@ -24,7 +24,9 @@ const LABELS: Record<LiveState, string> = {
   display: flex;
   align-items: center;
   gap: 8px;
+  font-family: var(--font-live);
   font-size: 14px;
+  font-weight: 500;
   color: var(--muted);
 }
 

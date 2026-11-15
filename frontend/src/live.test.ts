@@ -258,6 +258,15 @@ describe('connectLive', () => {
     expect(FakeSocket.created).toHaveLength(1);
   });
 
+  it('reports how many pages are connected, without touching the checkpoint', () => {
+    const onOnline = vi.fn();
+    const { connection, socket, onPixels } = connect({ onOnline });
+    socket.emit({ type: 'online', count: 7 });
+    expect(onOnline).toHaveBeenCalledWith(7);
+    expect(onPixels).not.toHaveBeenCalled();
+    expect(connection.checkpoint).toEqual(checkpoint);
+  });
+
   it('closes the socket and calls onReset on a reset, without reconnecting', () => {
     const { socket, onReset, onState, online } = connect();
 

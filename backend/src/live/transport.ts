@@ -21,6 +21,8 @@ export interface LiveTransportOptions extends GatewayOptions {
   onConnect?(connection: Connection, url: URL): void;
   // Called for every text message a client sends
   onMessage?(connection: Connection, data: string): void;
+  // Called once a connection has closed and left the registry
+  onDisconnect?(connection: Connection): void;
 }
 
 export function attachLiveTransport(
@@ -57,6 +59,7 @@ export function attachLiveTransport(
       onClose(connection) {
         tracker.forget(connection.id);
         connections.delete(connection.id);
+        options.onDisconnect?.(connection);
       },
     }
   );

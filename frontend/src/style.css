@@ -24,6 +24,8 @@
   --ok: #5fd68a;
   --error: #ff8a8a;
   --warn: #ffd27a;
+  /* The live parts of the page: the ticker, the connection and the count of open pages */
+  --font-live: 'Saira Semi Condensed', system-ui, sans-serif;
   font-family:
     system-ui,
     -apple-system,

@@ -71,6 +71,8 @@ const { summary: activity, record: recordActivity } = useActivity();
 let live: LiveConnection | null = null;
 // null until the first connection starts
 const liveState = ref<LiveState | null>(null);
+// How many pages are connected, from the server; null until it says
+const online = ref<number | null>(null);
 
 // Get the palette, the canvas size (only the first time) and the pixels from the server
 // (all at once), draw the canvas and follow the live updates from its checkpoint
@@ -119,6 +121,7 @@ function showSnapshot(size: CanvasSize, state: CanvasState) {
       onPixels: paintLivePixels,
       onReset: reloadSnapshot,
       onState: (state) => (liveState.value = state),
+      onOnline: (count) => (online.value = count),
     }
   );
 }
@@ -217,7 +220,11 @@ const placeLabel = computed(() =>
     }"
   >
     <TopLights :lights="topLights" />
-    <TopBar :hovered-cell="hoveredCell" :live-state="ready ? liveState : null" />
+    <TopBar
+      :hovered-cell="hoveredCell"
+      :live-state="ready ? liveState : null"
+      :online="liveState === 'connected' ? online : null"
+    />
 
     <main class="stage">
       <LoadState v-if="!ready" :failed="loadError" @retry="loadCanvas" />
