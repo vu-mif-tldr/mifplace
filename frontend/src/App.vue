@@ -49,9 +49,6 @@ const pixelError = ref('');
 const placing = ref(false);
 const ready = computed(() => !loading.value && !loadError.value);
 
-// Counts placed pixels, so the ring plays its "placed" animation again for every one
-const placedCount = ref(0);
-
 // Share of the cooldown that has passed, 0 to 100, or null when there is none. The server
 // has no cooldown yet (FR-8, MP-40/41), so the ring is always full.
 const cooldownProgress = ref<number | null>(null);
@@ -172,7 +169,6 @@ async function place() {
     await placePixel(toPosition(size, cell.x, cell.y), color.id);
     pixelError.value = '';
     canvasView.value?.paint(cell, color.color);
-    placedCount.value++;
   } catch (error) {
     console.error(error);
     pixelError.value = texts.placeFailed;
@@ -239,8 +235,6 @@ const placeLabel = computed(() =>
         :selected-color="selectedColor?.color"
         :blooms="blooms"
         :paused="liveState === 'reconnecting'"
-        :placed-count="placedCount"
-        :place-failed="pixelError !== ''"
         @pick="onPick"
         @release="letGo"
       />

@@ -96,7 +96,6 @@ describe('App', () => {
     await flushPromises();
     // pos = y * width + x, and the palette id, not the index
     expect(placePixel).toHaveBeenCalledWith(3, 9);
-    expect(wrapper.getComponent(SelectionRing).props('placedCount')).toBe(1);
     wrapper.unmount();
   });
 
@@ -130,7 +129,6 @@ describe('App', () => {
     await pick(wrapper, 0, 0);
     await flushPromises();
     expect(wrapper.getComponent(PaletteDock).props('error')).toBe(texts.placeFailed);
-    expect(wrapper.getComponent(SelectionRing).props('failed')).toBe(true);
     wrapper.unmount();
   });
 

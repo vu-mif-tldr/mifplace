@@ -21,8 +21,6 @@ const props = defineProps<{
   blooms: Bloom[];
   // No live updates right now (reconnecting): the colours dim
   paused: boolean;
-  placedCount: number;
-  placeFailed: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -347,8 +345,6 @@ const halo = computed(() => {
           :cell-px="cellPx"
           :color="selectedColor"
           :label="ringLabel"
-          :placed-count="placedCount"
-          :failed="placeFailed"
         />
         <Transition name="loupe">
           <CellLoupe
