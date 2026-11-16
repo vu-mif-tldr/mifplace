@@ -3,16 +3,14 @@ import { onMounted, onUnmounted, ref, shallowRef } from 'vue';
 import { addItem, emptyBelt, screenX, step, type Belt } from '../belt';
 import { MAX_BATCH_FOR_BLOOMS, type NewBloom } from '../blooms';
 import { outlineFor } from '../glow';
-import { texts } from '../texts';
+import { colorName, texts } from '../texts';
 
 // The strip at the bottom: a belt of new pixels running from right to left (belt.ts), each
-// "● x, y", shown at once and pushing the belt if there is no room. "Dabar ramu..." is not on
+// "+1 ●" in its colour, shown at once and pushing the belt if there is no room. "Dabar ramu..." is not on
 // the belt: it comes out from the left edge once the canvas has been quiet for a while and
 // stays there until the next new pixel sends it away. Places only, never people (NFR-11).
 type Message = {
   id: number;
-  x: number;
-  y: number;
   color: string;
 };
 
@@ -45,8 +43,8 @@ function announce(pixels: NewBloom[]) {
   if (pixels.length === 0 || pixels.length > MAX_BATCH_FOR_BLOOMS) return;
   lastEvent = window.performance.now();
   quiet.value = false;
-  for (const { x, y, color } of pixels) {
-    const message = { id: ++nextId, x, y, color };
+  for (const { color } of pixels) {
+    const message = { id: ++nextId, color };
     messages.set(message.id, message);
     pending.push(message);
   }
@@ -121,8 +119,13 @@ onUnmounted(() => {
         :ref="(el) => remember(message.id, el)"
         :style="{ transform: `translateX(${message.left}px)` }"
       >
-        <span class="dot" :style="{ background: message.color, borderColor: message.dot }"></span>
-        {{ texts.coordinates(message.x, message.y) }}
+        {{ texts.newPixel }}
+        <span
+          class="dot"
+          role="img"
+          :aria-label="colorName(message.color)"
+          :style="{ background: message.color, borderColor: message.dot }"
+        ></span>
       </li>
     </ul>
     <Transition name="quiet">
@@ -141,8 +144,6 @@ onUnmounted(() => {
   font-family: var(--font-live);
   font-size: 13px;
   font-weight: 500;
-  /* Digits of one width, so coordinates do not jump */
-  font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
 

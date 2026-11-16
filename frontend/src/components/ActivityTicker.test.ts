@@ -83,7 +83,7 @@ describe('ActivityTicker', () => {
     expect(items(wrapper)).toHaveLength(0);
   });
 
-  it('shows a new pixel as "● x, y" in its colour with a contrasting outline', async () => {
+  it('shows a new pixel as "+1 ●" in its colour with a contrasting outline, without its place', async () => {
     const wrapper = ticker();
     await run(wrapper, 2 / 60);
     wrapper.vm.announce([
@@ -91,8 +91,9 @@ describe('ActivityTicker', () => {
       { x: 5, y: 7, color: '#000000' },
     ]);
     await run(wrapper, 2 / 60);
-    expect(texts_(wrapper)).toEqual(['4, 7', '5, 7']);
+    expect(texts_(wrapper)).toEqual(['+1', '+1']);
     const dots = wrapper.findAll('.dot');
+    expect(dots.map((dot) => dot.attributes('aria-label'))).toEqual(['Geltona', 'Juoda']);
     expect(dots[0].attributes('style')).toContain(`border-color: ${INK}`);
     expect(dots[1].attributes('style')).toContain('background: #000000');
     expect(dots[1].attributes('style')).toContain('border-color: #ffffff');
@@ -112,8 +113,8 @@ describe('ActivityTicker', () => {
     wrapper.vm.announce([red(1), red(2), red(3)]);
     await run(wrapper, 0.3);
     const all = items(wrapper);
-    const last = all[all.length - 1];
-    expect(last.text()).toBe('3, 3');
+    expect(all).toHaveLength(3);
+    const last = all[2];
     expect(left(last) + WIDTH).toBeLessThanOrEqual(STRIP);
     expect(left(last) + WIDTH).toBeGreaterThan(STRIP - 30);
   });
