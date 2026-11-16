@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ringSize } from '../view';
+import CoordsLabel from './CoordsLabel.vue';
 
 // The ring on the selected cell: its colour fills by --progress (the cooldown), it closes
 // onto the cell when a pixel is placed and turns into a red dashed ring when that failed.
@@ -13,6 +14,7 @@ const props = defineProps<{
   cellPx: number;
   // The colour the pixel will get
   color: string | undefined;
+  // Empty while the coordinates are shown elsewhere (in the loupe)
   label: string;
   // Changes with every placed pixel, so the "placed" animation plays again
   placedCount: number;
@@ -58,7 +60,7 @@ const ticks = computed(() => {
       :class="{ framed }"
       :style="{ width: `${cellPx}px`, height: `${cellPx}px`, background: color }"
     ></span>
-    <span class="label" :style="{ left: `${size / 2 + 8}px` }">{{ label }}</span>
+    <CoordsLabel v-if="label" class="label" :style="{ left: `${size / 2 + 8}px` }" :text="label" />
   </div>
 </template>
 
@@ -148,15 +150,6 @@ const ticks = computed(() => {
 }
 
 .label {
-  position: absolute;
   top: -14px;
-  padding: 5px 11px;
-  border-radius: 14px;
-  background: var(--ink);
-  color: #ffffff;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  box-shadow: 0 0 0 1px rgb(255 255 255 / 12%);
 }
 </style>

@@ -4,10 +4,11 @@ import type { CanvasSize, CanvasState, PaletteColor } from '@mifplace/shared';
 import type { Bloom } from '../blooms';
 import { drawCanvas, getClickedCell, paintCell } from '../canvas';
 import { texts } from '../texts';
-import { LOUPE_UNTIL_PX, loupePlace } from '../loupe';
+import { LOUPE_UNTIL_PX, lensPoint, loupePlace } from '../loupe';
 import { cellCenter, clampOffset, fitCellSize, visiblePart, zoomOffset, type Cell } from '../view';
 import BloomLayer from './BloomLayer.vue';
 import CellLoupe from './CellLoupe.vue';
+import CoordsLabel from './CoordsLabel.vue';
 import SelectionRing from './SelectionRing.vue';
 
 // The canvas with pan and zoom, and everything drawn over it: the selection ring with its
@@ -29,13 +30,13 @@ const emit = defineEmits<{
   pick: [cell: Cell];
   // A click or tap beside the canvas, in the empty space around it, not ending a gesture
   release: [];
-  // The cell under the mouse or pen, null when it leaves the canvas (fingers do not hover)
-  hover: [cell: Cell | null];
 }>();
 
 const canvasEl = ref<HTMLCanvasElement | null>(null);
 const viewportEl = ref<HTMLDivElement | null>(null);
 const hoveredCell = ref<Cell | null>(null);
+// Space between a cell (or the ring on it) and its coordinates, px
+const LABEL_GAP = 8;
 
 // The viewport fills the space it is given; its size is measured
 const viewWidth = ref(0);
@@ -113,11 +114,14 @@ function cellUnderPointer(event: MouseEvent): Cell | null {
   return { x: cx, y: cy };
 }
 
-function setHovered(cell: Cell | null) {
+// Whether the cell under the mouse is one in the loupe: its coordinates are shown there
+const hoveredInLoupe = ref(false);
+
+function setHovered(cell: Cell | null, inLoupe = false) {
+  hoveredInLoupe.value = cell !== null && inLoupe;
   const old = hoveredCell.value;
   if (old?.x === cell?.x && old?.y === cell?.y) return;
   hoveredCell.value = cell;
-  emit('hover', cell);
 }
 
 const MIN_ZOOM = 1;
@@ -220,8 +224,11 @@ function onViewportClick(event: MouseEvent) {
 const ring = computed(() =>
   props.selectedCell ? cellCenter(props.selectedCell, offset.value, cellPx.value) : null
 );
+// With the loupe open the coordinates of the selected cell are in it, not next to the ring
 const ringLabel = computed(() =>
-  props.selectedCell ? texts.coordinates(props.selectedCell.x, props.selectedCell.y) : ''
+  props.selectedCell && !loupe.value
+    ? texts.coordinates(props.selectedCell.x, props.selectedCell.y)
+    : ''
 );
 
 // The loupe while cells are too small to tell apart, and only while the cell is in view
@@ -233,12 +240,33 @@ const loupe = computed(() => {
   return loupePlace(centre, cellPx.value, viewWidth.value, viewHeight.value);
 });
 
-// The thin ring under the mouse (MP-105), not over the selected cell
+// The thin ring under the mouse (MP-105) with the coordinates next to it, as on the selected
+// cell; not over the selected cell, which has its own
 const hoverRing = computed(() => {
   const cell = hoveredCell.value;
   const picked = props.selectedCell;
   if (!cell || (picked && picked.x === cell.x && picked.y === cell.y)) return null;
-  return { ...cellCenter(cell, offset.value, cellPx.value), size: Math.max(18, cellPx.value + 8) };
+  return {
+    ...cellCenter(cell, offset.value, cellPx.value),
+    size: Math.max(18, cellPx.value + 8),
+    // A cell under the mouse in the loupe has its coordinates there
+    label: hoveredInLoupe.value ? '' : texts.coordinates(cell.x, cell.y),
+  };
+});
+
+// The coordinates in the loupe: of the cell under the mouse there, or else of the selected
+// cell, next to the right edge of the cell as the lens shows it
+const loupeLabel = computed(() => {
+  const place = loupe.value;
+  const picked = props.selectedCell;
+  if (!place || !picked) return null;
+  const cell = hoveredInLoupe.value && hoveredCell.value ? hoveredCell.value : picked;
+  const edge = lensPoint(cell.x - picked.x + 0.5, cell.y - picked.y);
+  return {
+    x: place.x + edge.x + LABEL_GAP,
+    y: place.y + edge.y,
+    text: texts.coordinates(cell.x, cell.y),
+  };
 });
 
 // The light behind the canvas, only over its visible part
@@ -292,16 +320,26 @@ const halo = computed(() => {
 
       <div class="overlay">
         <BloomLayer :blooms="blooms" :offset="offset" :cell-px="cellPx" />
-        <span
-          v-if="hoverRing"
-          class="hover-ring"
-          :style="{
-            left: `${hoverRing.x}px`,
-            top: `${hoverRing.y}px`,
-            width: `${hoverRing.size}px`,
-            height: `${hoverRing.size}px`,
-          }"
-        ></span>
+        <template v-if="hoverRing">
+          <span
+            class="hover-ring"
+            :style="{
+              left: `${hoverRing.x}px`,
+              top: `${hoverRing.y}px`,
+              width: `${hoverRing.size}px`,
+              height: `${hoverRing.size}px`,
+            }"
+          ></span>
+          <CoordsLabel
+            v-if="hoverRing.label"
+            class="hover-label"
+            :style="{
+              left: `${hoverRing.x + hoverRing.size / 2 + LABEL_GAP}px`,
+              top: `${hoverRing.y}px`,
+            }"
+            :text="hoverRing.label"
+          />
+        </template>
         <SelectionRing
           v-if="ring"
           :x="ring.x"
@@ -324,9 +362,15 @@ const halo = computed(() => {
             :y="loupe.y"
             :drawn="drawn"
             @pick="emit('pick', $event)"
-            @hover="setHovered"
+            @hover="setHovered($event, true)"
           />
         </Transition>
+        <CoordsLabel
+          v-if="loupeLabel"
+          class="loupe-label"
+          :style="{ left: `${loupeLabel.x}px`, top: `${loupeLabel.y}px` }"
+          :text="loupeLabel.text"
+        />
       </div>
     </div>
   </div>
@@ -386,6 +430,11 @@ const halo = computed(() => {
   border-radius: 50%;
   border: 1.5px solid rgb(255 255 255 / 90%);
   box-shadow: 0 0 0 1px rgb(12 16 48 / 60%);
+}
+
+.hover-label,
+.loupe-label {
+  transform: translateY(-50%);
 }
 
 /* The loupe opens out of the selected cell */

@@ -2,6 +2,7 @@
 import { mount } from '@vue/test-utils';
 import CanvasView from './CanvasView.vue';
 import CellLoupe from './CellLoupe.vue';
+import { LOUPE_MIDDLE_PX } from '../loupe';
 import SelectionRing from './SelectionRing.vue';
 
 // happy-dom measures nothing: the viewport size comes from a fake ResizeObserver and the
@@ -115,13 +116,17 @@ describe('CanvasView', () => {
     expect(canvas.attributes('style')).toContain('translate(-20px, 0px)');
   });
 
-  it('reports the cell under the mouse, once per cell, and null when it leaves', async () => {
+  it('shows the coordinates of the cell under the mouse next to it, until it leaves', async () => {
     const { wrapper } = canvasView();
+    resize(640, 640);
+    await wrapper.vm.$nextTick();
     const viewport = wrapper.get('.viewport');
     await pointer(viewport, 'pointermove', { x: 12, y: 7 });
+    expect(wrapper.get('.hover-label').text()).toBe('2, 1');
     await pointer(viewport, 'pointermove', { x: 13, y: 8 });
+    expect(wrapper.get('.hover-label').text()).toBe('2, 1');
     await pointer(viewport, 'pointerleave');
-    expect(wrapper.emitted('hover')).toEqual([[{ x: 2, y: 1 }], [null]]);
+    expect(wrapper.find('.hover-label').exists()).toBe(false);
   });
 
   it('draws the ring on the selected cell and the hover ring elsewhere only', async () => {
@@ -129,14 +134,15 @@ describe('CanvasView', () => {
     resize(640, 640);
     await wrapper.vm.$nextTick();
     const ring = wrapper.getComponent(SelectionRing);
-    expect(ring.props('label')).toBe('2, 1');
     expect(ring.props('x')).toBe(12.5);
 
     const viewport = wrapper.get('.viewport');
     await pointer(viewport, 'pointermove', { x: 12, y: 7 });
     expect(wrapper.find('.hover-ring').exists()).toBe(false);
+    expect(wrapper.find('.hover-label').exists()).toBe(false);
     await pointer(viewport, 'pointermove', { x: 30, y: 7 });
     expect(wrapper.find('.hover-ring').exists()).toBe(true);
+    expect(wrapper.get('.hover-label').text()).toBe('6, 1');
   });
 
   it('shows the loupe over a small selected cell, and its picks as its own', async () => {
@@ -151,6 +157,36 @@ describe('CanvasView', () => {
     expect(wrapper.emitted('pick')).toEqual([[{ x: 61, y: 100 }]]);
   });
 
+  it('shows the coordinates of the selected cell in the loupe, not next to the ring', async () => {
+    const { wrapper } = canvasView({ selectedCell: { x: 60, y: 100 } });
+    resize(640, 640);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.getComponent(SelectionRing).find('.label').exists()).toBe(false);
+    const label = wrapper.get('.loupe-label');
+    expect(label.text()).toBe('60, 100');
+    // Next to the right edge of the cell in the middle of the lens, about 9.7 px from the centre
+    const left = Number(/left: ([\d.]+)px/.exec(label.attributes('style')!)![1]);
+    expect(left - 302.5 - 8).toBeCloseTo(LOUPE_MIDDLE_PX / 2, 0);
+    expect(label.attributes('style')).toContain(`top: ${502.5 - 25 - 88}px`);
+  });
+
+  it('shows the coordinates of the cell under the mouse in the loupe there', async () => {
+    const { wrapper } = canvasView({ selectedCell: { x: 60, y: 100 } });
+    resize(640, 640);
+    await wrapper.vm.$nextTick();
+    const loupe = wrapper.getComponent(CellLoupe);
+    loupe.vm.$emit('hover', { x: 62, y: 99 });
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('.loupe-label').text()).toBe('62, 99');
+    // The ring on the canvas still shows the cell, without coordinates of its own
+    expect(wrapper.find('.hover-ring').exists()).toBe(true);
+    expect(wrapper.find('.hover-label').exists()).toBe(false);
+
+    loupe.vm.$emit('hover', null);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('.loupe-label').text()).toBe('60, 100');
+  });
+
   it('shows no loupe once the cells are large enough to see', async () => {
     const { wrapper } = canvasView({ selectedCell: { x: 60, y: 100 } });
     resize(640, 640);
@@ -160,6 +196,8 @@ describe('CanvasView', () => {
       await viewport.trigger('wheel', { deltaY: -100, clientX: 302, clientY: 502 });
     }
     expect(wrapper.findComponent(CellLoupe).exists()).toBe(false);
+    expect(wrapper.find('.loupe-label').exists()).toBe(false);
+    expect(wrapper.getComponent(SelectionRing).props('label')).toBe('60, 100');
   });
 
   describe('on a touch screen', () => {
@@ -266,8 +304,8 @@ describe('CanvasView', () => {
     it('does not show the cell under a finger', async () => {
       const { wrapper, viewport } = touchView();
       await pointer(viewport, 'pointermove', finger(1, 12, 7));
-      await pointer(viewport, 'pointerleave', finger(1, 12, 7));
-      expect(wrapper.emitted('hover')).toBeUndefined();
+      expect(wrapper.find('.hover-ring').exists()).toBe(false);
+      expect(wrapper.find('.hover-label').exists()).toBe(false);
     });
 
     it('does not pan when a finger presses and moves on the loupe', async () => {

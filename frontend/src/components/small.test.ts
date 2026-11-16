@@ -36,26 +36,24 @@ describe('LiveStatus', () => {
 });
 
 describe('TopBar', () => {
-  it('shows the cell under the mouse, how many pages are open and the connection', () => {
+  it('shows how many pages are open and the connection', () => {
     const wrapper = mount(TopBar, {
-      props: { hoveredCell: { x: 3, y: 9 }, liveState: 'connected', online: 7 },
+      props: { liveState: 'connected', online: 7 },
     });
-    expect(wrapper.text()).toContain('3, 9');
     const online = wrapper.get('.online');
     expect(online.text()).toBe('7');
     expect(online.find('svg').exists()).toBe(true);
     expect(wrapper.findComponent(LiveStatus).exists()).toBe(true);
   });
 
-  it('shows none of them without a cell or a connection', () => {
-    const wrapper = mount(TopBar, { props: { hoveredCell: null, liveState: null, online: null } });
-    expect(wrapper.find('.coords').exists()).toBe(false);
+  it('shows none of them without a connection', () => {
+    const wrapper = mount(TopBar, { props: { liveState: null, online: null } });
     expect(wrapper.find('.online').exists()).toBe(false);
     expect(wrapper.findComponent(LiveStatus).exists()).toBe(false);
   });
 
   it('shows the version next to the logo, also before the connection', () => {
-    const wrapper = mount(TopBar, { props: { hoveredCell: null, liveState: null, online: null } });
+    const wrapper = mount(TopBar, { props: { liveState: null, online: null } });
     expect(wrapper.get('.version').text()).toBe('dev');
     expect(wrapper.get('.version').element.previousElementSibling?.classList).toContain('brand');
   });

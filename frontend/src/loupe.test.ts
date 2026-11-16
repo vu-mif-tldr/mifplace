@@ -6,6 +6,7 @@ import {
   hexRgb,
   lensArea,
   lensOffset,
+  lensPoint,
   loupeCell,
   loupePlace,
 } from './loupe';
@@ -49,6 +50,26 @@ describe('lensOffset', () => {
     // 8 px from the middle is still inside the selected cell; 80 px is 5 cells away
     expect(near.x).toBeLessThan(0.5);
     expect(far.x).toBeGreaterThan(5);
+  });
+});
+
+describe('lensPoint', () => {
+  it('finds where the lens shows a point, the other way from lensOffset', () => {
+    for (const [dx, dy] of [
+      [0.5, 0],
+      [2.5, -1],
+      [-4, 3],
+    ]) {
+      const point = lensPoint(dx, dy);
+      const back = lensOffset(radius + point.x, radius + point.y)!;
+      expect(back.x).toBeCloseTo(dx, 4);
+      expect(back.y).toBeCloseTo(dy, 4);
+    }
+  });
+
+  it('is the centre for the middle of the selected cell, and the rim for points past it', () => {
+    expect(lensPoint(0, 0)).toEqual({ x: 0, y: 0 });
+    expect(lensPoint(20, 0).x).toBeCloseTo(radius, 4);
   });
 });
 

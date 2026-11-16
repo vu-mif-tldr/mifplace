@@ -38,7 +38,6 @@ const selectedColor = ref<PaletteColor | null>(null);
 // The cell the next pixel goes to: picked with a click, placed with a second click on it,
 // the button or Enter (FR-7)
 const selectedCell = ref<Cell | null>(null);
-const hoveredCell = ref<Cell | null>(null);
 
 const canvasView = ref<InstanceType<typeof CanvasView> | null>(null);
 const ticker = ref<InstanceType<typeof ActivityTicker> | null>(null);
@@ -226,7 +225,6 @@ const placeLabel = computed(() =>
   >
     <TopLights :lights="topLights" />
     <TopBar
-      :hovered-cell="hoveredCell"
       :live-state="ready ? liveState : null"
       :online="liveState === 'connected' ? online : null"
     />
@@ -245,7 +243,6 @@ const placeLabel = computed(() =>
         :place-failed="pixelError !== ''"
         @pick="onPick"
         @release="letGo"
-        @hover="hoveredCell = $event"
       />
     </main>
 

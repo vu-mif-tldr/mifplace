@@ -51,6 +51,25 @@ export function lensOffset(px: number, py: number) {
   return { x: dx * cellsPerPx, y: dy * cellsPerPx, pxPerCell };
 }
 
+// The other way: where the lens shows a point `dx`, `dy` cells from the middle of the selected
+// cell, px from the centre of the loupe; a point past the rim is put on the rim. It asks
+// lensOffset, the same one that finds the cell under a click: along a radius the cells it
+// looks at go further with the distance from the centre, so halving that distance finds it.
+export function lensPoint(dx: number, dy: number): Cell {
+  const length = Math.hypot(dx, dy);
+  if (length === 0) return { x: 0, y: 0 };
+  const cells = Math.min(length, LOUPE_REACH);
+  let low = 0;
+  let high = RADIUS;
+  for (let i = 0; i < 30; i++) {
+    const r = (low + high) / 2;
+    if (lensOffset(RADIUS + r, RADIUS)!.x < cells) low = r;
+    else high = r;
+  }
+  const r = (low + high) / 2;
+  return { x: (dx / length) * r, y: (dy / length) * r };
+}
+
 // The canvas cell under a point of the loupe around `center`; null outside the lens or the canvas
 export function loupeCell(center: Cell, px: number, py: number, size: CanvasSize): Cell | null {
   const offset = lensOffset(px, py);
