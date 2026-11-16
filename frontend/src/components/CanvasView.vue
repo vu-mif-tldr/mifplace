@@ -25,11 +25,11 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  // A click on a cell that was not the end of a drag
+  // A click or tap on a cell that was not the end of a drag or a pinch
   pick: [cell: Cell];
-  // A click beside the canvas, in the empty space around it, that was not the end of a drag
+  // A click or tap beside the canvas, in the empty space around it, not ending a gesture
   release: [];
-  // The cell under the mouse, null when the mouse leaves the canvas
+  // The cell under the mouse or pen, null when it leaves the canvas (fingers do not hover)
   hover: [cell: Cell | null];
 }>();
 
@@ -103,7 +103,7 @@ onMounted(() => {
 });
 onUnmounted(() => resizeObserver.disconnect());
 
-function cellUnderMouse(event: MouseEvent): Cell | null {
+function cellUnderPointer(event: MouseEvent): Cell | null {
   const size = props.size;
   if (!canvasEl.value || !size) return null;
   const rect = canvasEl.value.getBoundingClientRect();
@@ -120,50 +120,92 @@ function setHovered(cell: Cell | null) {
   emit('hover', cell);
 }
 
-function onWheel(event: WheelEvent) {
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  const newScale = Math.min(20, Math.max(1, scale.value * (event.deltaY < 0 ? 1.1 : 1 / 1.1)));
-  x.value = zoomOffset(x.value, event.clientX - rect.left, scale.value, newScale);
-  y.value = zoomOffset(y.value, event.clientY - rect.top, scale.value, newScale);
-  scale.value = newScale;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 20;
+
+// Zoom to `newScale` (kept within 1 to 20) around a point in viewport px, so the spot under
+// the point stays under it
+function zoomAround(pointX: number, pointY: number, newScale: number) {
+  const clamped = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newScale));
+  x.value = zoomOffset(x.value, pointX, scale.value, clamped);
+  y.value = zoomOffset(y.value, pointY, scale.value, clamped);
+  scale.value = clamped;
   clampPosition();
 }
 
-let dragging = false;
+function onWheel(event: WheelEvent) {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+  zoomAround(event.clientX - rect.left, event.clientY - rect.top, scale.value * factor);
+}
+
+// The mouse, a pen or the fingers on the viewport, by pointer id, at their last position.
+// One pointer pans, two pinch. A press that moves more than 4 px, or any second finger,
+// makes the coming click the end of a gesture rather than a tap, so it picks nothing.
+const pointers = new Map<number, { x: number; y: number }>();
 let moved = false;
-let lastX = 0;
-let lastY = 0;
 let startX = 0;
 let startY = 0;
 
-function onMouseDown(event: MouseEvent) {
-  dragging = true;
-  moved = false;
-  startX = lastX = event.clientX;
-  startY = lastY = event.clientY;
+function onPointerDown(event: PointerEvent) {
+  if (pointers.size === 0) {
+    moved = false;
+    startX = event.clientX;
+    startY = event.clientY;
+  } else {
+    moved = true;
+  }
+  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
 }
 
-function onMouseMove(event: MouseEvent) {
-  setHovered(cellUnderMouse(event));
+function onPointerMove(event: PointerEvent) {
+  // Fingers do not hover: only the mouse and a pen show the cell under them
+  if (event.pointerType !== 'touch') setHovered(cellUnderPointer(event));
 
-  if (!dragging) return;
+  const last = pointers.get(event.pointerId);
+  if (!last) return;
+  const now = { x: event.clientX, y: event.clientY };
 
-  if (Math.hypot(event.clientX - startX, event.clientY - startY) > 4) moved = true;
-  if (!moved) return;
+  if (pointers.size === 1) {
+    if (Math.hypot(now.x - startX, now.y - startY) > 4) moved = true;
+    if (!moved) return;
+    x.value += now.x - last.x;
+    y.value += now.y - last.y;
+    pointers.set(event.pointerId, now);
+    clampPosition();
+    return;
+  }
 
-  x.value += event.clientX - lastX;
-  y.value += event.clientY - lastY;
-  lastX = event.clientX;
-  lastY = event.clientY;
-  clampPosition();
+  // Two fingers: the canvas follows their midpoint and zooms by how far apart they move.
+  // A third finger only keeps its position, to take over once one of the two is lifted.
+  pointers.set(event.pointerId, now);
+  const [first, second] = [...pointers.keys()];
+  if (event.pointerId !== first && event.pointerId !== second) return;
+  const other = pointers.get(event.pointerId === first ? second : first)!;
+  const before = Math.hypot(last.x - other.x, last.y - other.y);
+  const after = Math.hypot(now.x - other.x, now.y - other.y);
+  if (before === 0 || after === 0) return;
+
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  const midX = (now.x + other.x) / 2 - rect.left;
+  const midY = (now.y + other.y) / 2 - rect.top;
+  x.value += (now.x - last.x) / 2;
+  y.value += (now.y - last.y) / 2;
+  zoomAround(midX, midY, scale.value * (after / before));
 }
 
-function onMouseLeave() {
-  dragging = false;
-  setHovered(null);
+// A lifted, cancelled or departed pointer stops counting; the finger that is left pans on
+// from where it is
+function onPointerUp(event: PointerEvent) {
+  pointers.delete(event.pointerId);
 }
 
-// Ignored at the end of a drag, so moving the canvas does not pick anything
+function onPointerLeave(event: PointerEvent) {
+  pointers.delete(event.pointerId);
+  if (event.pointerType !== 'touch') setHovered(null);
+}
+
+// Ignored at the end of a drag or a pinch, so moving the canvas does not pick anything
 function onCanvasClick(event: MouseEvent) {
   if (moved || !props.size) return;
   emit('pick', getClickedCell(event, props.size));
@@ -236,10 +278,11 @@ const halo = computed(() => {
       :class="{ paused }"
       :aria-label="texts.canvas"
       @wheel.prevent="onWheel"
-      @mousedown="onMouseDown"
-      @mousemove="onMouseMove"
-      @mouseup="dragging = false"
-      @mouseleave="onMouseLeave"
+      @pointerdown="onPointerDown"
+      @pointermove="onPointerMove"
+      @pointerup="onPointerUp"
+      @pointercancel="onPointerUp"
+      @pointerleave="onPointerLeave"
       @click="onViewportClick"
     >
       <canvas
@@ -302,6 +345,8 @@ const halo = computed(() => {
   inset: 0;
   overflow: hidden;
   cursor: crosshair;
+  /* Pinch and drag move the canvas, not the page */
+  touch-action: none;
 }
 
 .canvas {

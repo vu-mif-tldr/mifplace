@@ -6,8 +6,9 @@ import type { Cell } from '../view';
 
 // The loupe over the selected cell while cells are small: a round lens over the cells around
 // it that magnifies the middle most (loupe.ts), with the coming pixel in the middle and a
-// glint of glass on top. A click on a cell in it picks that cell, as a click on the canvas
-// does: the middle one places the pixel, any other moves the selection.
+// glint of glass on top. A click or tap on a cell in it picks that cell, as on the canvas:
+// the middle one places the pixel, any other moves the selection. Presses on it stay its
+// own, so they never pan the canvas.
 const props = defineProps<{
   // The canvas element to read the cells from (one element pixel per cell)
   source: HTMLCanvasElement | null;
@@ -24,7 +25,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   pick: [cell: Cell];
-  // The cell under the mouse in the loupe, null when the mouse leaves it
+  // The cell under the mouse or pen in the loupe, null when it leaves
   hover: [cell: Cell | null];
 }>();
 
@@ -63,14 +64,17 @@ function cellAt(event: MouseEvent) {
   return loupeCell(props.cell, event.clientX - rect.left, event.clientY - rect.top, props.size);
 }
 
-function onMove(event: MouseEvent) {
+// Fingers do not hover: only the mouse and a pen light up the cell under them
+function onMove(event: PointerEvent) {
+  if (event.pointerType === 'touch') return;
   const cell = cellAt(event);
   if (cell?.x === hovered.value?.x && cell?.y === hovered.value?.y) return;
   hovered.value = cell;
   emit('hover', cell);
 }
 
-function onLeave() {
+function onLeave(event: PointerEvent) {
+  if (event.pointerType === 'touch') return;
   hovered.value = null;
   emit('hover', null);
 }
@@ -85,9 +89,9 @@ function onClick(event: MouseEvent) {
   <div
     class="loupe"
     :style="{ left: `${x}px`, top: `${y}px`, width: `${LOUPE_SIDE}px`, height: `${LOUPE_SIDE}px` }"
-    @mousedown.stop
-    @mousemove.stop="onMove"
-    @mouseleave="onLeave"
+    @pointerdown.stop
+    @pointermove.stop="onMove"
+    @pointerleave="onLeave"
     @click.stop="onClick"
   >
     <canvas ref="lensEl" class="lens" :width="side" :height="side"></canvas>

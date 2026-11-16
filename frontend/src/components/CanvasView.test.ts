@@ -43,6 +43,16 @@ function canvasView(props: Partial<InstanceType<typeof CanvasView>['$props']> = 
   return { wrapper, canvas };
 }
 
+// A pointer event on an element: the mouse unless a finger is named
+type Pointer = { id?: number; type?: 'mouse' | 'touch'; x?: number; y?: number };
+function pointer(
+  target: { trigger: (event: string, options: object) => Promise<void> },
+  event: string,
+  { id = 1, type = 'mouse', x = 0, y = 0 }: Pointer = {}
+) {
+  return target.trigger(event, { pointerId: id, pointerType: type, clientX: x, clientY: y });
+}
+
 beforeEach(() => {
   resizeCallbacks = [];
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
@@ -84,9 +94,9 @@ describe('CanvasView', () => {
     await viewport.trigger('click', { clientX: 50, clientY: 300 });
     expect(wrapper.emitted('release')).toHaveLength(1);
 
-    await viewport.trigger('mousedown', { clientX: 100, clientY: 100 });
-    await viewport.trigger('mousemove', { clientX: 60, clientY: 100 });
-    await viewport.trigger('mouseup');
+    await pointer(viewport, 'pointerdown', { x: 100, y: 100 });
+    await pointer(viewport, 'pointermove', { x: 60, y: 100 });
+    await pointer(viewport, 'pointerup', { x: 60, y: 100 });
     await viewport.trigger('click', { clientX: 60, clientY: 100 });
     expect(wrapper.emitted('release')).toHaveLength(1);
   });
@@ -96,9 +106,9 @@ describe('CanvasView', () => {
     resize(640, 640);
     await wrapper.get('.viewport').trigger('wheel', { deltaY: -100, clientX: 0, clientY: 0 });
     const viewport = wrapper.get('.viewport');
-    await viewport.trigger('mousedown', { clientX: 100, clientY: 100 });
-    await viewport.trigger('mousemove', { clientX: 80, clientY: 100 });
-    await viewport.trigger('mouseup');
+    await pointer(viewport, 'pointerdown', { x: 100, y: 100 });
+    await pointer(viewport, 'pointermove', { x: 80, y: 100 });
+    await pointer(viewport, 'pointerup', { x: 80, y: 100 });
     await canvas.trigger('click', { clientX: 80, clientY: 100 });
     expect(wrapper.emitted('pick')).toBeUndefined();
     // The zoomed canvas moved with the mouse
@@ -108,9 +118,9 @@ describe('CanvasView', () => {
   it('reports the cell under the mouse, once per cell, and null when it leaves', async () => {
     const { wrapper } = canvasView();
     const viewport = wrapper.get('.viewport');
-    await viewport.trigger('mousemove', { clientX: 12, clientY: 7 });
-    await viewport.trigger('mousemove', { clientX: 13, clientY: 8 });
-    await viewport.trigger('mouseleave');
+    await pointer(viewport, 'pointermove', { x: 12, y: 7 });
+    await pointer(viewport, 'pointermove', { x: 13, y: 8 });
+    await pointer(viewport, 'pointerleave');
     expect(wrapper.emitted('hover')).toEqual([[{ x: 2, y: 1 }], [null]]);
   });
 
@@ -123,9 +133,9 @@ describe('CanvasView', () => {
     expect(ring.props('x')).toBe(12.5);
 
     const viewport = wrapper.get('.viewport');
-    await viewport.trigger('mousemove', { clientX: 12, clientY: 7 });
+    await pointer(viewport, 'pointermove', { x: 12, y: 7 });
     expect(wrapper.find('.hover-ring').exists()).toBe(false);
-    await viewport.trigger('mousemove', { clientX: 30, clientY: 7 });
+    await pointer(viewport, 'pointermove', { x: 30, y: 7 });
     expect(wrapper.find('.hover-ring').exists()).toBe(true);
   });
 
@@ -150,6 +160,129 @@ describe('CanvasView', () => {
       await viewport.trigger('wheel', { deltaY: -100, clientX: 302, clientY: 502 });
     }
     expect(wrapper.findComponent(CellLoupe).exists()).toBe(false);
+  });
+
+  describe('on a touch screen', () => {
+    const finger = (id: number, x: number, y: number): Pointer => ({ id, type: 'touch', x, y });
+
+    // A 640 px viewport 100 px from the left and 50 px from the top of the page
+    function touchView(props: Parameters<typeof canvasView>[0] = {}) {
+      const view = canvasView(props);
+      resize(640, 640);
+      const viewport = view.wrapper.get('.viewport');
+      viewport.element.getBoundingClientRect = () =>
+        ({ left: 100, top: 50, width: 640, height: 640 }) as DOMRect;
+      return { ...view, viewport };
+    }
+
+    // Two fingers 100 px apart, the second one moved out to `secondX`
+    async function pinch(viewport: ReturnType<typeof touchView>['viewport'], secondX: number) {
+      await pointer(viewport, 'pointerdown', finger(1, 300, 250));
+      await pointer(viewport, 'pointerdown', finger(2, 400, 250));
+      await pointer(viewport, 'pointermove', finger(2, secondX, 250));
+    }
+
+    it('zooms around the middle of a pinch, and the canvas follows it', async () => {
+      const { canvas, viewport } = touchView();
+      // Twice as far apart: zoom 2, 10 px per cell. The cell under the middle (250, 200 in
+      // the viewport, cell 50, 40) is under the new middle (300, 200).
+      await pinch(viewport, 500);
+      expect(canvas.attributes('style')).toContain('translate(-200px, -200px) scale(10)');
+    });
+
+    it('keeps a pinch within zoom 1 to 20', async () => {
+      const { canvas, viewport } = touchView();
+      await pinch(viewport, 100_000);
+      expect(canvas.attributes('style')).toContain('scale(100)');
+      await pointer(viewport, 'pointermove', finger(2, 301, 250));
+      expect(canvas.attributes('style')).toContain('translate(0px, 0px) scale(5)');
+    });
+
+    it('pans with the finger that is left when the other one is lifted', async () => {
+      const { canvas, viewport } = touchView();
+      await pinch(viewport, 500);
+      await pointer(viewport, 'pointerup', finger(2, 500, 250));
+      await pointer(viewport, 'pointermove', finger(1, 290, 245));
+      expect(canvas.attributes('style')).toContain('translate(-210px, -205px) scale(10)');
+    });
+
+    it('pinches with the first two fingers, and a third one takes over where it is', async () => {
+      const { canvas, viewport } = touchView();
+      await pinch(viewport, 500);
+      await pointer(viewport, 'pointerdown', finger(3, 600, 250));
+      await pointer(viewport, 'pointermove', finger(3, 700, 250));
+      expect(canvas.attributes('style')).toContain('translate(-200px, -200px) scale(10)');
+      // Fingers 2 and 3 are 200 px apart, now 220: 1.1 times larger around their middle
+      await pointer(viewport, 'pointerup', finger(1, 300, 250));
+      await pointer(viewport, 'pointermove', finger(3, 720, 250));
+      expect(canvas.attributes('style')).toMatch(
+        /translate\(-260(\.0+\d*)?px, -240(\.0+\d*)?px\) scale\(11(\.0+\d*)?\)/
+      );
+    });
+
+    it('pans a zoomed canvas with one finger, and the end of it picks nothing', async () => {
+      const { wrapper, canvas, viewport } = touchView();
+      await viewport.trigger('wheel', { deltaY: -100, clientX: 100, clientY: 50 });
+      await pointer(viewport, 'pointerdown', finger(1, 200, 200));
+      // Within 4 px it is still a tap
+      await pointer(viewport, 'pointermove', finger(1, 197, 200));
+      expect(canvas.attributes('style')).toContain('translate(0px, 0px)');
+      await pointer(viewport, 'pointermove', finger(1, 170, 190));
+      expect(canvas.attributes('style')).toContain('translate(-30px, -10px)');
+      await pointer(viewport, 'pointerup', finger(1, 170, 190));
+      await canvas.trigger('click', { clientX: 170, clientY: 190 });
+      await viewport.trigger('click', { clientX: 170, clientY: 190 });
+      expect(wrapper.emitted('pick')).toBeUndefined();
+      expect(wrapper.emitted('release')).toBeUndefined();
+    });
+
+    it('never ends a pinch with a tap, even one that does not move, but picks on the next tap', async () => {
+      const { wrapper, canvas, viewport } = touchView();
+      await pointer(viewport, 'pointerdown', finger(1, 12, 7));
+      await pointer(viewport, 'pointerdown', finger(2, 40, 7));
+      await pointer(viewport, 'pointerup', finger(2, 40, 7));
+      await pointer(viewport, 'pointerup', finger(1, 12, 7));
+      await canvas.trigger('click', { clientX: 12, clientY: 7 });
+      expect(wrapper.emitted('pick')).toBeUndefined();
+
+      await pointer(viewport, 'pointerdown', finger(3, 12, 7));
+      await pointer(viewport, 'pointerup', finger(3, 12, 7));
+      await canvas.trigger('click', { clientX: 12, clientY: 7 });
+      expect(wrapper.emitted('pick')).toEqual([[{ x: 2, y: 1 }]]);
+    });
+
+    it('forgets cancelled fingers, so the next one pans instead of pinching', async () => {
+      const { canvas, viewport } = touchView();
+      await viewport.trigger('wheel', { deltaY: -100, clientX: 100, clientY: 50 });
+      await pointer(viewport, 'pointerdown', finger(1, 200, 200));
+      await pointer(viewport, 'pointerdown', finger(2, 300, 200));
+      await pointer(viewport, 'pointercancel', finger(1, 200, 200));
+      await pointer(viewport, 'pointercancel', finger(2, 300, 200));
+      await pointer(viewport, 'pointerdown', finger(3, 200, 200));
+      await pointer(viewport, 'pointermove', finger(3, 180, 200));
+      expect(canvas.attributes('style')).toContain('translate(-20px, 0px) scale(5.5');
+    });
+
+    it('does not show the cell under a finger', async () => {
+      const { wrapper, viewport } = touchView();
+      await pointer(viewport, 'pointermove', finger(1, 12, 7));
+      await pointer(viewport, 'pointerleave', finger(1, 12, 7));
+      expect(wrapper.emitted('hover')).toBeUndefined();
+    });
+
+    it('does not pan when a finger presses and moves on the loupe', async () => {
+      const { wrapper, canvas, viewport } = touchView({ selectedCell: { x: 60, y: 100 } });
+      await viewport.trigger('wheel', { deltaY: -100, clientX: 100, clientY: 50 });
+      const loupe = wrapper.get('.loupe');
+      await pointer(loupe, 'pointerdown', finger(1, 400, 400));
+      await pointer(loupe, 'pointermove', finger(1, 300, 400));
+      await pointer(loupe, 'pointerup', finger(1, 300, 400));
+      expect(canvas.attributes('style')).toContain('translate(0px, 0px)');
+      // And the next finger on the canvas pans: the one on the loupe is not counted
+      await pointer(viewport, 'pointerdown', finger(2, 200, 200));
+      await pointer(viewport, 'pointermove', finger(2, 180, 200));
+      expect(canvas.attributes('style')).toContain('translate(-20px, 0px)');
+    });
   });
 
   it('dims the canvas while paused', () => {
