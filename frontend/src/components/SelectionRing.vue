@@ -3,10 +3,9 @@ import { computed } from 'vue';
 import { ringSize } from '../view';
 import CoordsLabel from './CoordsLabel.vue';
 
-// The ring on the selected cell: its colour fills by --progress (the cooldown), it closes
-// onto the cell when a pixel is placed and turns into a red dashed ring when that failed.
-// Inside it the coming pixel covers exactly its cell, nothing of the cells around: small
-// cells get four ticks pointing at it from one cell away, large ones a frame inside the cell.
+// The mark on the selected cell: the coming pixel covers exactly its cell, nothing of the
+// cells around. Small cells get four ticks pointing at it from one cell away, large ones a
+// frame inside the cell.
 const props = defineProps<{
   // Centre of the cell in viewport px, and px per cell at the current zoom
   x: number;
@@ -16,9 +15,6 @@ const props = defineProps<{
   color: string | undefined;
   // Empty while the coordinates are shown elsewhere (in the loupe)
   label: string;
-  // Changes with every placed pixel, so the "placed" animation plays again
-  placedCount: number;
-  failed: boolean;
 }>();
 
 // Cells this large or larger have room for a frame inside
@@ -27,7 +23,7 @@ const FRAMED_FROM_PX = 8;
 const size = computed(() => ringSize(props.cellPx));
 const framed = computed(() => props.cellPx >= FRAMED_FROM_PX);
 
-// The ticks run from one cell away from the cell to just inside the ring
+// The ticks run from one cell away from the cell to just inside ringSize
 const ticks = computed(() => {
   const from = props.cellPx * 1.5;
   const to = size.value / 2 - 6;
@@ -37,12 +33,6 @@ const ticks = computed(() => {
 
 <template>
   <div class="selection-ring" :style="{ left: `${x}px`, top: `${y}px` }">
-    <span
-      :key="placedCount"
-      class="circle"
-      :class="{ landed: placedCount > 0, failed }"
-      :style="{ width: `${size}px`, height: `${size}px` }"
-    ></span>
     <svg
       v-if="ticks"
       class="ticks"
@@ -69,45 +59,6 @@ const ticks = computed(() => {
   position: absolute;
   width: 0;
   height: 0;
-}
-
-.circle {
-  position: absolute;
-  left: 0;
-  top: 0;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: conic-gradient(var(--glow) var(--progress), rgb(255 255 255 / 18%) 0);
-  mask: radial-gradient(circle closest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
-  box-shadow: 0 0 22px 2px color-mix(in srgb, var(--glow) 60%, transparent);
-  animation: breathe 2.4s ease-in-out infinite;
-}
-
-.circle.landed {
-  animation:
-    land 0.5s ease-out,
-    breathe 2.4s ease-in-out 0.5s infinite;
-}
-
-.circle.failed {
-  box-sizing: border-box;
-  background: none;
-  mask: none;
-  border: 3px dashed var(--error);
-  box-shadow: 0 0 0 1.5px var(--ink);
-  animation: none;
-}
-
-@keyframes breathe {
-  50% {
-    transform: translate(-50%, -50%) scale(1.06);
-  }
-}
-
-@keyframes land {
-  50% {
-    transform: translate(-50%, -50%) scale(0.3);
-  }
 }
 
 .ticks {

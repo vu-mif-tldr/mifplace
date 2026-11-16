@@ -32,8 +32,6 @@ function canvasView(props: Partial<InstanceType<typeof CanvasView>['$props']> = 
       selectedColor: '#ff0000',
       blooms: [],
       paused: false,
-      placedCount: 0,
-      placeFailed: false,
       ...props,
     },
   });

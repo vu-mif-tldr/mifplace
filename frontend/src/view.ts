@@ -47,7 +47,8 @@ export function visiblePart(rect: Rect, width: number, height: number): Rect {
   };
 }
 
-// Width of the ring on the selected cell: around the cell, never smaller than a fingertip mark
+// Width of the mark on the selected cell (its ticks, the loupe gap): around the cell, never
+// smaller than a fingertip mark
 export function ringSize(cellPx: number) {
   return Math.max(34, cellPx + 18);
 }
