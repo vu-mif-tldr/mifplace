@@ -20,7 +20,7 @@ function play(el: unknown, light: TopLight) {
 </script>
 
 <template>
-  <div class="top-lights" aria-hidden="true">
+  <div class="top-lights">
     <span
       v-for="light in lights"
       :key="`${light.id}:${light.start}`"

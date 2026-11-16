@@ -8,11 +8,10 @@ import TopBar from './TopBar.vue';
 import { texts } from '../texts';
 
 describe('BrandMark', () => {
-  it('shows the name with the logo hidden from screen readers', () => {
+  it('shows the name with the logo', () => {
     const wrapper = mount(BrandMark, { props: { size: 40 } });
     expect(wrapper.text()).toBe('vu.place');
     const svg = wrapper.get('svg');
-    expect(svg.attributes('aria-hidden')).toBe('true');
     expect(svg.attributes('width')).toBe('40');
   });
 
@@ -33,7 +32,6 @@ describe('LiveStatus', () => {
     const wrapper = mount(LiveStatus, { props: { state } });
     expect(wrapper.text()).toBe(label);
     expect(wrapper.classes()).toContain(state);
-    expect(wrapper.attributes('role')).toBe('status');
   });
 });
 
@@ -80,9 +78,8 @@ describe('LoadState', () => {
 });
 
 describe('ConfirmButton', () => {
-  it('is named by its label and reports a press', async () => {
+  it('shows its label and reports a press', async () => {
     const wrapper = mount(ConfirmButton, { props: { label: 'Dėti', disabled: false } });
-    expect(wrapper.attributes('aria-label')).toBe('Dėti');
     expect(wrapper.text()).toBe('Dėti');
     await wrapper.trigger('click');
     expect(wrapper.emitted('press')).toHaveLength(1);

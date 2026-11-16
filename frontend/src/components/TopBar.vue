@@ -27,7 +27,7 @@ defineProps<{
     </span>
     <span v-if="online !== null" class="online">
       <!-- A person, head and shoulders -->
-      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="currentColor">
         <circle cx="8" cy="5" r="3" />
         <path d="M2 14.5c0-3.2 2.7-5.3 6-5.3s6 2.1 6 5.3z" />
       </svg>

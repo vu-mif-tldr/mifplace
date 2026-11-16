@@ -263,7 +263,6 @@ const halo = computed(() => {
     <div
       v-if="halo"
       class="halo"
-      aria-hidden="true"
       :style="{
         left: `${halo.x}px`,
         top: `${halo.y}px`,
@@ -276,7 +275,6 @@ const halo = computed(() => {
       ref="viewportEl"
       class="viewport"
       :class="{ paused }"
-      :aria-label="texts.canvas"
       @wheel.prevent="onWheel"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
@@ -292,7 +290,7 @@ const halo = computed(() => {
         @click="onCanvasClick"
       ></canvas>
 
-      <div class="overlay" aria-hidden="true">
+      <div class="overlay">
         <BloomLayer :blooms="blooms" :offset="offset" :cell-px="cellPx" />
         <span
           v-if="hoverRing"

@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref, shallowRef } from 'vue';
 import { addItem, emptyBelt, screenX, step, type Belt } from '../belt';
 import { MAX_BATCH_FOR_BLOOMS, type NewBloom } from '../blooms';
 import { outlineFor } from '../glow';
-import { colorName, texts } from '../texts';
+import { texts } from '../texts';
 
 // The strip at the bottom: a belt of new pixels running from right to left (belt.ts), each
 // "+1 ●" in its colour, shown at once and pushing the belt if there is no room. "Dabar ramu..." is not on
@@ -111,7 +111,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section ref="stripEl" class="ticker" :aria-label="texts.activity">
+  <section ref="stripEl" class="ticker">
     <ul>
       <li
         v-for="message in drawn"
@@ -120,12 +120,7 @@ onUnmounted(() => {
         :style="{ transform: `translateX(${message.left}px)` }"
       >
         {{ texts.newPixel }}
-        <span
-          class="dot"
-          role="img"
-          :aria-label="colorName(message.color)"
-          :style="{ background: message.color, borderColor: message.dot }"
-        ></span>
+        <span class="dot" :style="{ background: message.color, borderColor: message.dot }"></span>
       </li>
     </ul>
     <Transition name="quiet">

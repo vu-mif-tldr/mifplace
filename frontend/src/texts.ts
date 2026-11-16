@@ -2,8 +2,6 @@
 // English version (NFR-14) added next to it later.
 
 export const texts = {
-  canvas: 'Drobė',
-  palette: 'Paletė',
   loading: 'Kraunama drobė…',
   loadFailed: 'Nepavyko užkrauti drobės',
   loadFailedHint: 'Patikrink interneto ryšį ir bandyk dar kartą.',
@@ -19,7 +17,6 @@ export const texts = {
   placeNothing: 'Pirma pasirink langelį',
   coordinates: (x: number, y: number) => `${x}, ${y}`,
   newPixel: '+1',
-  activity: 'Kas vyksta drobėje',
   quiet: 'Dabar ramu...',
 };
 

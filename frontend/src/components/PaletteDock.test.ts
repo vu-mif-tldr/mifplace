@@ -24,23 +24,22 @@ function dock(props: Partial<InstanceType<typeof PaletteDock>['$props']> = {}) {
 }
 
 describe('PaletteDock', () => {
-  it('shows one radio per colour, named, with the selected one checked', () => {
-    const swatches = dock().findAll('[role=radio]');
-    expect(swatches.map((s) => s.attributes('aria-label'))).toEqual(['Žydra', '#123ABC']);
-    expect(swatches.map((s) => s.attributes('aria-checked'))).toEqual(['false', 'true']);
-    expect(swatches[1].classes()).toContain('selected');
+  it('shows one swatch per colour, named in its tooltip, with the selected one marked', () => {
+    const swatches = dock().findAll('.swatch');
+    expect(swatches.map((s) => s.attributes('title'))).toEqual(['Žydra', '#123ABC']);
+    expect(swatches.map((s) => s.classes().includes('selected'))).toEqual([false, true]);
   });
 
   it('reports the colour that was clicked', async () => {
     const wrapper = dock();
-    await wrapper.findAll('[role=radio]')[0].trigger('click');
+    await wrapper.findAll('.swatch')[0].trigger('click');
     expect(wrapper.emitted('select')).toEqual([[palette[0]]]);
   });
 
   it('shows the hint, or the error instead of it', () => {
     expect(dock().text()).toContain('Pick a cell');
     const failed = dock({ error: 'Failed' });
-    expect(failed.get('[role=alert]').text()).toBe('Failed');
+    expect(failed.get('.error').text()).toBe('Failed');
     expect(failed.text()).not.toContain('Pick a cell');
   });
 

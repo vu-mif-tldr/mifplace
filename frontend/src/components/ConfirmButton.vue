@@ -7,15 +7,9 @@ defineEmits<{ press: [] }>();
 </script>
 
 <template>
-  <button
-    type="button"
-    class="confirm"
-    :disabled="disabled"
-    :aria-label="label"
-    @click="$emit('press')"
-  >
+  <button type="button" class="confirm" :disabled="disabled" @click="$emit('press')">
     <span class="face">
-      <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 24 24">
         <path
           d="M5 12.5l4.5 4.5L19 7.5"
           fill="none"
@@ -54,7 +48,7 @@ defineEmits<{ press: [] }>();
   color: var(--ink);
 }
 
-/* On a wide screen the name is in aria-label only */
+/* On a wide screen the check mark alone */
 .text {
   display: none;
 }

@@ -9,13 +9,13 @@ defineEmits<{ retry: [] }>();
 <template>
   <div class="load-state">
     <template v-if="failed">
-      <span class="broken-ring" aria-hidden="true"></span>
+      <span class="broken-ring"></span>
       <p class="title">{{ texts.loadFailed }}</p>
       <p class="hint">{{ texts.loadFailedHint }}</p>
       <button type="button" class="retry" @click="$emit('retry')">{{ texts.retry }}</button>
     </template>
     <template v-else>
-      <span class="spinner" aria-hidden="true"></span>
+      <span class="spinner"></span>
       <p>{{ texts.loading }}</p>
     </template>
   </div>

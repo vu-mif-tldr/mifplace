@@ -93,7 +93,6 @@ describe('ActivityTicker', () => {
     await run(wrapper, 2 / 60);
     expect(texts_(wrapper)).toEqual(['+1', '+1']);
     const dots = wrapper.findAll('.dot');
-    expect(dots.map((dot) => dot.attributes('aria-label'))).toEqual(['Geltona', 'Juoda']);
     expect(dots[0].attributes('style')).toContain(`border-color: ${INK}`);
     expect(dots[1].attributes('style')).toContain('background: #000000');
     expect(dots[1].attributes('style')).toContain('border-color: #ffffff');
