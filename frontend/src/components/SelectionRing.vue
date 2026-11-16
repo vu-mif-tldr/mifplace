@@ -159,11 +159,4 @@ const ticks = computed(() => {
   white-space: nowrap;
   box-shadow: 0 0 0 1px rgb(255 255 255 / 12%);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .circle,
-  .circle.landed {
-    animation: none;
-  }
-}
 </style>

@@ -36,8 +36,6 @@ function remember(id: number, el: unknown) {
   else elements.delete(id);
 }
 
-const moving = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
 // New pixels from the live stream. A catch-up batch after a reconnect is from the past.
 function announce(pixels: NewBloom[]) {
   if (pixels.length === 0 || pixels.length > MAX_BATCH_FOR_BLOOMS) return;
@@ -65,11 +63,8 @@ function redraw() {
 function frame(dt: number, now: number) {
   if (stripWidth === 0) return;
 
-  // Without motion pixels stay where they are, so "Dabar ramu..." does not wait for them to go
-  if (!quiet.value && now - lastEvent >= QUIET_AFTER_MS) {
-    const pixelsInView = belt.items.length > 0 || pending.length > 0;
-    if (!moving || !pixelsInView) quiet.value = true;
-  }
+  const pixelsInView = belt.items.length > 0 || pending.length > 0;
+  if (!quiet.value && !pixelsInView && now - lastEvent >= QUIET_AFTER_MS) quiet.value = true;
   // A message goes on the belt once it has been drawn and measured, in the order of arrival
   while (pending.length > 0) {
     const width = elements.get(pending[0].id)?.offsetWidth ?? 0;
@@ -81,7 +76,7 @@ function frame(dt: number, now: number) {
   const widths = new Map(
     belt.items.map((item) => [item.id, elements.get(item.id)?.offsetWidth || item.width])
   );
-  belt = step(belt, dt, widths, moving);
+  belt = step(belt, dt, widths);
   const kept = new Set([...belt.items, ...pending].map((item) => item.id));
   for (const id of messages.keys()) if (!kept.has(id)) messages.delete(id);
   redraw();
@@ -188,19 +183,6 @@ li {
 .quiet-enter-from,
 .quiet-leave-to {
   transform: translateX(-100%);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .quiet-enter-active,
-  .quiet-leave-active {
-    transition: opacity 300ms;
-  }
-
-  .quiet-enter-from,
-  .quiet-leave-to {
-    transform: none;
-    opacity: 0;
-  }
 }
 
 /* The pixel colour with an outline that shows on any background */

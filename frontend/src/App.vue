@@ -303,10 +303,4 @@ const placeLabel = computed(() =>
     margin: 0 4px;
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .page {
-    transition: none;
-  }
-}
 </style>

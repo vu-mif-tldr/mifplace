@@ -14,7 +14,6 @@ const WIDTH = 100;
 let frames: ((time: number) => void)[] = [];
 let clock = 0;
 let resizeCallback: (entries: { contentRect: { width: number } }[]) => void = () => {};
-let reducedMotion = false;
 
 class FakeResizeObserver {
   constructor(callback: typeof resizeCallback) {
@@ -27,8 +26,6 @@ class FakeResizeObserver {
 beforeEach(() => {
   frames = [];
   clock = 0;
-  reducedMotion = false;
-  vi.stubGlobal('matchMedia', () => ({ matches: reducedMotion }));
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
   vi.stubGlobal('requestAnimationFrame', (callback: (time: number) => void) => {
     frames.push(callback);
@@ -148,34 +145,6 @@ describe('ActivityTicker', () => {
     // It has left
     await run(wrapper, STRIP / BELT_SPEED - QUIET_AFTER + 0.5);
     expect(items(wrapper)).toHaveLength(0);
-    expect(quiet(wrapper)).toBe(true);
-  });
-
-  it('does not move without motion, but still makes room for a new pixel', async () => {
-    reducedMotion = true;
-    const wrapper = ticker();
-    await run(wrapper, 2 / 60);
-    wrapper.vm.announce([red(1)]);
-    await run(wrapper, 2 / 60);
-    const pixel = left(items(wrapper)[0]);
-    expect(pixel).toBe(STRIP - WIDTH);
-    await run(wrapper, 1);
-    expect(left(items(wrapper)[0])).toBe(pixel);
-
-    wrapper.vm.announce([red(2)]);
-    await run(wrapper, 2 / 60);
-    expect(left(items(wrapper)[1])).toBe(STRIP - WIDTH);
-  });
-
-  it('without motion brings "Dabar ramu..." back while old pixels still stand', async () => {
-    reducedMotion = true;
-    const wrapper = ticker();
-    await run(wrapper, 2 / 60);
-    wrapper.vm.announce([red(1)]);
-    await run(wrapper, QUIET_AFTER - 0.5);
-    expect(quiet(wrapper)).toBe(false);
-    await run(wrapper, 1);
-    expect(items(wrapper)).toHaveLength(1);
     expect(quiet(wrapper)).toBe(true);
   });
 });

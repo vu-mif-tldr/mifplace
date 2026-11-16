@@ -82,10 +82,4 @@ p {
   font-weight: 600;
   cursor: pointer;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .spinner {
-    animation: none;
-  }
-}
 </style>

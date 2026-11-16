@@ -38,7 +38,6 @@ class FakeResizeObserver {
 
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
-  vi.stubGlobal('matchMedia', () => ({ matches: false }));
   vi.mocked(getPalette).mockResolvedValue(palette);
   vi.mocked(getCanvasSize).mockResolvedValue({ width: 2, height: 2 });
   vi.mocked(getCanvas).mockResolvedValue(snapshot);

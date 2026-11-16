@@ -44,15 +44,9 @@ export function addItem(
 }
 
 // One frame of `dt` seconds. `widths` has the measured width of each message by id (a message
-// can get wider, once its font has loaded, for one); a message that grew pushes the ones behind
-// it back. Without motion the belt does not run and a push is done at once. Messages that have
-// left on the left are dropped.
-export function step(
-  belt: Belt,
-  dt: number,
-  widths: ReadonlyMap<number, number>,
-  moving: boolean
-): Belt {
+// can get wider, once its font has loaded or its count has grown); a message that grew pushes the
+// ones behind it back. Messages that have left on the left are dropped.
+export function step(belt: Belt, dt: number, widths: ReadonlyMap<number, number>): Belt {
   let end = -Infinity;
   const laidOut = belt.items.map((item) => {
     const width = widths.get(item.id) ?? item.width;
@@ -66,11 +60,7 @@ export function step(
   const normal = belt.offset + BELT_SPEED * frame;
   const pushed = belt.offset + (PUSH_MIN_SPEED + PUSH_RATE * left) * frame;
   // A push stops at its target, then the normal speed goes on
-  const offset = !moving
-    ? belt.offset + left
-    : left > 0
-      ? Math.max(normal, Math.min(pushed, belt.target))
-      : normal;
+  const offset = left > 0 ? Math.max(normal, Math.min(pushed, belt.target)) : normal;
   return {
     offset,
     target: Math.max(belt.target, offset),

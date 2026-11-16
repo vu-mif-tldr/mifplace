@@ -401,20 +401,4 @@ const halo = computed(() => {
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.6);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .canvas {
-    transition: none;
-  }
-
-  .loupe-enter-active,
-  .loupe-leave-active {
-    transition: opacity 0.16s ease-out;
-  }
-
-  .loupe-enter-from,
-  .loupe-leave-to {
-    transform: translate(-50%, -50%);
-  }
-}
 </style>

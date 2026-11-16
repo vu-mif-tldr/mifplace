@@ -144,10 +144,4 @@ function onClick(event: MouseEvent) {
     inset 0 0 0 1px rgb(255 255 255 / 18%),
     inset 0 -10px 18px rgb(12 16 48 / 25%);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .lens {
-    transition: none;
-  }
-}
 </style>
