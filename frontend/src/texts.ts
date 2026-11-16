@@ -16,7 +16,7 @@ export const texts = {
   place: (x: number, y: number) => `Dėti pikselį į (${x}, ${y})`,
   placeNothing: 'Pirma pasirink langelį',
   coordinates: (x: number, y: number) => `${x}, ${y}`,
-  newPixel: '+1',
+  newPixels: (count: number) => `+${count}`,
   quiet: 'Dabar ramu...',
 };
 

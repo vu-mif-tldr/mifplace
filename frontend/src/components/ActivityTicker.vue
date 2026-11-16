@@ -6,12 +6,15 @@ import { outlineFor } from '../glow';
 import { texts } from '../texts';
 
 // The strip at the bottom: a belt of new pixels running from right to left (belt.ts), each
-// "+1 ●" in its colour, shown at once and pushing the belt if there is no room. "Dabar ramu..." is not on
-// the belt: it comes out from the left edge once the canvas has been quiet for a while and
-// stays there until the next new pixel sends it away. Places only, never people (NFR-11).
+// "+1 ●" in its colour, shown at once and pushing the belt if there is no room. Another pixel of
+// the same colour makes it "+2", and so on, while the message is fully in view; once it has begun
+// to leave on the left, a new message comes instead. "Dabar ramu..." is not on the belt: it comes
+// out from the left edge once the canvas has been quiet for a while and stays there until the
+// next new pixel sends it away. Places only, never people (NFR-11).
 type Message = {
   id: number;
   color: string;
+  count: number;
 };
 
 // "Dabar ramu..." comes when no pixel has arrived for this long and the last one has left, ms
@@ -42,11 +45,27 @@ function announce(pixels: NewBloom[]) {
   lastEvent = window.performance.now();
   quiet.value = false;
   for (const { color } of pixels) {
-    const message = { id: ++nextId, color };
+    const same = growing(color);
+    if (same) {
+      same.count += 1;
+      continue;
+    }
+    const message = { id: ++nextId, color, count: 1 };
     messages.set(message.id, message);
     pending.push(message);
   }
   redraw();
+}
+
+// The message of this colour that can still count: the newest one, while its left edge is in
+// view. One still waiting to be measured is the newest of all.
+function growing(color: string): Message | undefined {
+  const sameColor = (message: Message | undefined) =>
+    message?.color.toUpperCase() === color.toUpperCase();
+  const waiting = [...pending].reverse().find(sameColor);
+  if (waiting) return waiting;
+  const item = [...belt.items].reverse().find((item) => sameColor(messages.get(item.id)));
+  return item && screenX(belt, item) >= 0 ? messages.get(item.id) : undefined;
 }
 
 defineExpose({ announce });
@@ -114,7 +133,10 @@ onUnmounted(() => {
         :ref="(el) => remember(message.id, el)"
         :style="{ transform: `translateX(${message.left}px)` }"
       >
-        {{ texts.newPixel }}
+        <!-- A new key for every count plays the flash again -->
+        <span :key="message.count" class="count" :class="{ grew: message.count > 1 }">
+          {{ texts.newPixels(message.count) }}
+        </span>
         <span class="dot" :style="{ background: message.color, borderColor: message.dot }"></span>
       </li>
     </ul>
@@ -134,6 +156,8 @@ onUnmounted(() => {
   font-family: var(--font-live);
   font-size: 13px;
   font-weight: 500;
+  /* Digits of one width, so a count does not jump when it grows */
+  font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
 
@@ -183,6 +207,27 @@ li {
 .quiet-enter-from,
 .quiet-leave-to {
   transform: translateX(-100%);
+}
+
+/* A count that has just grown lights up for a moment. Only transform and colour: the width the
+   belt measures stays as it is */
+.count {
+  display: inline-block;
+}
+
+.count.grew {
+  animation: grew 600ms ease-out;
+}
+
+@keyframes grew {
+  from {
+    transform: scale(1.35);
+    color: #ffffff;
+  }
+
+  to {
+    transform: none;
+  }
 }
 
 /* The pixel colour with an outline that shows on any background */

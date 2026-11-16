@@ -106,7 +106,11 @@ describe('ActivityTicker', () => {
   it('pushes the belt so a new pixel is fully in view in a fraction of a second', async () => {
     const wrapper = ticker();
     await run(wrapper, 2 / 60);
-    wrapper.vm.announce([red(1), red(2), red(3)]);
+    wrapper.vm.announce([
+      red(1),
+      { x: 2, y: 2, color: '#FFF200' },
+      { x: 3, y: 3, color: '#000000' },
+    ]);
     await run(wrapper, 0.3);
     const all = items(wrapper);
     expect(all).toHaveLength(3);
@@ -145,6 +149,65 @@ describe('ActivityTicker', () => {
     // It has left
     await run(wrapper, STRIP / BELT_SPEED - QUIET_AFTER + 0.5);
     expect(items(wrapper)).toHaveLength(0);
+    expect(quiet(wrapper)).toBe(true);
+  });
+
+  it('counts another pixel of the same colour on the message already in view', async () => {
+    const wrapper = ticker();
+    await run(wrapper, 2 / 60);
+    wrapper.vm.announce([red(1)]);
+    await run(wrapper, 1);
+    // Any case of the same code is the same colour
+    wrapper.vm.announce([{ x: 2, y: 2, color: '#ff0000' }]);
+    await run(wrapper, 2 / 60);
+    expect(texts_(wrapper)).toEqual(['+2']);
+    expect(wrapper.get('.count').classes()).toContain('grew');
+  });
+
+  it('counts the pixels of one colour in one batch on one message', async () => {
+    const wrapper = ticker();
+    await run(wrapper, 2 / 60);
+    wrapper.vm.announce([red(1), { x: 2, y: 2, color: '#FFF200' }, red(3)]);
+    await run(wrapper, 2 / 60);
+    expect(texts_(wrapper)).toEqual(['+2', '+1']);
+    expect(wrapper.findAll('.count').map((count) => count.classes().includes('grew'))).toEqual([
+      true,
+      false,
+    ]);
+  });
+
+  it('counts on a message that is still waiting to be measured', async () => {
+    const wrapper = ticker();
+    await run(wrapper, 2 / 60);
+    wrapper.vm.announce([red(1)]);
+    wrapper.vm.announce([red(2)]);
+    await run(wrapper, 2 / 60);
+    expect(texts_(wrapper)).toEqual(['+2']);
+  });
+
+  it('sends a new message once the one of that colour has begun to leave', async () => {
+    const wrapper = ticker();
+    await run(wrapper, 2 / 60);
+    wrapper.vm.announce([red(1)]);
+    // Its left edge passes the left edge of the strip
+    await run(wrapper, (STRIP - WIDTH) / BELT_SPEED + 0.2);
+    expect(left(items(wrapper)[0])).toBeLessThan(0);
+    wrapper.vm.announce([red(2)]);
+    await run(wrapper, 2 / 60);
+    expect(texts_(wrapper)).toEqual(['+1', '+1']);
+  });
+
+  it('waits with "Dabar ramu..." for a while after a pixel that was counted', async () => {
+    const wrapper = ticker();
+    await run(wrapper, 2 / 60);
+    wrapper.vm.announce([red(1)]);
+    await run(wrapper, QUIET_AFTER - 1);
+    wrapper.vm.announce([red(2)]);
+    // The message has left, but the last pixel came less than QUIET_AFTER ago
+    await run(wrapper, STRIP / BELT_SPEED - QUIET_AFTER + 2);
+    expect(items(wrapper)).toHaveLength(0);
+    expect(quiet(wrapper)).toBe(false);
+    await run(wrapper, QUIET_AFTER);
     expect(quiet(wrapper)).toBe(true);
   });
 });
