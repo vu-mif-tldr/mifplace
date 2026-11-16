@@ -38,7 +38,6 @@ class FakeResizeObserver {
 
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
-  vi.stubGlobal('matchMedia', () => ({ matches: false }));
   vi.mocked(getPalette).mockResolvedValue(palette);
   vi.mocked(getCanvasSize).mockResolvedValue({ width: 2, height: 2 });
   vi.mocked(getCanvas).mockResolvedValue(snapshot);
@@ -191,7 +190,7 @@ describe('App', () => {
     await flushPromises();
     const ticker = wrapper.getComponent(ActivityTicker);
     const items = ticker.findAll('li');
-    expect(items.map((li) => li.text())).toEqual(['0, 0', '1, 0']);
+    expect(items.map((li) => li.text())).toEqual(['+1', '+1']);
     // Black stays black here; only its bloom on the canvas is the neutral light
     expect(items[1].get('.dot').attributes('style')).toContain('background: #000000');
     wrapper.unmount();

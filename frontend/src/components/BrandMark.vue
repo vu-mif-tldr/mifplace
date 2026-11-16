@@ -13,7 +13,7 @@ const PIXELS = [
 
 <template>
   <span class="brand">
-    <svg :width="size" :height="size" viewBox="0 0 32 32" aria-hidden="true">
+    <svg :width="size" :height="size" viewBox="0 0 32 32">
       <rect
         v-for="pixel in PIXELS"
         :key="`${pixel.x},${pixel.y}`"

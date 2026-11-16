@@ -13,9 +13,9 @@ const STRIP = 800;
 const none = new Map<number, number>();
 
 // Runs the belt for `seconds` in frames of 1/60 s
-function run(belt: Belt, seconds: number, widths = none, moving = true): Belt {
+function run(belt: Belt, seconds: number, widths = none): Belt {
   let current = belt;
-  for (let t = 0; t < seconds; t += 1 / 60) current = step(current, 1 / 60, widths, moving);
+  for (let t = 0; t < seconds; t += 1 / 60) current = step(current, 1 / 60, widths);
   return current;
 }
 
@@ -84,22 +84,12 @@ describe('step', () => {
   it('moves the messages behind a message that grew', () => {
     let belt = addItem(emptyBelt(), { id: 1, width: 100 }, STRIP, true);
     belt = addItem(belt, { id: 2, width: 50 }, STRIP, true);
-    belt = step(belt, 0, new Map([[1, 160]]), true);
+    belt = step(belt, 0, new Map([[1, 160]]));
     expect(x(belt, 2) - x(belt, 1)).toBe(160 + BELT_GAP);
   });
 
-  it('does not run without motion, but still makes room at once', () => {
-    let belt = addItem(emptyBelt(), { id: 1, width: 300 }, STRIP, true);
-    belt = run(belt, 1, none, false);
-    expect(x(belt, 1)).toBe(STRIP - 300);
-
-    belt = step(addItem(belt, { id: 2, width: 100 }, STRIP, true), 1 / 60, none, false);
-    expect(x(belt, 2)).toBe(STRIP - 100);
-    expect(x(belt, 1)).toBe(STRIP - 100 - BELT_GAP - 300);
-  });
-
   it('counts a long frame as MAX_FRAME', () => {
-    const belt = step(addItem(emptyBelt(), { id: 1, width: 100 }, STRIP, true), 5, none, true);
+    const belt = step(addItem(emptyBelt(), { id: 1, width: 100 }, STRIP, true), 5, none);
     expect(belt.offset).toBeCloseTo(BELT_SPEED * MAX_FRAME);
   });
 });

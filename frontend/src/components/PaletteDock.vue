@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PaletteColor } from '@mifplace/shared';
-import { colorName, texts } from '../texts';
+import { colorName } from '../texts';
 import ConfirmButton from './ConfirmButton.vue';
 
 // The dock under the canvas: a hint (or the error of the last pixel), the palette and the
@@ -19,19 +19,16 @@ defineEmits<{ select: [color: PaletteColor]; place: [] }>();
 
 <template>
   <footer class="dock">
-    <p v-if="error" class="message error" role="alert">{{ error }}</p>
-    <p v-else class="message" aria-live="polite">{{ hint }}</p>
+    <p v-if="error" class="message error">{{ error }}</p>
+    <p v-else class="message">{{ hint }}</p>
     <div class="bar">
-      <div class="palette" role="radiogroup" :aria-label="texts.palette">
+      <div class="palette">
         <button
           v-for="swatch in palette"
           :key="swatch.id"
           type="button"
-          role="radio"
           class="swatch"
           :class="{ selected: swatch.id === selectedId }"
-          :aria-checked="swatch.id === selectedId"
-          :aria-label="colorName(swatch.color)"
           :title="colorName(swatch.color)"
           :style="{ backgroundColor: swatch.color }"
           @click="$emit('select', swatch)"

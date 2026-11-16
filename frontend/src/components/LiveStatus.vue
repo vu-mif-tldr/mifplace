@@ -14,9 +14,7 @@ const LABELS: Record<LiveState, string> = {
 </script>
 
 <template>
-  <span class="live-status" :class="state" role="status">
-    <span class="dot"></span>{{ LABELS[state] }}
-  </span>
+  <span class="live-status" :class="state"> <span class="dot"></span>{{ LABELS[state] }} </span>
 </template>
 
 <style scoped>

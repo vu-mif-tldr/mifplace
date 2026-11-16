@@ -6,14 +6,15 @@ import { outlineFor } from '../glow';
 import { texts } from '../texts';
 
 // The strip at the bottom: a belt of new pixels running from right to left (belt.ts), each
-// "● x, y", shown at once and pushing the belt if there is no room. "Dabar ramu..." is not on
-// the belt: it comes out from the left edge once the canvas has been quiet for a while and
-// stays there until the next new pixel sends it away. Places only, never people (NFR-11).
+// "+1 ●" in its colour, shown at once and pushing the belt if there is no room. Another pixel of
+// the same colour makes it "+2", and so on, while the message is fully in view; once it has begun
+// to leave on the left, a new message comes instead. "Dabar ramu..." is not on the belt: it comes
+// out from the left edge once the canvas has been quiet for a while and stays there until the
+// next new pixel sends it away. Places only, never people (NFR-11).
 type Message = {
   id: number;
-  x: number;
-  y: number;
   color: string;
+  count: number;
 };
 
 // "Dabar ramu..." comes when no pixel has arrived for this long and the last one has left, ms
@@ -38,19 +39,33 @@ function remember(id: number, el: unknown) {
   else elements.delete(id);
 }
 
-const moving = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
 // New pixels from the live stream. A catch-up batch after a reconnect is from the past.
 function announce(pixels: NewBloom[]) {
   if (pixels.length === 0 || pixels.length > MAX_BATCH_FOR_BLOOMS) return;
   lastEvent = window.performance.now();
   quiet.value = false;
-  for (const { x, y, color } of pixels) {
-    const message = { id: ++nextId, x, y, color };
+  for (const { color } of pixels) {
+    const same = growing(color);
+    if (same) {
+      same.count += 1;
+      continue;
+    }
+    const message = { id: ++nextId, color, count: 1 };
     messages.set(message.id, message);
     pending.push(message);
   }
   redraw();
+}
+
+// The message of this colour that can still count: the newest one, while its left edge is in
+// view. One still waiting to be measured is the newest of all.
+function growing(color: string): Message | undefined {
+  const sameColor = (message: Message | undefined) =>
+    message?.color.toUpperCase() === color.toUpperCase();
+  const waiting = [...pending].reverse().find(sameColor);
+  if (waiting) return waiting;
+  const item = [...belt.items].reverse().find((item) => sameColor(messages.get(item.id)));
+  return item && screenX(belt, item) >= 0 ? messages.get(item.id) : undefined;
 }
 
 defineExpose({ announce });
@@ -67,11 +82,8 @@ function redraw() {
 function frame(dt: number, now: number) {
   if (stripWidth === 0) return;
 
-  // Without motion pixels stay where they are, so "Dabar ramu..." does not wait for them to go
-  if (!quiet.value && now - lastEvent >= QUIET_AFTER_MS) {
-    const pixelsInView = belt.items.length > 0 || pending.length > 0;
-    if (!moving || !pixelsInView) quiet.value = true;
-  }
+  const pixelsInView = belt.items.length > 0 || pending.length > 0;
+  if (!quiet.value && !pixelsInView && now - lastEvent >= QUIET_AFTER_MS) quiet.value = true;
   // A message goes on the belt once it has been drawn and measured, in the order of arrival
   while (pending.length > 0) {
     const width = elements.get(pending[0].id)?.offsetWidth ?? 0;
@@ -83,7 +95,7 @@ function frame(dt: number, now: number) {
   const widths = new Map(
     belt.items.map((item) => [item.id, elements.get(item.id)?.offsetWidth || item.width])
   );
-  belt = step(belt, dt, widths, moving);
+  belt = step(belt, dt, widths);
   const kept = new Set([...belt.items, ...pending].map((item) => item.id));
   for (const id of messages.keys()) if (!kept.has(id)) messages.delete(id);
   redraw();
@@ -113,7 +125,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section ref="stripEl" class="ticker" :aria-label="texts.activity">
+  <section ref="stripEl" class="ticker">
     <ul>
       <li
         v-for="message in drawn"
@@ -121,8 +133,11 @@ onUnmounted(() => {
         :ref="(el) => remember(message.id, el)"
         :style="{ transform: `translateX(${message.left}px)` }"
       >
+        <!-- A new key for every count plays the flash again -->
+        <span :key="message.count" class="count" :class="{ grew: message.count > 1 }">
+          {{ texts.newPixels(message.count) }}
+        </span>
         <span class="dot" :style="{ background: message.color, borderColor: message.dot }"></span>
-        {{ texts.coordinates(message.x, message.y) }}
       </li>
     </ul>
     <Transition name="quiet">
@@ -133,6 +148,9 @@ onUnmounted(() => {
 
 <style scoped>
 .ticker {
+  /* Space between a count and its colour dot */
+  --count-gap: 4px;
+
   position: relative;
   height: 36px;
   overflow: hidden;
@@ -141,7 +159,7 @@ onUnmounted(() => {
   font-family: var(--font-live);
   font-size: 13px;
   font-weight: 500;
-  /* Digits of one width, so coordinates do not jump */
+  /* Digits of one width, so a count does not jump when it grows */
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
@@ -159,7 +177,7 @@ li {
   top: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--count-gap);
   height: 36px;
   white-space: nowrap;
   will-change: transform;
@@ -194,16 +212,24 @@ li {
   transform: translateX(-100%);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .quiet-enter-active,
-  .quiet-leave-active {
-    transition: opacity 300ms;
+/* A count that has just grown lights up for a moment. Only transform and colour: the width the
+   belt measures stays as it is */
+.count {
+  display: inline-block;
+}
+
+.count.grew {
+  animation: grew 600ms ease-out;
+}
+
+@keyframes grew {
+  from {
+    transform: scale(1.35);
+    color: #ffffff;
   }
 
-  .quiet-enter-from,
-  .quiet-leave-to {
+  to {
     transform: none;
-    opacity: 0;
   }
 }
 
