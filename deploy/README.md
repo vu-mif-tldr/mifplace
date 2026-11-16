@@ -14,7 +14,8 @@ browser ── HTTPS ──> Caddy on the host ── 127.0.0.1:3001 ──> con
   frontend itself, so there is one container and one port; the Vite dev server (5173) is for local
   development only.
 - **Build.** [`docker.yml`](../.github/workflows/docker.yml) publishes the image on every merge to
-  `main` as `ghcr.io/vu-mif-tldr/mifplace:main` and `:sha-<commit>`. Pull requests only build it, and
+  `main` as `ghcr.io/vu-mif-tldr/mifplace:main` and `:sha-<commit>`. A release
+  ([`release.yml`](../.github/workflows/release.yml), by hand) adds the version tags to one of them. Pull requests only build it, and
   only when they change the Dockerfile or the dependencies. A rebuild by hand: Actions → "Docker
   image" → Run workflow on `main`. The server only pulls images, it never builds them.
 - **Database.** The SQLite file lives in the named volume `data`. The container creates it on the
@@ -95,13 +96,13 @@ sudo docker compose up -d
 The old container is stopped before the new one starts, so the demo is down for a few seconds.
 Never run two containers on the same database file.
 
-Which version runs: `curl -s http://127.0.0.1:3001/health` shows it in `version`.
+Which build runs: `curl -s http://127.0.0.1:3001/health` shows its commit in `commit`.
 
 ## Rollback
 
-Every image is also tagged with its version (`0.4.1`, see
-[Versions](../docs/development.md#versions)) and its commit (`sha-` and the first 7 characters of
-the hash); GitHub → repository → Packages → `mifplace` lists them. Pin the version in `.env` next
+Every image is also tagged with its commit (`sha-` and the first 7 characters of the hash), and a
+released one with its version (`0.4.1`, see [Versions](../docs/development.md#versions)); GitHub →
+repository → Packages → `mifplace` lists them. Pin the version in `.env` next
 to `compose.yaml`, so that a later `up -d` keeps it:
 
 ```sh

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { LiveState } from '../live';
-import { appVersion } from '../version';
 import BrandMark from './BrandMark.vue';
 import LiveStatus from './LiveStatus.vue';
 
-// The bar over the canvas: the logo with the version, how many pages are open and the
+// The bar over the canvas: the logo with the commit of the build, how many pages are open and the
 // connection. The cell under the mouse (FR-11) is shown on the canvas, next to it.
+const appCommit = import.meta.env.APP_COMMIT;
+
 defineProps<{
   // null while there is no connection yet (loading, or loading failed)
   liveState: LiveState | null;
@@ -17,7 +18,8 @@ defineProps<{
 <template>
   <header class="top-bar">
     <BrandMark />
-    <span class="version">{{ appVersion }}</span>
+    <!-- docs/development.md, "Versions" -->
+    <span class="version">{{ appCommit }}</span>
     <span class="spacer"></span>
     <span v-if="online !== null" class="online">
       <!-- A person, head and shoulders -->

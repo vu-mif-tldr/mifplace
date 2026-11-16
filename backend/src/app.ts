@@ -24,8 +24,8 @@ export interface AppConfig {
   // The snapshot for GET /api/canvas, with the checkpoint of its last event
   getCanvasState: () => CanvasState;
 
-  // The version shown by GET /health: APP_VERSION from the image build. Left out, "dev".
-  version?: string;
+  // The commit shown by GET /health: APP_COMMIT from the image build. Left out, "dev".
+  commit?: string;
   // Throws if the database is not reachable. Injected so the app can be built without a database.
   checkDbHealth: () => void;
   // Saves a new pixel, sends it to the open pages and returns its event id
@@ -45,7 +45,7 @@ export interface AppConfig {
 
 type HealthResponse = {
   status: 'ok' | 'down';
-  version: string;
+  commit: string;
   DB: {
     status: 'ok' | 'down';
     latencyMs?: string;
@@ -56,7 +56,7 @@ type HealthResponse = {
 // Builds the Express app from plain values: it does not read .env or open the database,
 // so tests can create it without any setup. server.ts wires in the real values.
 export function createApp({
-  version = 'dev',
+  commit = 'dev',
   canvasSize,
   palette,
   checkDbHealth: checkHealth,
@@ -117,7 +117,7 @@ export function createApp({
 
       const response: HealthResponse = {
         status: 'ok',
-        version,
+        commit,
         DB: {
           status: 'ok',
           latencyMs: latencyMs.toFixed(2),
@@ -131,7 +131,7 @@ export function createApp({
 
       const response: HealthResponse = {
         status: 'down',
-        version,
+        commit,
         DB: {
           status: 'down',
         },

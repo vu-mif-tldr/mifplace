@@ -90,7 +90,7 @@ try {
 }
 
 const app = createApp({
-  version: process.env.APP_VERSION,
+  commit: process.env.APP_COMMIT,
   canvasSize,
   palette,
   checkDbHealth: () => mifDb.checkHealth(),
