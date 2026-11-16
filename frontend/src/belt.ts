@@ -6,7 +6,7 @@
 // Normal speed of the belt, px per second
 export const BELT_SPEED = 70;
 // Space between two messages, px
-export const BELT_GAP = 40;
+export const BELT_GAP = 20;
 // How fast a push catches up: quickly while far, slower near the end (the part still to go
 // shrinks like e^(-PUSH_RATE * t)), never slower than PUSH_MIN_SPEED px per second, so it ends
 // in about a quarter of a second
