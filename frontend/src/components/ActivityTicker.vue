@@ -148,6 +148,9 @@ onUnmounted(() => {
 
 <style scoped>
 .ticker {
+  /* Space between a count and its colour dot */
+  --count-gap: 4px;
+
   position: relative;
   height: 36px;
   overflow: hidden;
@@ -174,7 +177,7 @@ li {
   top: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--count-gap);
   height: 36px;
   white-space: nowrap;
   will-change: transform;
