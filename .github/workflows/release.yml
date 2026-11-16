@@ -1,0 +1,94 @@
+name: Release
+
+# Releases the current head of main as a new version X.Y.Z, only when run by hand
+# (Actions → "Release" → Run workflow on main). The choice says which part goes up from the last
+# tag vX.Y.Z: patch raises Z, minor raises Y (Z back to 0), major raises X (Y and Z back to 0).
+# Nothing is rebuilt: the image of that commit, already published by docker.yml as sha-<commit>,
+# gets the tags X.Y.Z and X.Y as well, so the release is exactly the image that ran as main.
+# Then the commit gets the git tag vX.Y.Z with a GitHub release listing the merged pull requests.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of X.Y.Z goes up
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: read
+
+# Two releases at once would both count from the same last tag
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      # The whole history with tags: the last version and whether this commit already has one
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: next
+        name: Next version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          if [ -n "$(git tag --points-at HEAD --list 'v*')" ]; then
+            echo "::error::$(git tag --points-at HEAD --list 'v*') is already on this commit"
+            exit 1
+          fi
+          last=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
+          IFS=. read -r x y z <<< "${last:-v0.0.0}"
+          x=${x#v}
+          case "$BUMP" in
+            major) version="$((x + 1)).0.0" ;;
+            minor) version="$x.$((y + 1)).0" ;;
+            *) version="$x.$y.$((z + 1))" ;;
+          esac
+          echo "${last:-none} -> v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "minor=${version%.*}" >> "$GITHUB_OUTPUT"
+          echo "commit=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The image of this commit must be there: its "Docker image" run may have failed or still run
+      - name: Tag the image
+        env:
+          SOURCE: ${{ env.IMAGE }}:sha-${{ steps.next.outputs.commit }}
+          VERSION: ${{ steps.next.outputs.version }}
+          MINOR: ${{ steps.next.outputs.minor }}
+        run: |
+          if ! docker buildx imagetools inspect "$SOURCE" > /dev/null; then
+            echo "::error::$SOURCE is not published yet: wait for the \"Docker image\" run of this commit"
+            exit 1
+          fi
+          docker buildx imagetools create --tag "$IMAGE:$VERSION" --tag "$IMAGE:$MINOR" "$SOURCE"
+
+      # Creates the tag vX.Y.Z on the commit, with the pull requests since the last tag as notes
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.next.outputs.version }}
+        run: >-
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA"
+          --title "v$VERSION" --generate-notes

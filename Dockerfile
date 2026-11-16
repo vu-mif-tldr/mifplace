@@ -22,9 +22,9 @@ COPY shared shared
 COPY db db
 COPY backend backend
 COPY frontend frontend
-# The version for the page (vite.config.ts), X.Y.Z from CI on main. Declared only here, so the
-# layers above stay cached from one version to the next.
-ARG APP_VERSION=dev
+# The commit for the page (vite.config.ts), the first 7 characters of the hash from docker.yml.
+# Declared only here, so the layers above stay cached from one commit to the next.
+ARG APP_COMMIT=dev
 RUN npm run build
 
 # Production dependencies of the backend only (with @mifplace/db and @mifplace/shared): no frontend
@@ -57,10 +57,9 @@ WORKDIR /app/backend
 ENV HOST=0.0.0.0 \
     PORT=3000 \
     DB_PATH=/data/mifplace.db
-# The version X.Y.Z of a build of main (docker.yml), shown by GET /health. Last, as it changes
-# with every build.
-ARG APP_VERSION=dev
-ENV APP_VERSION=${APP_VERSION}
+# The commit of the build (docker.yml), shown by GET /health. Last, as it changes with every build.
+ARG APP_COMMIT=dev
+ENV APP_COMMIT=${APP_COMMIT}
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
   CMD ["node", "-e", "fetch('http://127.0.0.1:3000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]

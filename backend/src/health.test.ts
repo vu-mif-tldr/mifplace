@@ -28,22 +28,22 @@ async function health(config: Partial<AppConfig>) {
 }
 
 describe('GET /health', () => {
-  it('shows the version of the build', async () => {
-    expect((await health({ version: '0.4.1' })).body.version).toBe('0.4.1');
+  it('shows the commit of the build', async () => {
+    expect((await health({ commit: 'abc1234' })).body.commit).toBe('abc1234');
   });
 
-  it('shows "dev" without a version', async () => {
-    expect((await health({})).body.version).toBe('dev');
+  it('shows "dev" without a commit', async () => {
+    expect((await health({})).body.commit).toBe('dev');
   });
 
-  it('shows the version while the database is down', async () => {
+  it('shows the commit while the database is down', async () => {
     const down = await health({
-      version: '0.4.1',
+      commit: 'abc1234',
       checkDbHealth: () => {
         throw new Error('no database');
       },
     });
     expect(down.status).toBe(503);
-    expect(down.body).toMatchObject({ status: 'down', version: '0.4.1' });
+    expect(down.body).toMatchObject({ status: 'down', commit: 'abc1234' });
   });
 });
