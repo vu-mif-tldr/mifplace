@@ -31,6 +31,11 @@
       </form>
       <p id="status" class="status"></p>
 
+      <button type="button" id="qr-open" class="qr-thumb" title="Show the QR code larger">
+        <img src="/qr.svg" alt="QR code for vu.place" width="120" height="120" />
+      </button>
+      <p class="qr-caption">Scan to join from your phone</p>
+
       <p class="fine">
         Only <b>vu.lt</b> addresses. We use your address for one thing: to tell you when vu.place
         opens and invite you to the beta. The emails go out through SendPulse; nobody else gets it.
@@ -38,6 +43,10 @@
         sooner.
       </p>
     </main>
+    <dialog id="qr-dialog">
+      <button type="button" class="qr-close" title="Close">&times;</button>
+      <img src="/qr.svg" alt="QR code for vu.place" />
+    </dialog>
     <script src="/waitlist.js"></script>
     <script>
       const form = document.getElementById('signup');
@@ -62,6 +71,14 @@
         );
         if (result.ok) form.reset();
         button.disabled = false;
+      });
+
+      // The QR code opens full size over the page; Esc closes the dialog by itself, a click on
+      // the cross or anywhere outside the image (the backdrop belongs to the dialog) too.
+      const qrDialog = document.getElementById('qr-dialog');
+      document.getElementById('qr-open').addEventListener('click', () => qrDialog.showModal());
+      qrDialog.addEventListener('click', (event) => {
+        if (event.target === qrDialog || event.target.closest('.qr-close')) qrDialog.close();
       });
     </script>
   </body>

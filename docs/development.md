@@ -43,7 +43,7 @@ Then delete the `MIGRATIONS_DIR` line from `.env`. If you have a feature branch,
 | `mcp`      | Read-only MCP server for Claude Code                                                      |
 | `tools`    | Development-only scripts (seed, palette export, pixel rain), not in the Docker image      |
 
-`scripts/` has the Node scripts behind `setup`, `setup:mcp` and `clean`; `prototypes/` holds earlier research (MP-34).
+`scripts/` has the Node scripts behind `setup`, `setup:mcp` and `clean`; `prototypes/` holds earlier research (MP-34). `docs/assets/` keeps the QR code for https://vu.place: [qr-vu-place.svg](assets/qr-vu-place.svg) for print and slides, [qr-vu-place.png](assets/qr-vu-place.png) (1200×1200) where SVG does not work. The landing page shows a copy, `deploy/landing/qr.svg`.
 
 ## Commands
 
