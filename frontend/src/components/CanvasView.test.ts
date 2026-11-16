@@ -73,6 +73,22 @@ describe('CanvasView', () => {
     const { wrapper, canvas } = canvasView();
     await canvas.trigger('click', { clientX: 12, clientY: 7 });
     expect(wrapper.emitted('pick')).toEqual([[{ x: 2, y: 1 }]]);
+    // The click on the canvas is not one beside it
+    expect(wrapper.emitted('release')).toBeUndefined();
+  });
+
+  it('reports a click beside the canvas, but not the end of a drag there', async () => {
+    const { wrapper } = canvasView();
+    resize(1000, 640);
+    const viewport = wrapper.get('.viewport');
+    await viewport.trigger('click', { clientX: 50, clientY: 300 });
+    expect(wrapper.emitted('release')).toHaveLength(1);
+
+    await viewport.trigger('mousedown', { clientX: 100, clientY: 100 });
+    await viewport.trigger('mousemove', { clientX: 60, clientY: 100 });
+    await viewport.trigger('mouseup');
+    await viewport.trigger('click', { clientX: 60, clientY: 100 });
+    expect(wrapper.emitted('release')).toHaveLength(1);
   });
 
   it('does not report a click that ends a drag', async () => {

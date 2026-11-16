@@ -11,8 +11,8 @@ import CellLoupe from './CellLoupe.vue';
 import SelectionRing from './SelectionRing.vue';
 
 // The canvas with pan and zoom, and everything drawn over it: the selection ring with its
-// loupe, the ring under the mouse and the blooms. It only reports clicks on cells; what a click
-// means (select or place) is up to the page.
+// loupe, the ring under the mouse and the blooms. It only reports clicks on cells and clicks
+// beside the canvas; what a click means (select, place or let go) is up to the page.
 const props = defineProps<{
   size: CanvasSize | null;
   selectedCell: Cell | null;
@@ -27,6 +27,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   // A click on a cell that was not the end of a drag
   pick: [cell: Cell];
+  // A click beside the canvas, in the empty space around it, that was not the end of a drag
+  release: [];
   // The cell under the mouse, null when the mouse leaves the canvas
   hover: [cell: Cell | null];
 }>();
@@ -167,6 +169,12 @@ function onCanvasClick(event: MouseEvent) {
   emit('pick', getClickedCell(event, props.size));
 }
 
+// Only on the empty space itself: clicks on the canvas and the loupe are theirs
+function onViewportClick(event: MouseEvent) {
+  if (moved || event.target !== event.currentTarget) return;
+  emit('release');
+}
+
 const ring = computed(() =>
   props.selectedCell ? cellCenter(props.selectedCell, offset.value, cellPx.value) : null
 );
@@ -232,6 +240,7 @@ const halo = computed(() => {
       @mousemove="onMouseMove"
       @mouseup="dragging = false"
       @mouseleave="onMouseLeave"
+      @click="onViewportClick"
     >
       <canvas
         ref="canvasEl"
