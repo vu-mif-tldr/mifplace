@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { mount } from '@vue/test-utils';
 import CanvasView from './CanvasView.vue';
+import CellLoupe from './CellLoupe.vue';
 import SelectionRing from './SelectionRing.vue';
 
 // happy-dom measures nothing: the viewport size comes from a fake ResizeObserver and the
@@ -110,6 +111,29 @@ describe('CanvasView', () => {
     expect(wrapper.find('.hover-ring').exists()).toBe(false);
     await viewport.trigger('mousemove', { clientX: 30, clientY: 7 });
     expect(wrapper.find('.hover-ring').exists()).toBe(true);
+  });
+
+  it('shows the loupe over a small selected cell, and its picks as its own', async () => {
+    const { wrapper } = canvasView({ selectedCell: { x: 60, y: 100 } });
+    resize(640, 640);
+    await wrapper.vm.$nextTick();
+    const loupe = wrapper.getComponent(CellLoupe);
+    // Above the cell: centre 502.5 px, ring 34 px, loupe 176 px
+    expect(loupe.props('x')).toBe(302.5);
+    expect(loupe.props('y')).toBe(502.5 - 25 - 88);
+    loupe.vm.$emit('pick', { x: 61, y: 100 });
+    expect(wrapper.emitted('pick')).toEqual([[{ x: 61, y: 100 }]]);
+  });
+
+  it('shows no loupe once the cells are large enough to see', async () => {
+    const { wrapper } = canvasView({ selectedCell: { x: 60, y: 100 } });
+    resize(640, 640);
+    const viewport = wrapper.get('.viewport');
+    // 5 px per cell, 1.1 times larger per step: 12 px after 10 steps
+    for (let i = 0; i < 10; i++) {
+      await viewport.trigger('wheel', { deltaY: -100, clientX: 302, clientY: 502 });
+    }
+    expect(wrapper.findComponent(CellLoupe).exists()).toBe(false);
   });
 
   it('dims the canvas while paused', () => {

@@ -1,4 +1,12 @@
-import { cellCenter, clampOffset, clickAction, fitCellSize, visiblePart, zoomOffset } from './view';
+import {
+  cellCenter,
+  clampOffset,
+  clickAction,
+  fitCellSize,
+  ringSize,
+  visiblePart,
+  zoomOffset,
+} from './view';
 
 describe('fitCellSize', () => {
   it('keeps 5 px per cell for the default 128x128 canvas in 640 px', () => {
@@ -90,5 +98,12 @@ describe('visiblePart', () => {
   it('has zero size when the rectangle is outside', () => {
     const part = visiblePart({ x: 200, y: 0, width: 50, height: 50 }, 100, 100);
     expect(part.width).toBe(0);
+  });
+});
+
+describe('ringSize', () => {
+  it('is at least 34 px and grows with the cells', () => {
+    expect(ringSize(5)).toBe(34);
+    expect(ringSize(40)).toBe(58);
   });
 });
