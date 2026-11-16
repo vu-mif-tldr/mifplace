@@ -30,6 +30,21 @@ describe('SelectionRing', () => {
     expect(zoomed.get('.circle').attributes('style')).toContain('width: 58px');
   });
 
+  it('covers exactly the cell: ticks around a small one, a frame inside a large one', () => {
+    const small = mount(SelectionRing, { props });
+    expect(small.get('.cell').attributes('style')).toContain('width: 5px');
+    expect(small.get('.cell').classes()).not.toContain('framed');
+    // From one cell away (7.5 px from the centre) to inside the ring (17 - 6 px)
+    const tick = small.get('.tick');
+    expect([tick.attributes('x1'), tick.attributes('x2')]).toEqual(['7.5', '11']);
+    expect(small.findAll('.tick')).toHaveLength(4);
+
+    const large = mount(SelectionRing, { props: { ...props, cellPx: 40 } });
+    expect(large.get('.cell').attributes('style')).toContain('width: 40px');
+    expect(large.get('.cell').classes()).toContain('framed');
+    expect(large.find('.ticks').exists()).toBe(false);
+  });
+
   it('plays the placed animation after a pixel and shows a failure', () => {
     expect(mount(SelectionRing, { props }).get('.circle').classes()).not.toContain('landed');
     const placed = mount(SelectionRing, { props: { ...props, placedCount: 1 } });

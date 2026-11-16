@@ -4,13 +4,15 @@ import type { CanvasSize, CanvasState, PaletteColor } from '@mifplace/shared';
 import type { Bloom } from '../blooms';
 import { drawCanvas, getClickedCell, paintCell } from '../canvas';
 import { texts } from '../texts';
+import { LOUPE_UNTIL_PX, loupePlace } from '../loupe';
 import { cellCenter, clampOffset, fitCellSize, visiblePart, zoomOffset, type Cell } from '../view';
 import BloomLayer from './BloomLayer.vue';
+import CellLoupe from './CellLoupe.vue';
 import SelectionRing from './SelectionRing.vue';
 
-// The canvas with pan and zoom, and everything drawn over it: the selection ring, the ring
-// under the mouse and the blooms. It only reports clicks on cells; what a click means
-// (select or place) is up to the page.
+// The canvas with pan and zoom, and everything drawn over it: the selection ring with its
+// loupe, the ring under the mouse and the blooms. It only reports clicks on cells and clicks
+// beside the canvas; what a click means (select, place or let go) is up to the page.
 const props = defineProps<{
   size: CanvasSize | null;
   selectedCell: Cell | null;
@@ -25,6 +27,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   // A click on a cell that was not the end of a drag
   pick: [cell: Cell];
+  // A click beside the canvas, in the empty space around it, that was not the end of a drag
+  release: [];
   // The cell under the mouse, null when the mouse leaves the canvas
   hover: [cell: Cell | null];
 }>();
@@ -45,14 +49,19 @@ const y = ref(0);
 const cellPx = computed(() => cellSize.value * scale.value);
 const offset = computed(() => ({ x: x.value, y: y.value }));
 
+// Counts what is drawn on the canvas element, so the loupe copies it again
+const drawn = ref(0);
+
 // Draw a whole snapshot, or one cell, on the canvas element. The size is passed in: the page
 // draws right after it learns the size, before the prop has reached this component.
 function draw(size: CanvasSize, state: CanvasState, palette: PaletteColor[]) {
   if (canvasEl.value) drawCanvas(canvasEl.value, size, state, palette);
+  drawn.value++;
 }
 
 function paint(cell: Cell, color: string) {
   if (canvasEl.value) paintCell(canvasEl.value, cell.x, cell.y, color);
+  drawn.value++;
 }
 
 defineExpose({ draw, paint });
@@ -160,12 +169,27 @@ function onCanvasClick(event: MouseEvent) {
   emit('pick', getClickedCell(event, props.size));
 }
 
+// Only on the empty space itself: clicks on the canvas and the loupe are theirs
+function onViewportClick(event: MouseEvent) {
+  if (moved || event.target !== event.currentTarget) return;
+  emit('release');
+}
+
 const ring = computed(() =>
   props.selectedCell ? cellCenter(props.selectedCell, offset.value, cellPx.value) : null
 );
 const ringLabel = computed(() =>
   props.selectedCell ? texts.coordinates(props.selectedCell.x, props.selectedCell.y) : ''
 );
+
+// The loupe while cells are too small to tell apart, and only while the cell is in view
+const loupe = computed(() => {
+  const centre = ring.value;
+  if (!centre || cellPx.value >= LOUPE_UNTIL_PX) return null;
+  if (centre.x < 0 || centre.y < 0 || centre.x > viewWidth.value || centre.y > viewHeight.value)
+    return null;
+  return loupePlace(centre, cellPx.value, viewWidth.value, viewHeight.value);
+});
 
 // The thin ring under the mouse (MP-105), not over the selected cell
 const hoverRing = computed(() => {
@@ -216,6 +240,7 @@ const halo = computed(() => {
       @mousemove="onMouseMove"
       @mouseup="dragging = false"
       @mouseleave="onMouseLeave"
+      @click="onViewportClick"
     >
       <canvas
         ref="canvasEl"
@@ -246,6 +271,21 @@ const halo = computed(() => {
           :placed-count="placedCount"
           :failed="placeFailed"
         />
+        <Transition name="loupe">
+          <CellLoupe
+            v-if="loupe && size && selectedCell"
+            :class="{ paused }"
+            :source="canvasEl"
+            :size="size"
+            :cell="selectedCell"
+            :color="selectedColor"
+            :x="loupe.x"
+            :y="loupe.y"
+            :drawn="drawn"
+            @pick="emit('pick', $event)"
+            @hover="setHovered"
+          />
+        </Transition>
       </div>
     </div>
   </div>
@@ -305,9 +345,33 @@ const halo = computed(() => {
   box-shadow: 0 0 0 1px rgb(12 16 48 / 60%);
 }
 
+/* The loupe opens out of the selected cell */
+.loupe-enter-active,
+.loupe-leave-active {
+  transition:
+    opacity 0.16s ease-out,
+    transform 0.16s ease-out;
+}
+
+.loupe-enter-from,
+.loupe-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.6);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .canvas {
     transition: none;
+  }
+
+  .loupe-enter-active,
+  .loupe-leave-active {
+    transition: opacity 0.16s ease-out;
+  }
+
+  .loupe-enter-from,
+  .loupe-leave-to {
+    transform: translate(-50%, -50%);
   }
 }
 </style>

@@ -46,3 +46,8 @@ export function visiblePart(rect: Rect, width: number, height: number): Rect {
     height: Math.max(0, Math.min(height, rect.y + rect.height) - y),
   };
 }
+
+// Width of the ring on the selected cell: around the cell, never smaller than a fingertip mark
+export function ringSize(cellPx: number) {
+  return Math.max(34, cellPx + 18);
+}

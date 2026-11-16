@@ -20,7 +20,6 @@ export const texts = {
   coordinates: (x: number, y: number) => `${x}, ${y}`,
   activity: 'Kas vyksta drobėje',
   quiet: 'Dabar ramu...',
-  yours: 'Tavo:',
 };
 
 // Names of the colours of the default palette. The palette comes from the server, so a colour

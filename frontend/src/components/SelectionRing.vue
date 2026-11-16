@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { ringSize } from '../view';
 
 // The ring on the selected cell: its colour fills by --progress (the cooldown), it closes
-// onto the cell when a pixel is placed and turns into a red dashed ring when that failed
+// onto the cell when a pixel is placed and turns into a red dashed ring when that failed.
+// Inside it the coming pixel covers exactly its cell, nothing of the cells around: small
+// cells get four ticks pointing at it from one cell away, large ones a frame inside the cell.
 const props = defineProps<{
   // Centre of the cell in viewport px, and px per cell at the current zoom
   x: number;
@@ -16,8 +19,18 @@ const props = defineProps<{
   failed: boolean;
 }>();
 
-const size = computed(() => Math.max(34, props.cellPx + 18));
-const cell = computed(() => Math.max(4, props.cellPx) + 2);
+// Cells this large or larger have room for a frame inside
+const FRAMED_FROM_PX = 8;
+
+const size = computed(() => ringSize(props.cellPx));
+const framed = computed(() => props.cellPx >= FRAMED_FROM_PX);
+
+// The ticks run from one cell away from the cell to just inside the ring
+const ticks = computed(() => {
+  const from = props.cellPx * 1.5;
+  const to = size.value / 2 - 6;
+  return to - from >= 3 ? { from, to } : null;
+});
 </script>
 
 <template>
@@ -28,9 +41,22 @@ const cell = computed(() => Math.max(4, props.cellPx) + 2);
       :class="{ landed: placedCount > 0, failed }"
       :style="{ width: `${size}px`, height: `${size}px` }"
     ></span>
+    <svg
+      v-if="ticks"
+      class="ticks"
+      :width="size"
+      :height="size"
+      :viewBox="`${-size / 2} ${-size / 2} ${size} ${size}`"
+    >
+      <g v-for="angle in [0, 90, 180, 270]" :key="angle" :transform="`rotate(${angle})`">
+        <line class="tick-shade" :x1="ticks.from" :x2="ticks.to" y1="0" y2="0" />
+        <line class="tick" :x1="ticks.from" :x2="ticks.to" y1="0" y2="0" />
+      </g>
+    </svg>
     <span
       class="cell"
-      :style="{ width: `${cell}px`, height: `${cell}px`, background: color }"
+      :class="{ framed }"
+      :style="{ width: `${cellPx}px`, height: `${cellPx}px`, background: color }"
     ></span>
     <span class="label" :style="{ left: `${size / 2 + 8}px` }">{{ label }}</span>
   </div>
@@ -82,14 +108,43 @@ const cell = computed(() => Math.max(4, props.cellPx) + 2);
   }
 }
 
+.ticks {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  overflow: visible;
+}
+
+.tick,
+.tick-shade {
+  stroke-linecap: round;
+}
+
+.tick {
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+
+/* A dark edge, so the ticks show on white cells too */
+.tick-shade {
+  stroke: var(--ink);
+  stroke-width: 3.5;
+  stroke-opacity: 0.6;
+}
+
+/* Exactly the cell: the pixel as it will be, nothing over its neighbours */
 .cell {
   position: absolute;
   left: 0;
   top: 0;
   transform: translate(-50%, -50%);
+}
+
+.cell.framed {
   box-shadow:
-    0 0 0 1px var(--ink),
-    0 0 0 2.5px #ffffff;
+    inset 0 0 0 2px #ffffff,
+    inset 0 0 0 3px var(--ink);
 }
 
 .label {

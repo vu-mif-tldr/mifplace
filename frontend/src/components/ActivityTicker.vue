@@ -1,27 +1,16 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import { onMounted, onUnmounted, ref, shallowRef } from 'vue';
 import { addItem, emptyBelt, screenX, step, type Belt } from '../belt';
 import { MAX_BATCH_FOR_BLOOMS, type NewBloom } from '../blooms';
 import { outlineFor } from '../glow';
 import { texts } from '../texts';
-import type { Cell } from '../view';
 
-// The strip at the bottom: a belt of messages running from right to left (belt.ts).
-// - every new pixel: "● x, y", shown at once, pushing the belt if there is no room;
-// - the selected cell: "Tavo: ● x, y", one message that follows the selection; it waits its
-//   turn behind the right edge and never pushes;
-// "Dabar ramu..." is not on the belt: it comes out from the left edge once the canvas has been
-// quiet for a while and stays there until the next new pixel sends it away.
-// Places only, never people (NFR-11).
-const props = defineProps<{
-  selectedCell: Cell | null;
-  // The colour of the selected swatch
-  selectedColor: string | undefined;
-}>();
-
+// The strip at the bottom: a belt of new pixels running from right to left (belt.ts), each
+// "● x, y", shown at once and pushing the belt if there is no room. "Dabar ramu..." is not on
+// the belt: it comes out from the left edge once the canvas has been quiet for a while and
+// stays there until the next new pixel sends it away. Places only, never people (NFR-11).
 type Message = {
   id: number;
-  kind: 'pixel' | 'you';
   x: number;
   y: number;
   color: string;
@@ -51,47 +40,27 @@ function remember(id: number, el: unknown) {
 
 const moving = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function enqueue(kind: Message['kind'], x = 0, y = 0, color = '') {
-  const message = { id: ++nextId, kind, x, y, color };
-  messages.set(message.id, message);
-  pending.push(message);
-  redraw();
-}
-
 // New pixels from the live stream. A catch-up batch after a reconnect is from the past.
 function announce(pixels: NewBloom[]) {
   if (pixels.length === 0 || pixels.length > MAX_BATCH_FOR_BLOOMS) return;
   lastEvent = window.performance.now();
   quiet.value = false;
-  for (const pixel of pixels) enqueue('pixel', pixel.x, pixel.y, pixel.color);
+  for (const { x, y, color } of pixels) {
+    const message = { id: ++nextId, x, y, color };
+    messages.set(message.id, message);
+    pending.push(message);
+  }
+  redraw();
 }
 
 defineExpose({ announce });
-
-// The selected cell is one message: while it is on the belt it shows the selection as it is
-// now; once it has left, the next change of the selection adds it again. Without a selection
-// it keeps its last values.
-function you() {
-  return [...messages.values()].find((message) => message.kind === 'you');
-}
-watch(
-  () => [props.selectedCell, props.selectedColor] as const,
-  ([cell, color]) => {
-    if (!cell || !color) return;
-    const message = you();
-    if (message) Object.assign(message, { x: cell.x, y: cell.y, color });
-    else enqueue('you', cell.x, cell.y, color);
-    redraw();
-  },
-  { immediate: true }
-);
 
 function redraw() {
   const onBelt = belt.items.map((item) => ({ id: item.id, left: screenX(belt, item) }));
   const waiting = pending.map((message) => ({ id: message.id, left: stripWidth + 10_000 }));
   drawn.value = [...onBelt, ...waiting].flatMap(({ id, left }) => {
     const message = messages.get(id);
-    return message ? [{ ...message, left, dot: outlineFor(message.color || '#c8cdea') }] : [];
+    return message ? [{ ...message, left, dot: outlineFor(message.color) }] : [];
   });
 }
 
@@ -100,9 +69,7 @@ function frame(dt: number, now: number) {
 
   // Without motion pixels stay where they are, so "Dabar ramu..." does not wait for them to go
   if (!quiet.value && now - lastEvent >= QUIET_AFTER_MS) {
-    const pixelsInView = [...belt.items, ...pending].some(
-      (item) => messages.get(item.id)?.kind === 'pixel'
-    );
+    const pixelsInView = belt.items.length > 0 || pending.length > 0;
     if (!moving || !pixelsInView) quiet.value = true;
   }
   // A message goes on the belt once it has been drawn and measured, in the order of arrival
@@ -110,8 +77,7 @@ function frame(dt: number, now: number) {
     const width = elements.get(pending[0].id)?.offsetWidth ?? 0;
     if (width === 0) break;
     const message = pending.shift()!;
-    // Only a new pixel pushes the belt
-    belt = addItem(belt, { id: message.id, width }, stripWidth, message.kind === 'pixel');
+    belt = addItem(belt, { id: message.id, width }, stripWidth, true);
   }
 
   const widths = new Map(
@@ -155,15 +121,8 @@ onUnmounted(() => {
         :ref="(el) => remember(message.id, el)"
         :style="{ transform: `translateX(${message.left}px)` }"
       >
-        <template v-if="message.kind === 'pixel'">
-          <span class="dot" :style="{ background: message.color, borderColor: message.dot }"></span>
-          {{ texts.coordinates(message.x, message.y) }}
-        </template>
-        <template v-else>
-          {{ texts.yours }}
-          <span class="dot" :style="{ background: message.color, borderColor: message.dot }"></span>
-          {{ texts.coordinates(message.x, message.y) }}
-        </template>
+        <span class="dot" :style="{ background: message.color, borderColor: message.dot }"></span>
+        {{ texts.coordinates(message.x, message.y) }}
       </li>
     </ul>
     <Transition name="quiet">
@@ -206,7 +165,7 @@ li {
   will-change: transform;
 }
 
-/* Over the belt, at the left edge: "Tavo" runs under it and fades out behind its soft edge */
+/* Over the belt, at the left edge: pixels fade out behind its soft edge */
 .quiet {
   position: absolute;
   left: 0;

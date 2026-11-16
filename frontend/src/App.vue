@@ -188,7 +188,12 @@ function onKeyDown(event: KeyboardEvent) {
     return;
   }
   if (event.key === 'Enter') void place();
-  if (event.key === 'Escape') selectedCell.value = null;
+  if (event.key === 'Escape') letGo();
+}
+
+// Escape or a click beside the canvas: no cell selected, so no ring and no loupe
+function letGo() {
+  selectedCell.value = null;
 }
 
 onMounted(() => {
@@ -239,6 +244,7 @@ const placeLabel = computed(() =>
         :placed-count="placedCount"
         :place-failed="pixelError !== ''"
         @pick="onPick"
+        @release="letGo"
         @hover="hoveredCell = $event"
       />
     </main>
@@ -255,12 +261,7 @@ const placeLabel = computed(() =>
       @place="place"
     />
 
-    <ActivityTicker
-      v-show="ready"
-      ref="ticker"
-      :selected-color="selectedColor?.color"
-      :selected-cell="selectedCell"
-    />
+    <ActivityTicker v-show="ready" ref="ticker" />
   </div>
 </template>
 

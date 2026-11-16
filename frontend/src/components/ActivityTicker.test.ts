@@ -58,10 +58,8 @@ async function run(wrapper: ReturnType<typeof ticker>, seconds: number) {
   }
 }
 
-function ticker(props: Partial<InstanceType<typeof ActivityTicker>['$props']> = {}) {
-  const wrapper = mount(ActivityTicker, {
-    props: { selectedCell: null, selectedColor: undefined, ...props },
-  });
+function ticker() {
+  const wrapper = mount(ActivityTicker);
   resizeCallback([{ contentRect: { width: STRIP } }]);
   return wrapper;
 }
@@ -150,43 +148,6 @@ describe('ActivityTicker', () => {
     // It has left
     await run(wrapper, STRIP / BELT_SPEED - QUIET_AFTER + 0.5);
     expect(items(wrapper)).toHaveLength(0);
-    expect(quiet(wrapper)).toBe(true);
-  });
-
-  it('shows the selected cell as one "Tavo: ● (x, y)" that follows the selection', async () => {
-    const wrapper = ticker({ selectedCell: { x: 5, y: 6 }, selectedColor: '#00A2E8' });
-    await run(wrapper, 2 / 60);
-    expect(texts_(wrapper)).toContain(`${texts.yours} ${texts.coordinates(5, 6)}`);
-
-    await wrapper.setProps({ selectedCell: { x: 7, y: 8 }, selectedColor: '#000000' });
-    await run(wrapper, 1 / 60);
-    const yours = items(wrapper).filter((li) => li.text().startsWith(texts.yours));
-    expect(yours).toHaveLength(1);
-    expect(yours[0].text().replace(/\s+/g, ' ')).toBe(`${texts.yours} ${texts.coordinates(7, 8)}`);
-    expect(yours[0].get('.dot').attributes('style')).toContain('background: #000000');
-  });
-
-  it('lets "Tavo" wait its turn behind the right edge, without a push', async () => {
-    const wrapper = ticker();
-    await run(wrapper, 2 / 60);
-    wrapper.vm.announce([red(1)]);
-    await run(wrapper, 0.5);
-    const pixel = left(items(wrapper)[0]);
-    await wrapper.setProps({ selectedCell: { x: 5, y: 6 }, selectedColor: '#00A2E8' });
-    await run(wrapper, 0.3);
-    // The belt kept its normal speed...
-    expect(pixel - left(items(wrapper)[0])).toBeCloseTo(BELT_SPEED * 0.3, -1);
-    // ...and "Tavo" is still coming in, not pushed fully into view
-    expect(texts_(wrapper)[1]).toBe(`${texts.yours} ${texts.coordinates(5, 6)}`);
-    expect(left(items(wrapper)[1])).toBeGreaterThan(STRIP - WIDTH + 50);
-  });
-
-  it('keeps "Dabar ramu..." while "Tavo" runs under it', async () => {
-    const wrapper = ticker();
-    await run(wrapper, 2 / 60);
-    await wrapper.setProps({ selectedCell: { x: 5, y: 6 }, selectedColor: '#00A2E8' });
-    await run(wrapper, 1);
-    expect(items(wrapper)).toHaveLength(1);
     expect(quiet(wrapper)).toBe(true);
   });
 

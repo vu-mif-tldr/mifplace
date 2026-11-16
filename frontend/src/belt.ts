@@ -44,7 +44,7 @@ export function addItem(
 }
 
 // One frame of `dt` seconds. `widths` has the measured width of each message by id (a message
-// can change its text, the selected cell, for one); a message that grew pushes the ones behind
+// can get wider, once its font has loaded, for one); a message that grew pushes the ones behind
 // it back. Without motion the belt does not run and a push is done at once. Messages that have
 // left on the left are dropped.
 export function step(

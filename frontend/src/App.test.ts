@@ -114,6 +114,15 @@ describe('App', () => {
     wrapper.unmount();
   });
 
+  it('lets go of the cell on a click beside the canvas', async () => {
+    const wrapper = await page();
+    await pick(wrapper, 0, 1);
+    expect(wrapper.findComponent(SelectionRing).exists()).toBe(true);
+    await wrapper.get('.viewport').trigger('click');
+    expect(wrapper.findComponent(SelectionRing).exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('tells when the pixel was not placed', async () => {
     vi.mocked(placePixel).mockRejectedValueOnce(new Error('400'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -185,7 +194,6 @@ describe('App', () => {
     expect(items.map((li) => li.text())).toEqual(['0, 0', '1, 0']);
     // Black stays black here; only its bloom on the canvas is the neutral light
     expect(items[1].get('.dot').attributes('style')).toContain('background: #000000');
-    expect(ticker.props('selectedColor')).toBe('#000000');
     wrapper.unmount();
   });
 });
