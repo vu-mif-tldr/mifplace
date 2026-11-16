@@ -27,6 +27,7 @@ export default tseslint.config(
         MouseEvent: 'readonly',
         KeyboardEvent: 'readonly',
         WheelEvent: 'readonly',
+        PointerEvent: 'readonly',
       },
     },
     rules,

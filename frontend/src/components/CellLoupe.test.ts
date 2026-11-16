@@ -44,10 +44,21 @@ describe('CellLoupe', () => {
 
   it('reports the cell under the mouse once, and null when it leaves', async () => {
     const wrapper = loupe();
-    await wrapper.trigger('mousemove', { clientX: middle + 24, clientY: middle });
-    await wrapper.trigger('mousemove', { clientX: middle + 25, clientY: middle });
-    await wrapper.trigger('mouseleave');
+    await wrapper.trigger('pointermove', { clientX: middle + 24, clientY: middle });
+    await wrapper.trigger('pointermove', { clientX: middle + 25, clientY: middle });
+    await wrapper.trigger('pointerleave');
     expect(wrapper.emitted('hover')).toEqual([[{ x: 65, y: 72 }], [null]]);
+  });
+
+  it('does not show the cell under a finger', async () => {
+    const wrapper = loupe();
+    await wrapper.trigger('pointermove', {
+      pointerType: 'touch',
+      clientX: middle,
+      clientY: middle,
+    });
+    await wrapper.trigger('pointerleave', { pointerType: 'touch' });
+    expect(wrapper.emitted('hover')).toBeUndefined();
   });
 
   it('reads the cells around the selected one, again after every drawing', async () => {
