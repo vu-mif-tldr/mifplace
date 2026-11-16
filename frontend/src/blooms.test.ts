@@ -1,4 +1,12 @@
-import { BLOOM_MS, MAX_BATCH_FOR_BLOOMS, MAX_BLOOMS, addBlooms, pruneBlooms } from './blooms';
+import {
+  BLOOM_EFFECTS,
+  BLOOM_MS,
+  MAX_BATCH_FOR_BLOOMS,
+  MAX_BLOOMS,
+  addBlooms,
+  bloomLifetime,
+  pruneBlooms,
+} from './blooms';
 
 const pixel = (x: number) => ({ x, y: 1, color: '#ff0000' });
 
@@ -38,5 +46,21 @@ describe('pruneBlooms', () => {
     const blooms = addBlooms([], [pixel(1)], 0);
     expect(pruneBlooms(blooms, BLOOM_MS - 1)).toHaveLength(1);
     expect(pruneBlooms(blooms, BLOOM_MS)).toHaveLength(0);
+  });
+});
+
+describe('bloomLifetime', () => {
+  const off = {
+    glow: { ...BLOOM_EFFECTS.glow, enabled: false, ms: 2000 },
+    ring: { ...BLOOM_EFFECTS.ring, enabled: false, ms: 1000, waves: 3, gapMs: 300 },
+  };
+
+  it('is the longest of the effects that are on, rings with their delays', () => {
+    expect(bloomLifetime({ ...off, ring: { ...off.ring, enabled: true } })).toBe(1600);
+    expect(bloomLifetime({ ...off, glow: { ...off.glow, enabled: true } })).toBe(2000);
+  });
+
+  it('is zero when every effect is off', () => {
+    expect(bloomLifetime(off)).toBe(0);
   });
 });
