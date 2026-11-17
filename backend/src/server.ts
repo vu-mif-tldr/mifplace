@@ -11,8 +11,9 @@ import { createApp, listen } from './app.js';
 import type { CanvasStore } from './canvas-state.js';
 import { loadCanvas, placePixel } from './canvas-log.js';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
-import { emailDomainsFromEnv } from './auth/config.js';
-import { devAccountFromEnv, ensureDevAccount } from './auth/dev-account.js';
+import { adminEmailsFromEnv, emailDomainsFromEnv } from './auth/config.js';
+import { devAccountFromEnv } from './auth/dev-account.js';
+import { prepareAccounts } from './auth/startup.js';
 import { VERIFY_WITHIN_MS, type AuthOptions } from './auth/router.js';
 import { createSessions, type Sessions } from './auth/sessions.js';
 import { HourlyQuota } from './email-budget.js';
@@ -65,6 +66,8 @@ const devAccount = devAccountFromEnv();
 // All emails of the server together, see .env.example
 const mailQuota = new HourlyQuota(positiveInt(process.env, 'MAIL_PER_HOUR', 40));
 const emailDomains = emailDomainsFromEnv();
+// Who is an administrator; fails here if an entry is not an address
+const adminEmails = adminEmailsFromEnv();
 
 // Fails loudly if DB_PATH is not set or the file does not exist (run db:setup first).
 const dbPath = resolveDbPath();
@@ -105,10 +108,14 @@ try {
   // One object for the account routes, the check in front of the other routes and the
   // live server
   sessions = createSessions({ store: mifDb, publicUrl });
-  if (devAccount) {
-    const id = await ensureDevAccount(mifDb, devAccount);
-    console.log(`Development account ready: user ${id} (DEV_USER_EMAIL)`);
+
+  const accounts = await prepareAccounts(mifDb, { adminEmails, devAccount });
+  if (accounts.devUserId !== undefined) {
+    console.log(`Development account ready: user ${accounts.devUserId} (DEV_USER_EMAIL)`);
   }
+  console.log(
+    `Administrators: ${adminEmails.length} in ADMIN_EMAILS, ${accounts.promoted} given the role, ${accounts.demoted} lost it`
+  );
   const { eventId, timestamp } = canvas.snapshot();
   console.log(`Canvas loaded up to event ${eventId} (${new Date(timestamp).toISOString()})`);
 } catch (e) {
@@ -156,6 +163,7 @@ function authOptions(): AuthOptions {
     emailDomains,
     quota: mailQuota,
     allowedOrigins: liveOptions.allowedOrigins,
+    adminEmails,
     sessions,
     // A sign-out, a new password: the live connections of those sessions are closed too
     onSessionsEnded: (ended) => live.endSessions(ended),
@@ -165,12 +173,18 @@ function authOptions(): AuthOptions {
 // Expired sessions and email links are of no use, and an account that never verified its
 // address frees the address again.
 function removeExpiredAuth(): void {
-  const now = Date.now();
-  const removed = mifDb.removeExpiredAuth(now, now - VERIFY_WITHIN_MS);
-  if (removed.sessions + removed.tokens + removed.users > 0) {
-    console.log(
-      `Accounts: removed ${removed.sessions} expired sessions, ${removed.tokens} expired email links, ${removed.users} unverified accounts`
-    );
+  // Housekeeping must never take the server down: it runs from a timer, where nothing
+  // catches an exception. What was not removed now is removed the next hour.
+  try {
+    const now = Date.now();
+    const removed = mifDb.removeExpiredAuth(now, now - VERIFY_WITHIN_MS);
+    if (removed.sessions + removed.tokens + removed.users > 0) {
+      console.log(
+        `Accounts: removed ${removed.sessions} expired sessions, ${removed.tokens} expired email links, ${removed.users} unverified accounts`
+      );
+    }
+  } catch (error) {
+    console.error('Accounts: removing expired sessions and accounts failed:', error);
   }
 }
 // At start (above) and then every hour; unref: the timer does not keep the process alive
