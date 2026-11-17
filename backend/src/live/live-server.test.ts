@@ -4,7 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 import { createApp } from '../app.js';
 import { CanvasStore } from '../canvas-state.js';
-import { startLiveServer, type LiveServer, type LiveServerOptions } from './live-server.js';
+import {
+  SIGNED_OUT_CODE,
+  startLiveServer,
+  type LiveServer,
+  type LiveServerOptions,
+} from './live-server.js';
 
 // The app and the live server wired as server.ts does it, with the canvas in memory instead of
 // the database: POST /api/pixels stores the pixel, applies it and publishes it in one step.
@@ -74,13 +79,17 @@ async function start(options: Partial<LiveServerOptions> = {}) {
 // Collects the text messages and the close code from the moment the socket is created: a reset
 // and the close after it arrive right after the upgrade, before a listener added later would run.
 // The online counts go to their own list, so the other tests see only pixels and resets.
-function connect(url: string): Promise<{
+function connect(
+  url: string,
+  // The Cookie header of the upgrade request, for a server with accounts
+  cookie?: string
+): Promise<{
   ws: WebSocket;
   messages: unknown[];
   online: number[];
   closed: Promise<number>;
 }> {
-  const ws = new WebSocket(url);
+  const ws = new WebSocket(url, cookie ? { headers: { cookie } } : undefined);
   clients.push(ws);
   const messages: unknown[] = [];
   const online: number[] = [];
@@ -344,5 +353,47 @@ describe('live server', () => {
 
     expect(await closed).toBe(1001);
     expect(messages).toEqual([]);
+  });
+});
+
+describe('live server with accounts', () => {
+  // Three sessions: user 1 in two browsers, user 2 in one
+  const owners: Record<string, { userId: number; session: string }> = {
+    'session=a1': { userId: 1, session: 'a1' },
+    'session=a2': { userId: 1, session: 'a2' },
+    'session=b1': { userId: 2, session: 'b1' },
+  };
+  const authenticate = (cookie: string | undefined) => owners[cookie ?? ''];
+
+  it('lets only signed-in visitors connect', async () => {
+    const { ws } = await start({ authenticate });
+    await expect(connect(ws)).rejects.toThrow('401');
+    await expect(connect(ws, 'session=unknown')).rejects.toThrow('401');
+    const signedIn = await connect(ws, 'session=a1');
+    expect(signedIn.ws.readyState).toBe(WebSocket.OPEN);
+  });
+
+  it('closes the connections of the sessions that ended, with 4401', async () => {
+    const { ws, live } = await start({ authenticate });
+    const a1 = await connect(ws, 'session=a1');
+    const a2 = await connect(ws, 'session=a2');
+    const b1 = await connect(ws, 'session=b1');
+
+    // A sign-out in one browser: only that session
+    expect(live.endSessions({ session: 'a1' })).toBe(1);
+    expect(await a1.closed).toBe(SIGNED_OUT_CODE);
+    expect(a2.ws.readyState).toBe(WebSocket.OPEN);
+
+    // A password change in the browser of a2: the other sessions of the user
+    const again = await connect(ws, 'session=a1');
+    expect(live.endSessions({ userId: 1, exceptSession: 'a2' })).toBe(1);
+    expect(await again.closed).toBe(SIGNED_OUT_CODE);
+    expect(a2.ws.readyState).toBe(WebSocket.OPEN);
+
+    // A reset or a block: every session of the user, nobody else's
+    expect(live.endSessions({ userId: 1 })).toBe(1);
+    expect(await a2.closed).toBe(SIGNED_OUT_CODE);
+    expect(b1.ws.readyState).toBe(WebSocket.OPEN);
+    expect(live.endSessions({ userId: 99 })).toBe(0);
   });
 });

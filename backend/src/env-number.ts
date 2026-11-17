@@ -10,3 +10,12 @@ export function positiveInt(env: NodeJS.ProcessEnv, name: string, fallback: numb
   }
   return Number(raw);
 }
+
+// An on/off setting from the environment: "true" or "false". Unset or empty gives the
+// fallback; anything else stops the server at start, for the same reason.
+export function onOff(env: NodeJS.ProcessEnv, name: string, fallback: boolean): boolean {
+  const raw = env[name];
+  if (raw === undefined || raw === '') return fallback;
+  if (raw !== 'true' && raw !== 'false') throw new Error(`Invalid ${name}: ${raw}`);
+  return raw === 'true';
+}

@@ -229,6 +229,22 @@ describe('connectLive', () => {
     ]);
   });
 
+  it('tells every drop, also a reconnect that fails, but not a close() of its own', () => {
+    const onDrop = vi.fn();
+    const { connection, socket } = connect({ onDrop });
+    socket.emitClose();
+    expect(onDrop).toHaveBeenCalledTimes(1);
+    // The next socket never opens (the server refuses it): a drop again
+    vi.advanceTimersByTime(500);
+    lastSocket().emitClose();
+    expect(onDrop).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(1000);
+    connection.close();
+    lastSocket().emitClose();
+    expect(onDrop).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps painting on the new socket after a reconnect', () => {
     const { socket, onPixels } = connect();
     socket.emitClose();

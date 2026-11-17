@@ -290,3 +290,28 @@ describe('ConnectionRegistry', () => {
     expect(registry.size).toBe(0);
   });
 });
+
+describe('ConnectionRegistry.closeWhere', () => {
+  it('closes only the connections the test picks and counts them', () => {
+    const registry = new ConnectionRegistry({ maxBufferedBytes: 1024 });
+    const mine = new FakeSocket();
+    const theirs = new FakeSocket();
+    const nobody = new FakeSocket();
+    const first = registry.add(mine as unknown as WebSocket, '1.1.1.1', {
+      userId: 1,
+      session: 'a',
+    });
+    registry.add(theirs as unknown as WebSocket, '1.1.1.1', { userId: 2, session: 'b' });
+    // A server without accounts registers connections without an owner
+    registry.add(nobody as unknown as WebSocket, '1.1.1.1');
+    expect(first.owner).toEqual({ userId: 1, session: 'a' });
+
+    const closed = registry.closeWhere(({ owner }) => owner?.userId === 1, 4401, 'Signed out');
+    expect(closed).toBe(1);
+    expect(mine.close).toHaveBeenCalledWith(4401, 'Signed out');
+    expect(theirs.close).not.toHaveBeenCalled();
+    expect(nobody.close).not.toHaveBeenCalled();
+    expect(registry.size).toBe(2);
+    expect(registry.closeWhere(() => false, 4401, 'Signed out')).toBe(0);
+  });
+});

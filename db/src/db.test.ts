@@ -436,6 +436,24 @@ describe('MifDb accounts', () => {
     );
   });
 
+  it('makes a ready account for development, and sets its password again', () => {
+    const { mif } = accountsDb();
+    const made = mif.ensureVerifiedUser('dev@vu.lt', 'hash-1', 1000);
+    assert.equal(made.verified_at, 1000);
+    assert.equal(made.password_hash, 'hash-1');
+
+    const again = mif.ensureVerifiedUser('dev@vu.lt', 'hash-2', 2000);
+    assert.equal(again.id, made.id);
+    assert.equal(again.password_hash, 'hash-2');
+    assert.equal(again.verified_at, 1000);
+    assert.equal(again.created_at, 1000);
+
+    // An account still waiting for its email becomes verified
+    const pending = mif.registerUser('ona@vu.lt', 'hash-o', 3000).user;
+    assert.equal(mif.ensureVerifiedUser('ona@vu.lt', 'hash-p', 4000).verified_at, 4000);
+    assert.equal(mif.findUserByEmail('ona@vu.lt')?.id, pending.id);
+  });
+
   it('rejects an account without a password, an upper-case address and an unknown role', () => {
     const { db } = accountsDb();
     const insert = (columns: string, values: string) =>

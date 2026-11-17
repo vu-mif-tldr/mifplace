@@ -24,6 +24,10 @@ export interface LiveHandlers {
   onReset(): void;
   // The state changed, for an indicator on the page
   onState?(state: LiveState): void;
+  // The connection dropped or could not be made, and will be tried again. Called for every
+  // such attempt, while onState reports "reconnecting" only once. The server refuses a
+  // visitor without a session, so the page uses this to check that it still has one.
+  onDrop?(): void;
   // How many pages are connected now, the page itself included
   onOnline?(count: number): void;
 }
@@ -188,6 +192,7 @@ export function connectLive(
       if (stopped || opened !== socket) return;
       socket = undefined;
       setState('reconnecting');
+      handlers.onDrop?.();
       timer = setTimeout(reconnect, reconnectDelay(attempt++, minDelayMs, maxDelayMs, random));
     });
   }

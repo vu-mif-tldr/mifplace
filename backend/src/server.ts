@@ -12,9 +12,11 @@ import type { CanvasStore } from './canvas-state.js';
 import { loadCanvas, placePixel } from './canvas-log.js';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
 import { emailDomainsFromEnv } from './auth/config.js';
+import { devAccountFromEnv, ensureDevAccount } from './auth/dev-account.js';
 import { VERIFY_WITHIN_MS, type AuthOptions } from './auth/router.js';
+import { createSessions, type Sessions } from './auth/sessions.js';
 import { HourlyQuota } from './email-budget.js';
-import { positiveInt } from './env-number.js';
+import { onOff, positiveInt } from './env-number.js';
 import { liveOptionsFromEnv } from './live/config.js';
 import { rateLimitsFromEnv } from './rate-limits.js';
 import { startLiveServer } from './live/live-server.js';
@@ -45,14 +47,21 @@ const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
 const liveOptions = liveOptionsFromEnv();
 const rateLimits = rateLimitsFromEnv();
 
-// The waitlist and the accounts run where PUBLIC_URL is set (the email links point there). In
-// development it defaults to this server; in production they stay off unless it is set, so
-// the demo has none.
-const publicUrl =
-  process.env.PUBLIC_URL ||
-  (process.env.NODE_ENV === 'production' ? undefined : `http://localhost:${PORT}`);
+const production = process.env.NODE_ENV === 'production';
+
+// Where the page is: the links in the emails point there, and https turns on the Secure
+// cookie. Nothing works without sign-in, so production must say it; in development it
+// defaults to this server.
+const publicUrl = process.env.PUBLIC_URL || (production ? undefined : `http://localhost:${PORT}`);
+if (!publicUrl) {
+  throw new Error('PUBLIC_URL must be set in production, e.g. https://vu.place (see .env.example)');
+}
 // Fails here, before the database is opened, if production has no SMTP settings.
-const mailer = publicUrl ? mailerFromEnv() : undefined;
+const mailer = mailerFromEnv();
+// The waitlist of vu.place before launch (POST /api/waitlist); in production only where asked for
+const waitlistOn = onOff(process.env, 'WAITLIST_ENABLED', !production);
+// Fails here if the development account is set in production or is not valid
+const devAccount = devAccountFromEnv();
 // All emails of the server together, see .env.example
 const mailQuota = new HourlyQuota(positiveInt(process.env, 'MAIL_PER_HOUR', 40));
 const emailDomains = emailDomainsFromEnv();
@@ -64,6 +73,7 @@ let mifDb: MifDb;
 let palette: PaletteColor[];
 let canvasSize: CanvasSize;
 let canvas: CanvasStore;
+let sessions: Sessions;
 
 try {
   // Version 0 means a file without any applied migration, MifDb cannot work with it.
@@ -85,11 +95,19 @@ try {
   // Reads the whole event log once; after that GET /api/canvas is served from memory
   canvas = loadCanvas(mifDb, canvasSize);
 
-  if (publicUrl) {
+  if (waitlistOn) {
     // Pending addresses whose link has expired are of no use, see confirmWithinMs.
     const removed = mifDb.removeExpiredWaitlist(Date.now() - CONFIRM_WITHIN_MS);
     if (removed > 0) console.log(`Waitlist: removed ${removed} expired unconfirmed addresses`);
-    removeExpiredAuth();
+  }
+  removeExpiredAuth();
+
+  // One object for the account routes, the check in front of the other routes and the
+  // live server
+  sessions = createSessions({ store: mifDb, publicUrl });
+  if (devAccount) {
+    const id = await ensureDevAccount(mifDb, devAccount);
+    console.log(`Development account ready: user ${id} (DEV_USER_EMAIL)`);
   }
   const { eventId, timestamp } = canvas.snapshot();
   console.log(`Canvas loaded up to event ${eventId} (${new Date(timestamp).toISOString()})`);
@@ -121,27 +139,26 @@ function placeAndPublish(event: NewEvent): number {
 }
 
 function waitlistOptions(): WaitlistOptions | undefined {
-  if (!publicUrl || !mailer) {
-    console.log('Waitlist: off (PUBLIC_URL is not set)');
+  if (!waitlistOn) {
+    console.log('Waitlist: off (WAITLIST_ENABLED)');
     return undefined;
   }
   console.log(`Waitlist: on, email links point to ${publicUrl}`);
-  return { store: mifDb, mailer, publicUrl, quota: mailQuota };
+  return { store: mifDb, mailer, publicUrl: publicUrl!, quota: mailQuota };
 }
 
-function authOptions(): AuthOptions | undefined {
-  if (!publicUrl || !mailer) {
-    console.log('Accounts: off (PUBLIC_URL is not set)');
-    return undefined;
-  }
-  console.log(`Accounts: on for ${emailDomains.join(', ')} addresses`);
+function authOptions(): AuthOptions {
+  console.log(`Accounts: for ${emailDomains.join(', ')} addresses, the page is at ${publicUrl}`);
   return {
     store: mifDb,
     mailer,
-    publicUrl,
+    publicUrl: publicUrl!,
     emailDomains,
     quota: mailQuota,
     allowedOrigins: liveOptions.allowedOrigins,
+    sessions,
+    // A sign-out, a new password: the live connections of those sessions are closed too
+    onSessionsEnded: (ended) => live.endSessions(ended),
   };
 }
 
@@ -157,7 +174,7 @@ function removeExpiredAuth(): void {
   }
 }
 // At start (above) and then every hour; unref: the timer does not keep the process alive
-const authCleanup = publicUrl ? setInterval(removeExpiredAuth, 60 * 60 * 1000).unref() : undefined;
+const authCleanup = setInterval(removeExpiredAuth, 60 * 60 * 1000).unref();
 
 // The live server is attached before the port opens, so no upgrade request can arrive first.
 // Everything in the log up to the loaded checkpoint is in the snapshot; later events go out live.
@@ -172,7 +189,14 @@ const live = startLiveServer(
         .getEventsBetween(afterId, toId)
         .map((row) => ({ eventId: row.id, pos: row.position, colorId: row.color_id })),
   },
-  liveOptions
+  {
+    ...liveOptions,
+    // Only a signed-in visitor may connect; the session rides on the cookie of the upgrade
+    authenticate(cookieHeader) {
+      const user = sessions.authenticate(cookieHeader);
+      return user && { userId: user.id, session: user.tokenHash };
+    },
+  }
 );
 
 try {

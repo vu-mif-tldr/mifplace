@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { flushPromises, mount } from '@vue/test-utils';
 import CanvasPage from './CanvasPage.vue';
-import { getCanvas, getCanvasSize, getPalette, placePixel } from './api';
+import { SignedOutError, getCanvas, getCanvasSize, getPalette, placePixel } from './api';
+import { getSession } from './auth';
 import { connectLive, type LiveHandlers } from './live';
 import { NEUTRAL_GLOW } from './glow';
 import { texts } from './texts';
@@ -14,12 +15,17 @@ import TopBar from './components/TopBar.vue';
 import TopLights from './components/TopLights.vue';
 
 // The page against a fake server: the API calls and the live connection are mocked
-vi.mock('./api', () => ({
+vi.mock('./api', async (original) => ({
+  // The real SignedOutError: the page tells it apart with instanceof
+  ...(await original<typeof import('./api')>()),
   getPalette: vi.fn(),
   getCanvasSize: vi.fn(),
   getCanvas: vi.fn(),
   placePixel: vi.fn(),
 }));
+vi.mock('./auth', () => ({ getSession: vi.fn() }));
+
+const user = { email: 'ona@vu.lt', role: 'user' as const };
 vi.mock('./live', () => ({ connectLive: vi.fn() }));
 
 const palette = [
@@ -54,7 +60,7 @@ afterEach(() => {
 });
 
 async function page() {
-  const wrapper = mount(CanvasPage, { props: { user: null }, attachTo: document.body });
+  const wrapper = mount(CanvasPage, { props: { user }, attachTo: document.body });
   await flushPromises();
   return wrapper;
 }
@@ -73,15 +79,50 @@ describe('CanvasPage', () => {
   });
 
   it('passes the signed-in user to the top bar and the sign-out up', async () => {
-    const wrapper = mount(CanvasPage, {
-      props: { user: { email: 'ona@vu.lt', role: 'user' } },
-      attachTo: document.body,
-    });
-    await flushPromises();
+    const wrapper = await page();
     const bar = wrapper.getComponent(TopBar);
     expect(bar.props('email')).toBe('ona@vu.lt');
     bar.vm.$emit('signOut');
     expect(wrapper.emitted('signOut')).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it('says the session is gone when loading the canvas answers 401, without an error screen', async () => {
+    vi.mocked(getCanvas).mockRejectedValue(new SignedOutError());
+    const wrapper = await page();
+    expect(wrapper.emitted('signedOut')).toHaveLength(1);
+    expect(connectLive).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it('says the session is gone when placing a pixel answers 401', async () => {
+    const wrapper = await page();
+    vi.mocked(placePixel).mockRejectedValue(new SignedOutError());
+    await pick(wrapper, 1, 1);
+    await pick(wrapper, 1, 1);
+    await flushPromises();
+    expect(wrapper.emitted('signedOut')).toHaveLength(1);
+    expect(wrapper.getComponent(PaletteDock).props('error')).toBe('');
+    wrapper.unmount();
+  });
+
+  it('asks who is signed in when the live connection drops', async () => {
+    const wrapper = await page();
+    // The server answers, the session is fine: the connection just keeps trying
+    vi.mocked(getSession).mockResolvedValue(user);
+    handlers.onDrop?.();
+    await flushPromises();
+    expect(wrapper.emitted('signedOut')).toBeUndefined();
+    // No answer at all: nothing to conclude
+    vi.mocked(getSession).mockRejectedValue(new Error('offline'));
+    handlers.onDrop?.();
+    await flushPromises();
+    expect(wrapper.emitted('signedOut')).toBeUndefined();
+    // The session ended (signed out elsewhere, a new password, a block)
+    vi.mocked(getSession).mockResolvedValue('anonymous');
+    handlers.onDrop?.();
+    await flushPromises();
+    expect(wrapper.emitted('signedOut')).toHaveLength(1);
     wrapper.unmount();
   });
 

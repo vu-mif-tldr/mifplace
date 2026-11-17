@@ -40,15 +40,15 @@ describe('auth', () => {
       expect(fetchMock).toHaveBeenCalledWith('/api/auth/me');
     });
 
-    it('is anonymous without a session and off on a server without accounts', async () => {
+    it('is anonymous without a session', async () => {
       fetchMock.mockResolvedValue(answer(401, { success: false, code: 'unauthenticated' }));
       await expect(getSession()).resolves.toBe('anonymous');
-      fetchMock.mockResolvedValue(answer(404));
-      await expect(getSession()).resolves.toBe('off');
     });
 
     it('throws when the server fails or answers something else', async () => {
       fetchMock.mockResolvedValue(answer(500));
+      await expect(getSession()).rejects.toThrow('Could not load the session');
+      fetchMock.mockResolvedValue(answer(404));
       await expect(getSession()).rejects.toThrow('Could not load the session');
       fetchMock.mockResolvedValue(answer(200, { success: true, user: { email: 'a@vu.lt' } }));
       await expect(getSession()).rejects.toThrow('invalid');

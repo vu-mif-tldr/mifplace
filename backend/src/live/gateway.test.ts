@@ -274,3 +274,39 @@ describe('attachGateway', () => {
     expect(ip).toBe('198.51.100.25');
   });
 });
+
+describe('attachGateway with accounts', () => {
+  const owner = { userId: 7, session: 's'.repeat(64) };
+  // Knows one session, by the cookie of the upgrade request
+  const authenticate = (cookie: string | undefined) =>
+    cookie === 'session=abc' ? owner : undefined;
+
+  it('refuses an upgrade without a session with 401', async () => {
+    const onConnection = vi.fn<ConnectionHandler>();
+    const { address } = await createServer({ authenticate }, () => 0, onConnection);
+
+    expect((await connect(`${address}/api/ws`)).status).toBe(401);
+    const stale = await connect(`${address}/api/ws`, { headers: { cookie: 'session=old' } });
+    expect(stale.status).toBe(401);
+    expect(onConnection).not.toHaveBeenCalled();
+  });
+
+  it('lets a signed-in visitor in and says whose connection it is', async () => {
+    const onConnection = vi.fn<ConnectionHandler>();
+    const { address } = await createServer({ authenticate }, () => 0, onConnection);
+
+    const result = await connect(`${address}/api/ws`, { headers: { cookie: 'session=abc' } });
+    expect(result.status).toBeUndefined();
+    expect(result.error).toBeUndefined();
+    expect(onConnection).toHaveBeenCalledOnce();
+    const request = onConnection.mock.calls[0][1] as { owner?: typeof owner };
+    expect(request.owner).toEqual(owner);
+  });
+
+  it('answers 401 before it counts the connections', async () => {
+    const { address } = await createServer({ authenticate, maxConnections: 1 }, () => 1);
+    expect((await connect(`${address}/api/ws`)).status).toBe(401);
+    const signedIn = await connect(`${address}/api/ws`, { headers: { cookie: 'session=abc' } });
+    expect(signedIn.status).toBe(503);
+  });
+});

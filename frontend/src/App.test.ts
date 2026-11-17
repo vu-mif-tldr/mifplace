@@ -78,10 +78,15 @@ describe('App', () => {
     expect(wrapper.getComponent(CanvasPage).props('user')).toEqual(user);
   });
 
-  it('shows the canvas to everyone on a server without accounts', async () => {
-    vi.mocked(getSession).mockResolvedValue('off');
+  it('goes back to the sign-in screens when the canvas page finds the session gone', async () => {
+    vi.mocked(getSession).mockResolvedValue(user);
     const wrapper = await page();
-    expect(wrapper.getComponent(CanvasPage).props('user')).toBeNull();
+    wrapper.getComponent(CanvasPage).vm.$emit('signedOut');
+    await flushPromises();
+    expect(wrapper.findComponent(CanvasPage).exists()).toBe(false);
+    expect(wrapper.findComponent(AuthScreen).exists()).toBe(true);
+    // The server was not asked to sign out: there is nothing to end
+    expect(signOut).not.toHaveBeenCalled();
   });
 
   it('waits for the session, and offers to try again when the server cannot be asked', async () => {
