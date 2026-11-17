@@ -1,12 +1,10 @@
 import { z } from 'zod';
+import { isAllowedEmail } from './auth.js';
 
 // Only Vilnius University addresses: vu.lt itself and any subdomain (mif.stud.vu.lt, mif.vu.lt, ...).
-// The same rule will decide who may sign in.
+// Who may register an account is a setting of the server instead (ALLOWED_EMAIL_DOMAINS).
 export function isVuEmail(email: string): boolean {
-  const at = email.lastIndexOf('@');
-  if (at < 1) return false;
-  const domain = email.slice(at + 1).toLowerCase();
-  return domain === 'vu.lt' || domain.endsWith('.vu.lt');
+  return isAllowedEmail(email, ['vu.lt']);
 }
 
 // An address as typed in a form: spaces around it are dropped and it is stored in lower case,

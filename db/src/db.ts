@@ -1,15 +1,29 @@
 import Database from 'better-sqlite3';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { CanvasSize, PaletteColor } from '@mifplace/shared';
+import type { CanvasSize, PaletteColor, UserRole } from '@mifplace/shared';
 import { resolveFromRoot } from './env.js';
 
 export type Db = Database.Database;
 
+// An account has an email and a password hash; a system user (user 0 of the seed scripts) has
+// neither and cannot sign in.
 export interface UserRow {
   id: number;
-  name: string;
+  email: string | null;
+  password_hash: string | null;
+  role: UserRole;
+  created_at: number;
+  verified_at: number | null;
+  banned_at: number | null;
+  ban_reason: string | null;
 }
+
+// The user of a session, with the time the session was last seen
+export type SessionUserRow = UserRow & { session_last_seen_at: number };
+
+// What a token from an email is for
+export type EmailTokenPurpose = 'verify' | 'reset';
 
 export interface EventRow {
   id: number;
@@ -92,6 +106,19 @@ export class MifDb {
   private readonly updateWaitlistConfirmed;
   private readonly deleteWaitlistToken;
   private readonly deletePendingWaitlist;
+  private readonly selectUserByEmail;
+  private readonly selectUserById;
+  private readonly registerUserTx;
+  private readonly insertEmailToken;
+  private readonly selectEmailToken;
+  private readonly insertSession;
+  private readonly selectSessionUser;
+  private readonly updateSessionSeen;
+  private readonly deleteSessionByHash;
+  private readonly verifyEmailTx;
+  private readonly resetPasswordTx;
+  private readonly changePasswordTx;
+  private readonly removeExpiredAuthTx;
 
   constructor(private readonly db: Db) {
     this.insertEvent = db.prepare(
@@ -129,6 +156,109 @@ export class MifDb {
     this.deletePendingWaitlist = db.prepare(
       'DELETE FROM waitlist WHERE confirmed_at IS NULL AND created_at < ?'
     );
+
+    this.selectUserByEmail = db.prepare('SELECT * FROM users WHERE email = ?');
+    this.selectUserById = db.prepare('SELECT * FROM users WHERE id = ?');
+    // A repeated registration of an address that is not verified yet replaces the password and
+    // restarts the day it has to be verified in. A verified account is left alone (no row back).
+    const upsertPendingUser = db.prepare(
+      `INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, ?)
+         ON CONFLICT (email) DO UPDATE
+           SET password_hash = excluded.password_hash, created_at = excluded.created_at
+           WHERE verified_at IS NULL
+         RETURNING *`
+    );
+    this.insertEmailToken = db.prepare(
+      'INSERT INTO email_tokens (token_hash, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)'
+    );
+    this.selectEmailToken = db.prepare(
+      'SELECT user_id FROM email_tokens WHERE token_hash = ? AND purpose = ? AND expires_at > ?'
+    );
+    this.insertSession = db.prepare(
+      `INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_seen_at)
+         VALUES (?, ?, ?, ?, ?)`
+    );
+    this.selectSessionUser = db.prepare(
+      `SELECT u.*, s.last_seen_at AS session_last_seen_at
+         FROM sessions s JOIN users u ON u.id = s.user_id
+         WHERE s.token_hash = ? AND s.expires_at > ?`
+    );
+    this.updateSessionSeen = db.prepare(
+      'UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?'
+    );
+    this.deleteSessionByHash = db.prepare('DELETE FROM sessions WHERE token_hash = ?');
+
+    const setVerified = db.prepare(
+      'UPDATE users SET verified_at = COALESCE(verified_at, ?) WHERE id = ?'
+    );
+    const setPassword = db.prepare(
+      'UPDATE users SET password_hash = ? WHERE id = ? AND email IS NOT NULL'
+    );
+    const deleteTokensOf = db.prepare('DELETE FROM email_tokens WHERE user_id = ?');
+    const deleteVerifyTokensOf = db.prepare(
+      `DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'verify'`
+    );
+    const deleteSessionsOf = db.prepare('DELETE FROM sessions WHERE user_id = ?');
+    const deleteOtherSessionsOf = db.prepare(
+      'DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?'
+    );
+    const deleteExpiredSessions = db.prepare('DELETE FROM sessions WHERE expires_at <= ?');
+    const deleteExpiredTokens = db.prepare('DELETE FROM email_tokens WHERE expires_at <= ?');
+    // Run after the expired tokens are gone: a token left means a link that still works
+    const deleteUnverifiedUsers = db.prepare(
+      `DELETE FROM users
+         WHERE email IS NOT NULL AND verified_at IS NULL AND created_at < ?
+           AND NOT EXISTS (SELECT 1 FROM email_tokens t WHERE t.user_id = users.id)`
+    );
+
+    // Links from earlier emails stop working: the address is verified only through the email
+    // of the registration whose password the account now has.
+    this.registerUserTx = db.transaction(
+      (email: string, passwordHash: string, now: number): UserRow | undefined => {
+        const row = upsertPendingUser.get(email, passwordHash, now) as UserRow | undefined;
+        if (row) deleteVerifyTokensOf.run(row.id);
+        return row;
+      }
+    );
+
+    // The token is checked and used up in one step, so it works once.
+    this.verifyEmailTx = db.transaction((tokenHash: string, now: number): UserRow | undefined => {
+      const token = this.selectEmailToken.get(tokenHash, 'verify', now) as
+        { user_id: number } | undefined;
+      if (!token) return undefined;
+      setVerified.run(now, token.user_id);
+      deleteVerifyTokensOf.run(token.user_id);
+      return this.selectUserById.get(token.user_id) as UserRow;
+    });
+
+    // The new password, the used-up token and the closed sessions must change together.
+    this.resetPasswordTx = db.transaction(
+      (tokenHash: string, passwordHash: string, now: number): UserRow | undefined => {
+        const token = this.selectEmailToken.get(tokenHash, 'reset', now) as
+          { user_id: number } | undefined;
+        if (!token) return undefined;
+        setPassword.run(passwordHash, token.user_id);
+        // The link came by email, so the address is verified too
+        setVerified.run(now, token.user_id);
+        deleteTokensOf.run(token.user_id);
+        deleteSessionsOf.run(token.user_id);
+        return this.selectUserById.get(token.user_id) as UserRow;
+      }
+    );
+
+    this.changePasswordTx = db.transaction(
+      (userId: number, passwordHash: string, keepSessionHash: string): void => {
+        setPassword.run(passwordHash, userId);
+        deleteTokensOf.run(userId);
+        deleteOtherSessionsOf.run(userId, keepSessionHash);
+      }
+    );
+
+    this.removeExpiredAuthTx = db.transaction((now: number, unverifiedBefore: number) => ({
+      sessions: deleteExpiredSessions.run(now).changes,
+      tokens: deleteExpiredTokens.run(now).changes,
+      users: deleteUnverifiedUsers.run(unverifiedBefore).changes,
+    }));
 
     // The event and the cooldown timestamp must change together.
     this.appendTx = db.transaction((event: NewEvent, now: number): number => {
@@ -213,6 +343,94 @@ export class MifDb {
   // Deletes pending rows created before the cutoff and returns how many.
   removeExpiredWaitlist(before: number): number {
     return this.deletePendingWaitlist.run(before).changes;
+  }
+
+  // The account with this address (as stored: trimmed, lower case), verified or not.
+  findUserByEmail(email: string): UserRow | undefined {
+    return this.selectUserByEmail.get(email) as UserRow | undefined;
+  }
+
+  // Creates an account that still has to verify its address, or, if the address has one that
+  // is not verified yet, replaces its password and drops its earlier 'verify' tokens. pending
+  // is false when the address belongs to a verified account: that one is returned unchanged.
+  registerUser(
+    email: string,
+    passwordHash: string,
+    now: number = Date.now()
+  ): { user: UserRow; pending: boolean } {
+    const row = this.registerUserTx(email, passwordHash, now);
+    if (row) return { user: row, pending: true };
+    return { user: this.selectUserByEmail.get(email) as UserRow, pending: false };
+  }
+
+  // Stores the hash of a token that goes out in an email.
+  addEmailToken(
+    tokenHash: string,
+    userId: number,
+    purpose: EmailTokenPurpose,
+    expiresAt: number
+  ): void {
+    this.insertEmailToken.run(tokenHash, userId, purpose, expiresAt);
+  }
+
+  // Is this a token for that purpose that has not expired? It stays usable.
+  hasEmailToken(tokenHash: string, purpose: EmailTokenPurpose, now: number = Date.now()): boolean {
+    return this.selectEmailToken.get(tokenHash, purpose, now) !== undefined;
+  }
+
+  // Uses up a 'verify' token: marks the address of its account as verified and returns the
+  // account. Undefined for an unknown, used or expired token.
+  verifyEmail(tokenHash: string, now: number = Date.now()): UserRow | undefined {
+    return this.verifyEmailTx(tokenHash, now);
+  }
+
+  // Uses up a 'reset' token: sets the new password hash and closes every session of the
+  // account. Undefined for an unknown, used or expired token.
+  resetPassword(
+    tokenHash: string,
+    passwordHash: string,
+    now: number = Date.now()
+  ): UserRow | undefined {
+    return this.resetPasswordTx(tokenHash, passwordHash, now);
+  }
+
+  // Sets a new password hash and closes every session of the account but the one given.
+  changePassword(userId: number, passwordHash: string, keepSessionHash: string): void {
+    this.changePasswordTx(userId, passwordHash, keepSessionHash);
+  }
+
+  createSession(
+    tokenHash: string,
+    userId: number,
+    expiresAt: number,
+    now: number = Date.now()
+  ): void {
+    this.insertSession.run(tokenHash, userId, now, expiresAt, now);
+  }
+
+  // The user of a session that has not expired. A blocked user is returned too (banned_at),
+  // the caller decides.
+  findSession(tokenHash: string, now: number = Date.now()): SessionUserRow | undefined {
+    return this.selectSessionUser.get(tokenHash, now) as SessionUserRow | undefined;
+  }
+
+  touchSession(tokenHash: string, now: number = Date.now()): void {
+    this.updateSessionSeen.run(now, tokenHash);
+  }
+
+  // Signs one browser out. False if there was no such session.
+  deleteSession(tokenHash: string): boolean {
+    return this.deleteSessionByHash.run(tokenHash).changes > 0;
+  }
+
+  // Deletes expired sessions and tokens, and accounts created before unverifiedBefore that
+  // never verified their address and have no link left that still works (a link sent again
+  // later keeps its account until it expires). Returns how many of each.
+  removeExpiredAuth(
+    now: number,
+    unverifiedBefore: number
+  ): { sessions: number; tokens: number; users: number } {
+    return this.removeExpiredAuthTx(now, unverifiedBefore);
   }
 
   // Online backup that is safe while the server is running.
