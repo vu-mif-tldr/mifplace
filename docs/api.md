@@ -6,16 +6,20 @@
 
 **Rate limits.** Every endpoint counts requests per client IP on its own; above the limit the answer is `429` with the usual body `{"success":false,"error":"..."}`. The limits are set in `.env` (`RATE_LIMIT_*`, see [`.env.example`](../.env.example)):
 
-| Endpoint                          | Setting                                      | Default |
-| --------------------------------- | -------------------------------------------- | ------- |
-| `GET /api/palette`                | `RATE_LIMIT_PALETTE_PER_MINUTE`              | 120/min |
-| `GET /api/canvas/size`            | `RATE_LIMIT_CANVAS_SIZE_PER_MINUTE`          | 120/min |
-| `GET /api/canvas`                 | `RATE_LIMIT_CANVAS_PER_MINUTE`               | 20/min  |
-| `POST /api/pixels`                | `RATE_LIMIT_PIXELS_PER_MINUTE`               | 10/min  |
-| `POST /api/waitlist`              | `RATE_LIMIT_WAITLIST_SIGNUP_PER_HOUR`        | 30/hour |
-| `POST /api/waitlist/confirm`      | `RATE_LIMIT_WAITLIST_CONFIRM_PER_MINUTE`     | 120/min |
-| `POST /api/waitlist/unsubscribe`  | `RATE_LIMIT_WAITLIST_UNSUBSCRIBE_PER_MINUTE` | 120/min |
-| The page, its files, the 404 page | `RATE_LIMIT_OTHER_PER_MINUTE`                | 120/min |
+| Endpoint                          | Setting                                      | Default  |
+| --------------------------------- | -------------------------------------------- | -------- |
+| `GET /api/palette`                | `RATE_LIMIT_PALETTE_PER_MINUTE`              | 120/min  |
+| `GET /api/canvas/size`            | `RATE_LIMIT_CANVAS_SIZE_PER_MINUTE`          | 120/min  |
+| `GET /api/canvas`                 | `RATE_LIMIT_CANVAS_PER_MINUTE`               | 20/min   |
+| `POST /api/pixels`                | `RATE_LIMIT_PIXELS_PER_MINUTE`               | 10/min   |
+| `POST /api/waitlist`              | `RATE_LIMIT_WAITLIST_SIGNUP_PER_HOUR`        | 30/hour  |
+| `POST /api/waitlist/confirm`      | `RATE_LIMIT_WAITLIST_CONFIRM_PER_MINUTE`     | 120/min  |
+| `POST /api/waitlist/unsubscribe`  | `RATE_LIMIT_WAITLIST_UNSUBSCRIBE_PER_MINUTE` | 120/min  |
+| `POST /api/auth/register`         | `RATE_LIMIT_AUTH_REGISTER_PER_HOUR`          | 100/hour |
+| `POST /api/auth/login`            | `RATE_LIMIT_AUTH_LOGIN_PER_MINUTE`           | 60/min   |
+| `POST /api/auth/password/*`       | `RATE_LIMIT_AUTH_PASSWORD_PER_HOUR`          | 30/hour  |
+| Other `/api/auth/*`               | `RATE_LIMIT_AUTH_PER_MINUTE`                 | 120/min  |
+| The page, its files, the 404 page | `RATE_LIMIT_OTHER_PER_MINUTE`                | 120/min  |
 
 `GET /health` has no limit. The WebSocket `/api/ws` is limited by `WS_MAX_CONNECTIONS` instead.
 
@@ -138,6 +142,63 @@ Collects addresses of people who want to play, before launch, with double opt-in
 | both           | `400`  | Malformed token                                         |
 
 Errors have the usual body `{"success":false,"error":"..."}`.
+
+### Accounts: `/api/auth/*`
+
+People register with an email address and a password; a session cookie keeps the browser signed in. The routes exist only where `PUBLIC_URL` is set, like the waitlist. Nothing else requires a session yet: `POST /api/pixels` and the canvas routes are still open.
+
+| Route                            | Body                                   | Success                      |
+| -------------------------------- | -------------------------------------- | ---------------------------- |
+| `POST /api/auth/register`        | `{ "email", "password" }`              | `202`, an email is sent      |
+| `POST /api/auth/verify`          | `{ "token" }`                          | `200`, the address counts    |
+| `POST /api/auth/login`           | `{ "email", "password" }`              | `200` with `user`, cookie    |
+| `POST /api/auth/logout`          | none                                   | `200`, cookie deleted        |
+| `GET /api/auth/me`               | none                                   | `200` with `user`            |
+| `POST /api/auth/password/forgot` | `{ "email" }`                          | `202`, an email is sent      |
+| `POST /api/auth/password/reset`  | `{ "token", "password" }`              | `200`, all sessions closed   |
+| `POST /api/auth/password/change` | `{ "currentPassword", "newPassword" }` | `200`, other sessions closed |
+
+Success bodies are `{"success":true}`; `login` and `me` add the user:
+
+```json
+{ "success": true, "user": { "email": "jonas@mif.stud.vu.lt", "role": "user" } }
+```
+
+`role` is `user` or `admin`. The schemas are in `@mifplace/shared` (`auth.ts`).
+
+**Rules**
+
+- **Address:** trimmed and lower-cased. Only the domains of `ALLOWED_EMAIL_DOMAINS` and their subdomains may register (`vu.lt` by default), and not addresses with `+` before the `@` (they reach the same mailbox, so one person could have many accounts).
+- **Password:** 10 to 128 characters, no other rules. Stored only as a scrypt hash.
+- **Verification:** the email links to `PUBLIC_URL/#/verify/<token>`; the page there has a button that sends `POST /api/auth/verify` (a button, because mail scanners open every link). The link works once, for 24 hours; an account not verified by then is deleted. Verifying does not sign in. Registering again before verifying replaces the password and makes earlier links invalid.
+- **Reset:** the email links to `PUBLIC_URL/#/reset/<token>`, valid once, for 1 hour. A reset also verifies the address.
+- **Session:** the cookie `session` (`__Host-session` over HTTPS) is `HttpOnly`, `SameSite=Lax`, `Secure` over HTTPS, and lasts 90 days. The server keeps only a hash of it. A blocked user has no session.
+- **Who is registered stays private:** `register` and `forgot` answer `202` whether the address has an account or not (its owner gets an email saying so); `login` answers the same `401` for an unknown address and a wrong password.
+- **Same site only:** a request other than `GET` with an `Origin` header of another site is refused (`403`). The page's own host is allowed, `WS_ALLOWED_ORIGINS` adds others.
+- **Limits besides the per-IP ones:** 5 wrong passwords for one account from one IP in 15 minutes, or 30 from anywhere in an hour, then `429`. One address gets at most one email a minute and 5 a day (above that still `202`, without an email, and a repeated registration changes nothing). All emails of the server together: `MAIL_PER_HOUR` (40).
+
+**Errors** have the usual body plus a `code` the page can pick its text by:
+
+```json
+{ "success": false, "code": "invalid_credentials", "error": "Wrong email or password." }
+```
+
+| Status | `code`                | Case                                                                  |
+| ------ | --------------------- | --------------------------------------------------------------------- |
+| `400`  | `invalid_request`     | The body does not match the schema (schema message in `error`)        |
+| `400`  | `email_not_allowed`   | `register`: domain not allowed, or an address with `+`                |
+| `401`  | `invalid_credentials` | `login`: unknown address or wrong password                            |
+| `401`  | `unauthenticated`     | `me`, `password/change`: no session, or it expired                    |
+| `403`  | `invalid_credentials` | `password/change`: the current password is wrong                      |
+| `403`  | `email_not_verified`  | `login`: right password, address not verified; the link is sent again |
+| `403`  | `banned`              | `login`: the account is blocked                                       |
+| `403`  | `forbidden_origin`    | The request comes from another site                                   |
+| `404`  | `invalid_token`       | `verify`, `password/reset`: unknown, used or expired link             |
+| `429`  | `too_many_attempts`   | Too many wrong passwords for this account                             |
+| `429`  | none                  | Per-IP limit reached (see rate limits above)                          |
+| `503`  | `mail_unavailable`    | The email could not be sent, or `MAIL_PER_HOUR` is used up            |
+| `503`  | `busy`                | Too many passwords are being checked at once, try again               |
+| `500`  | `internal`            | Anything else                                                         |
 
 ## 2. WebSocket — `/api/ws`
 

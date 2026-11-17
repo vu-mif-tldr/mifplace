@@ -11,6 +11,10 @@ import { createApp, listen } from './app.js';
 import type { CanvasStore } from './canvas-state.js';
 import { loadCanvas, placePixel } from './canvas-log.js';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
+import { emailDomainsFromEnv } from './auth/config.js';
+import { VERIFY_WITHIN_MS, type AuthOptions } from './auth/router.js';
+import { HourlyQuota } from './email-budget.js';
+import { positiveInt } from './env-number.js';
 import { liveOptionsFromEnv } from './live/config.js';
 import { rateLimitsFromEnv } from './rate-limits.js';
 import { startLiveServer } from './live/live-server.js';
@@ -41,13 +45,17 @@ const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
 const liveOptions = liveOptionsFromEnv();
 const rateLimits = rateLimitsFromEnv();
 
-// The waitlist runs where PUBLIC_URL is set (the email links point there). In development it
-// defaults to this server; in production it stays off unless set, so the demo has none.
+// The waitlist and the accounts run where PUBLIC_URL is set (the email links point there). In
+// development it defaults to this server; in production they stay off unless it is set, so
+// the demo has none.
 const publicUrl =
   process.env.PUBLIC_URL ||
   (process.env.NODE_ENV === 'production' ? undefined : `http://localhost:${PORT}`);
 // Fails here, before the database is opened, if production has no SMTP settings.
 const mailer = publicUrl ? mailerFromEnv() : undefined;
+// All emails of the server together, see .env.example
+const mailQuota = new HourlyQuota(positiveInt(process.env, 'MAIL_PER_HOUR', 40));
+const emailDomains = emailDomainsFromEnv();
 
 // Fails loudly if DB_PATH is not set or the file does not exist (run db:setup first).
 const dbPath = resolveDbPath();
@@ -81,6 +89,7 @@ try {
     // Pending addresses whose link has expired are of no use, see confirmWithinMs.
     const removed = mifDb.removeExpiredWaitlist(Date.now() - CONFIRM_WITHIN_MS);
     if (removed > 0) console.log(`Waitlist: removed ${removed} expired unconfirmed addresses`);
+    removeExpiredAuth();
   }
   const { eventId, timestamp } = canvas.snapshot();
   console.log(`Canvas loaded up to event ${eventId} (${new Date(timestamp).toISOString()})`);
@@ -100,6 +109,7 @@ const app = createApp({
   rateLimits,
   trustProxy,
   waitlist: waitlistOptions(),
+  auth: authOptions(),
 });
 
 // The log, memory and the live stream get the same event with the same timestamp, in one
@@ -116,8 +126,38 @@ function waitlistOptions(): WaitlistOptions | undefined {
     return undefined;
   }
   console.log(`Waitlist: on, email links point to ${publicUrl}`);
-  return { store: mifDb, mailer, publicUrl };
+  return { store: mifDb, mailer, publicUrl, quota: mailQuota };
 }
+
+function authOptions(): AuthOptions | undefined {
+  if (!publicUrl || !mailer) {
+    console.log('Accounts: off (PUBLIC_URL is not set)');
+    return undefined;
+  }
+  console.log(`Accounts: on for ${emailDomains.join(', ')} addresses`);
+  return {
+    store: mifDb,
+    mailer,
+    publicUrl,
+    emailDomains,
+    quota: mailQuota,
+    allowedOrigins: liveOptions.allowedOrigins,
+  };
+}
+
+// Expired sessions and email links are of no use, and an account that never verified its
+// address frees the address again.
+function removeExpiredAuth(): void {
+  const now = Date.now();
+  const removed = mifDb.removeExpiredAuth(now, now - VERIFY_WITHIN_MS);
+  if (removed.sessions + removed.tokens + removed.users > 0) {
+    console.log(
+      `Accounts: removed ${removed.sessions} expired sessions, ${removed.tokens} expired email links, ${removed.users} unverified accounts`
+    );
+  }
+}
+// At start (above) and then every hour; unref: the timer does not keep the process alive
+const authCleanup = publicUrl ? setInterval(removeExpiredAuth, 60 * 60 * 1000).unref() : undefined;
 
 // The live server is attached before the port opens, so no upgrade request can arrive first.
 // Everything in the log up to the loaded checkpoint is in the snapshot; later events go out live.
@@ -158,6 +198,7 @@ const shutdown = () => {
   // Stop the batches, the upgrades and the liveness check, close every client with 1001.
   // Without this server.close() would wait for the open WebSockets until Docker kills the process.
   live.close();
+  clearInterval(authCleanup);
 
   // Stop HTTP server and then close the database.
   server.close(() => {

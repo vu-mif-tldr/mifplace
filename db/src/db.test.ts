@@ -244,3 +244,207 @@ describe('MifDb waitlist', () => {
     mif.close();
   });
 });
+
+describe('MifDb accounts', () => {
+  function accountsDb(): { mif: MifDb; db: Database.Database } {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    migrate(db, loadMigrations(MIGRATIONS_DIR));
+    return { mif: new MifDb(db), db };
+  }
+  const hash = (c: string) => c.repeat(64);
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it('migration 007 keeps the old users as system users and their events', () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    const migrations = loadMigrations(MIGRATIONS_DIR);
+    migrate(
+      db,
+      migrations.filter((m) => m.version < 7)
+    );
+    db.prepare(`INSERT INTO users (id, name) VALUES (5, 'Old user')`).run();
+    db.prepare(
+      'INSERT INTO events (user_id, color_id, position, timestamp) VALUES (5, 0, 0, 1)'
+    ).run();
+    migrate(db, migrations);
+
+    const users = db.prepare('SELECT id, email, password_hash, role FROM users ORDER BY id').all();
+    assert.deepEqual(users, [
+      { id: 0, email: null, password_hash: null, role: 'user' },
+      { id: 5, email: null, password_hash: null, role: 'user' },
+    ]);
+    assert.equal((db.pragma('foreign_key_check') as unknown[]).length, 0);
+    // New accounts get ids after the old ones
+    const mif = new MifDb(db);
+    assert.equal(mif.registerUser('a@vu.lt', 'h', 1).user.id, 6);
+    // The events table still points at users
+    assert.throws(() => mif.appendEvent({ user_id: 99, color_id: 0, position: 0 }), /FOREIGN KEY/);
+  });
+
+  it('registers an account that waits for verification, a repeat replaces the password', () => {
+    const { mif } = accountsDb();
+    const first = mif.registerUser('jonas@vu.lt', 'hash-1', 1000);
+    assert.equal(first.pending, true);
+    assert.deepEqual(
+      { ...first.user },
+      {
+        id: first.user.id,
+        email: 'jonas@vu.lt',
+        password_hash: 'hash-1',
+        role: 'user',
+        created_at: 1000,
+        verified_at: null,
+        banned_at: null,
+        ban_reason: null,
+      }
+    );
+    mif.addEmailToken(hash('a'), first.user.id, 'verify', 5000);
+
+    // Same account, new password, new period; the link of the first email is dead
+    const again = mif.registerUser('jonas@vu.lt', 'hash-2', 2000);
+    assert.equal(again.pending, true);
+    assert.equal(again.user.id, first.user.id);
+    assert.equal(again.user.password_hash, 'hash-2');
+    assert.equal(again.user.created_at, 2000);
+    assert.equal(mif.hasEmailToken(hash('a'), 'verify', 2000), false);
+    assert.equal(mif.findUserByEmail('jonas@vu.lt')?.password_hash, 'hash-2');
+    assert.equal(mif.findUserByEmail('nobody@vu.lt'), undefined);
+  });
+
+  it('leaves a verified account alone when its address registers again', () => {
+    const { mif } = accountsDb();
+    const { user } = mif.registerUser('jonas@vu.lt', 'hash-1', 1000);
+    mif.addEmailToken(hash('a'), user.id, 'verify', 5000);
+    assert.equal(mif.verifyEmail(hash('a'), 1500)?.verified_at, 1500);
+
+    const again = mif.registerUser('jonas@vu.lt', 'hash-2', 2000);
+    assert.equal(again.pending, false);
+    assert.equal(again.user.password_hash, 'hash-1');
+    assert.equal(again.user.created_at, 1000);
+  });
+
+  it('verifies by token once, not after it expires and not with a reset token', () => {
+    const { mif } = accountsDb();
+    const { user } = mif.registerUser('jonas@vu.lt', 'hash-1', 1000);
+    mif.addEmailToken(hash('a'), user.id, 'verify', 5000);
+    mif.addEmailToken(hash('b'), user.id, 'verify', 5000);
+    mif.addEmailToken(hash('c'), user.id, 'reset', 5000);
+
+    assert.equal(mif.verifyEmail(hash('a'), 5000), undefined); // expired
+    assert.equal(mif.verifyEmail(hash('c'), 2000), undefined); // wrong purpose
+    assert.equal(mif.verifyEmail(hash('x'), 2000), undefined); // unknown
+    assert.equal(mif.findUserByEmail('jonas@vu.lt')?.verified_at, null);
+
+    assert.equal(mif.verifyEmail(hash('a'), 2000)?.verified_at, 2000);
+    // Used up, and the other verify token went with it; the reset token stays
+    assert.equal(mif.verifyEmail(hash('a'), 2100), undefined);
+    assert.equal(mif.verifyEmail(hash('b'), 2100), undefined);
+    assert.equal(mif.hasEmailToken(hash('c'), 'reset', 2100), true);
+  });
+
+  it('keeps sessions until they expire or are deleted', () => {
+    const { mif } = accountsDb();
+    const { user } = mif.registerUser('jonas@vu.lt', 'hash-1', 1000);
+    mif.createSession(hash('s'), user.id, 9000, 2000);
+
+    const found = mif.findSession(hash('s'), 3000);
+    assert.equal(found?.id, user.id);
+    assert.equal(found?.email, 'jonas@vu.lt');
+    assert.equal(found?.session_last_seen_at, 2000);
+    assert.equal(mif.findSession(hash('s'), 9000), undefined); // expired
+    assert.equal(mif.findSession(hash('x'), 3000), undefined);
+
+    mif.touchSession(hash('s'), 4000);
+    assert.equal(mif.findSession(hash('s'), 4500)?.session_last_seen_at, 4000);
+
+    assert.equal(mif.deleteSession(hash('s')), true);
+    assert.equal(mif.deleteSession(hash('s')), false);
+    assert.equal(mif.findSession(hash('s'), 4500), undefined);
+  });
+
+  it('a password reset uses up the token, verifies the address and closes every session', () => {
+    const { mif } = accountsDb();
+    const { user } = mif.registerUser('jonas@vu.lt', 'hash-1', 1000);
+    mif.createSession(hash('s'), user.id, 90_000, 2000);
+    mif.createSession(hash('t'), user.id, 90_000, 2000);
+    mif.addEmailToken(hash('a'), user.id, 'verify', 50_000);
+    mif.addEmailToken(hash('r'), user.id, 'reset', 5000);
+
+    assert.equal(mif.resetPassword(hash('r'), 'hash-2', 5000), undefined); // expired
+    assert.equal(mif.resetPassword(hash('a'), 'hash-2', 3000), undefined); // wrong purpose
+    assert.equal(mif.findUserByEmail('jonas@vu.lt')?.password_hash, 'hash-1');
+
+    const reset = mif.resetPassword(hash('r'), 'hash-2', 3000);
+    assert.equal(reset?.password_hash, 'hash-2');
+    assert.equal(reset?.verified_at, 3000);
+    assert.equal(mif.findSession(hash('s'), 3000), undefined);
+    assert.equal(mif.findSession(hash('t'), 3000), undefined);
+    assert.equal(mif.resetPassword(hash('r'), 'hash-3', 3100), undefined); // used
+    assert.equal(mif.hasEmailToken(hash('a'), 'verify', 3100), false);
+  });
+
+  it('a password change keeps only the session it was made from', () => {
+    const { mif } = accountsDb();
+    const { user } = mif.registerUser('jonas@vu.lt', 'hash-1', 1000);
+    const other = mif.registerUser('ona@vu.lt', 'hash-o', 1000).user;
+    mif.createSession(hash('s'), user.id, 90_000, 2000);
+    mif.createSession(hash('t'), user.id, 90_000, 2000);
+    mif.createSession(hash('o'), other.id, 90_000, 2000);
+    mif.addEmailToken(hash('r'), user.id, 'reset', 50_000);
+
+    mif.changePassword(user.id, 'hash-2', hash('s'));
+    assert.equal(mif.findUserByEmail('jonas@vu.lt')?.password_hash, 'hash-2');
+    assert.equal(mif.findSession(hash('s'), 3000)?.id, user.id);
+    assert.equal(mif.findSession(hash('t'), 3000), undefined);
+    assert.equal(mif.findSession(hash('o'), 3000)?.id, other.id);
+    // A reset link asked for before the change does not work after it
+    assert.equal(mif.hasEmailToken(hash('r'), 'reset', 3000), false);
+  });
+
+  it('removes expired sessions, expired tokens and accounts never verified', () => {
+    const { mif, db } = accountsDb();
+    const old = mif.registerUser('old@vu.lt', 'h', 1000).user;
+    const fresh = mif.registerUser('fresh@vu.lt', 'h', 1000 + DAY).user;
+    const verified = mif.registerUser('verified@vu.lt', 'h', 1000).user;
+    mif.addEmailToken(hash('o'), old.id, 'verify', 1000 + DAY);
+    mif.addEmailToken(hash('v'), verified.id, 'verify', 1000 + DAY);
+    mif.verifyEmail(hash('v'), 2000);
+    mif.addEmailToken(hash('e'), verified.id, 'reset', 3000);
+    mif.addEmailToken(hash('k'), verified.id, 'reset', 9000 + DAY);
+    mif.createSession(hash('s'), verified.id, 4000, 2000);
+    mif.createSession(hash('t'), verified.id, 9000 + DAY, 2000);
+
+    const now = 2000 + DAY;
+    assert.deepEqual(mif.removeExpiredAuth(now, now - DAY), { sessions: 1, tokens: 2, users: 1 });
+    assert.equal(mif.findUserByEmail('old@vu.lt'), undefined);
+    assert.equal(mif.findUserByEmail('fresh@vu.lt')?.id, fresh.id);
+    assert.equal(mif.findUserByEmail('verified@vu.lt')?.id, verified.id);
+    assert.equal(mif.findSession(hash('t'), now)?.id, verified.id);
+    assert.equal(mif.hasEmailToken(hash('k'), 'reset', now), true);
+    // An account past its day whose link was sent again later lives until that link expires
+    const late = mif.registerUser('late@vu.lt', 'h', now).user;
+    mif.addEmailToken(hash('l'), late.id, 'verify', now + 2 * DAY);
+    const later = now + DAY + 1000;
+    assert.equal(mif.removeExpiredAuth(later, later - DAY).users, 1); // fresh@vu.lt
+    assert.equal(mif.findUserByEmail('late@vu.lt')?.id, late.id);
+    assert.equal(mif.verifyEmail(hash('l'), later)?.id, late.id);
+    // User 0 has no email: it is not an unverified account
+    assert.equal(
+      (db.prepare('SELECT count(*) AS n FROM users WHERE id = 0').get() as { n: number }).n,
+      1
+    );
+  });
+
+  it('rejects an account without a password, an upper-case address and an unknown role', () => {
+    const { db } = accountsDb();
+    const insert = (columns: string, values: string) =>
+      db.prepare(`INSERT INTO users (${columns}, created_at) VALUES (${values}, 1)`).run();
+    assert.throws(() => insert('email', `'a@vu.lt'`), /CHECK constraint/);
+    assert.throws(() => insert('password_hash', `'h'`), /CHECK constraint/);
+    assert.throws(() => insert('email, password_hash', `'A@vu.lt', 'h'`), /CHECK constraint/);
+    assert.throws(() => insert('email, password_hash, role', `'a@vu.lt', 'h', 'root'`), /CHECK/);
+    insert('email, password_hash, role', `'a@vu.lt', 'h', 'admin'`);
+    assert.throws(() => insert('email, password_hash', `'a@vu.lt', 'h'`), /UNIQUE constraint/);
+  });
+});

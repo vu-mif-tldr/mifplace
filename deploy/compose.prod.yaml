@@ -10,6 +10,7 @@
 #   SMTP_USER=...
 #   SMTP_PASS=...
 #   MAIL_FROM=vu.place <noreply@vu.place>
+#   MAIL_PER_HOUR=40        # all emails together; raise it with the SendPulse plan
 
 name: mifplace-prod
 
@@ -21,8 +22,9 @@ services:
       # Loopback only, see compose.yaml
       - '127.0.0.1:3002:3000'
     environment:
-      # The email links point here. Setting it turns the waitlist on; without SMTP_HOST in
-      # app.env the app then refuses to start.
+      # The email links point here. Setting it turns the waitlist and the accounts (/api/auth)
+      # on; without SMTP_HOST in app.env the app then refuses to start. Caddy forwards only
+      # /api/waitlist* for now, so /api/auth is not reachable from outside yet.
       PUBLIC_URL: https://vu.place
       # See compose.yaml
       TRUST_PROXY: uniquelocal

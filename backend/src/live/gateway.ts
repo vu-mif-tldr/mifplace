@@ -1,6 +1,7 @@
 import http, { type IncomingMessage } from 'node:http';
 import type { Socket } from 'node:net';
 import WebSocket, { WebSocketServer } from 'ws';
+import { isAllowedOrigin } from '../origin.js';
 
 export interface GatewayOptions {
   path: string;
@@ -51,53 +52,6 @@ export function attachGateway(
     );
   }
 
-  function isAllowedOrigin(request: IncomingMessage): boolean {
-    const origin = request.headers.origin;
-
-    // Non-browser clients may omit Origin.
-    if (origin === undefined) {
-      return true;
-    }
-
-    const host = request.headers.host;
-
-    if (!host) {
-      return false;
-    }
-
-    try {
-      const parsedOrigin = new URL(origin);
-
-      if (
-        !['http:', 'https:'].includes(parsedOrigin.protocol) ||
-        parsedOrigin.username ||
-        parsedOrigin.password ||
-        parsedOrigin.pathname !== '/' ||
-        parsedOrigin.search ||
-        parsedOrigin.hash ||
-        parsedOrigin.origin === 'null'
-      ) {
-        return false;
-      }
-
-      // Allow the page's own host.
-      if (parsedOrigin.host.toLowerCase() === host.toLowerCase()) {
-        return true;
-      }
-
-      // Allow explicitly configured additional origins.
-      return options.allowedOrigins.some((allowed) => {
-        try {
-          return new URL(allowed).origin === parsedOrigin.origin;
-        } catch {
-          return false;
-        }
-      });
-    } catch {
-      return false;
-    }
-  }
-
   function handleUpgrade(request: IncomingMessage, socket: Socket, head: Buffer): void {
     let url: URL;
 
@@ -115,7 +69,7 @@ export function attachGateway(
     }
 
     // Reject unauthorized origins.
-    if (!isAllowedOrigin(request)) {
+    if (!isAllowedOrigin(request.headers.origin, request.headers.host, options.allowedOrigins)) {
       reject(socket, 403, 'Forbidden');
       return;
     }
