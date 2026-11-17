@@ -22,6 +22,21 @@ export interface UserRow {
 // The user of a session, with the time the session was last seen
 export type SessionUserRow = UserRow & { session_last_seen_at: number };
 
+// An account as an administrator sees it: with the number of its sessions that have not expired
+export type AdminUserRow = UserRow & { sessions: number };
+
+export type AdminAction = 'block' | 'unblock' | 'end_sessions';
+
+export interface AdminLogRow {
+  id: number;
+  admin_id: number;
+  action: AdminAction;
+  target_user_id: number;
+  // The reason of a block
+  details: string | null;
+  timestamp: number;
+}
+
 // What a token from an email is for
 export type EmailTokenPurpose = 'verify' | 'reset';
 
@@ -120,6 +135,14 @@ export class MifDb {
   private readonly resetPasswordTx;
   private readonly changePasswordTx;
   private readonly removeExpiredAuthTx;
+  private readonly syncAdminsTx;
+  private readonly selectAccounts;
+  private readonly selectAccount;
+  private readonly blockUserTx;
+  private readonly unblockUserTx;
+  private readonly endUserSessionsTx;
+  private readonly deleteAccountTx;
+  private readonly selectAdminLog;
 
   constructor(private readonly db: Db) {
     this.insertEvent = db.prepare(
@@ -268,6 +291,83 @@ export class MifDb {
       users: deleteUnverifiedUsers.run(unverifiedBefore).changes,
     }));
 
+    // The administrators are the verified accounts with these addresses (a JSON list), nobody else
+    const demoteAdmins = db.prepare(
+      `UPDATE users SET role = 'user'
+         WHERE role = 'admin'
+           AND (email IS NULL OR email NOT IN (SELECT value FROM json_each(?)))`
+    );
+    const promoteAdmins = db.prepare(
+      `UPDATE users SET role = 'admin'
+         WHERE role = 'user' AND verified_at IS NOT NULL
+           AND email IN (SELECT value FROM json_each(?))`
+    );
+    this.syncAdminsTx = db.transaction((emails: string) => ({
+      demoted: demoteAdmins.run(emails).changes,
+      promoted: promoteAdmins.run(emails).changes,
+    }));
+
+    const accountColumns = `u.*, (SELECT count(*) FROM sessions s
+                                    WHERE s.user_id = u.id AND s.expires_at > ?) AS sessions`;
+    this.selectAccounts = db.prepare(
+      `SELECT ${accountColumns} FROM users u
+         WHERE u.email LIKE ? ESCAPE '\\' ORDER BY u.email LIMIT ?`
+    );
+    // Only accounts: a system user or a deleted account has no address
+    this.selectAccount = db.prepare(
+      `SELECT ${accountColumns} FROM users u WHERE u.id = ? AND u.email IS NOT NULL`
+    );
+    const insertAdminLog = db.prepare(
+      `INSERT INTO admin_log (admin_id, action, target_user_id, details, timestamp)
+         VALUES (?, ?, ?, ?, ?)`
+    );
+    const setBlocked = db.prepare(
+      'UPDATE users SET banned_at = ?, ban_reason = ? WHERE id = ? AND email IS NOT NULL'
+    );
+
+    // The block, the closed sessions and the log entry change together.
+    this.blockUserTx = db.transaction(
+      (adminId: number, userId: number, reason: string, now: number): boolean => {
+        if (setBlocked.run(now, reason, userId).changes === 0) return false;
+        deleteSessionsOf.run(userId);
+        insertAdminLog.run(adminId, 'block', userId, reason, now);
+        return true;
+      }
+    );
+    this.unblockUserTx = db.transaction((adminId: number, userId: number, now: number): boolean => {
+      if (setBlocked.run(null, null, userId).changes === 0) return false;
+      insertAdminLog.run(adminId, 'unblock', userId, null, now);
+      return true;
+    });
+    this.endUserSessionsTx = db.transaction(
+      (adminId: number, userId: number, now: number): number | undefined => {
+        if (!this.selectAccount.get(now, userId)) return undefined;
+        const ended = deleteSessionsOf.run(userId).changes;
+        insertAdminLog.run(adminId, 'end_sessions', userId, null, now);
+        return ended;
+      }
+    );
+
+    // The row stays, because the event log and the admin log refer to it, but nothing in it
+    // says whose it was: no address, no password. The address leaves the waitlist too.
+    const emptyUser = db.prepare(
+      `UPDATE users
+         SET email = NULL, password_hash = NULL, verified_at = NULL, role = 'user',
+             banned_at = NULL, ban_reason = NULL
+         WHERE id = ?`
+    );
+    const deleteWaitlistEmail = db.prepare('DELETE FROM waitlist WHERE email = ?');
+    this.deleteAccountTx = db.transaction((userId: number): boolean => {
+      const user = this.selectUserById.get(userId) as UserRow | undefined;
+      if (!user || user.email === null) return false;
+      deleteSessionsOf.run(userId);
+      deleteTokensOf.run(userId);
+      deleteWaitlistEmail.run(user.email);
+      emptyUser.run(userId);
+      return true;
+    });
+    this.selectAdminLog = db.prepare('SELECT * FROM admin_log ORDER BY id DESC LIMIT ?');
+
     // The event and the cooldown timestamp must change together.
     this.appendTx = db.transaction((event: NewEvent, now: number): number => {
       const result = this.insertEvent.run(event.user_id, event.color_id, event.position, now);
@@ -376,6 +476,60 @@ export class MifDb {
   // start; a registration goes through registerUser and the email.
   ensureVerifiedUser(email: string, passwordHash: string, now: number = Date.now()): UserRow {
     return this.upsertVerifiedUser.get(email, passwordHash, now, now) as UserRow;
+  }
+
+  // Makes the verified accounts with these addresses administrators and everybody else a
+  // user. The list comes from ADMIN_EMAILS: the backend calls this at start and when an
+  // address from the list gets verified. Returns how many roles changed.
+  syncAdmins(emails: readonly string[]): { promoted: number; demoted: number } {
+    return this.syncAdminsTx(JSON.stringify(emails));
+  }
+
+  // Accounts whose address contains the text, in the order of the addresses.
+  searchUsers(text: string, limit: number, now: number = Date.now()): AdminUserRow[] {
+    // % and _ in the text are letters, not wildcards
+    const pattern = `%${text.replace(/[\\%_]/g, '\\$&')}%`;
+    return this.selectAccounts.all(now, pattern, limit) as AdminUserRow[];
+  }
+
+  // One account by the id of its user. Undefined for a system user and a deleted account.
+  getAccount(userId: number, now: number = Date.now()): AdminUserRow | undefined {
+    return this.selectAccount.get(now, userId) as AdminUserRow | undefined;
+  }
+
+  // Blocks an account (FR-13), closes its sessions and writes it to the admin log.
+  // Undefined if there is no such account.
+  blockUser(
+    adminId: number,
+    userId: number,
+    reason: string,
+    now: number = Date.now()
+  ): AdminUserRow | undefined {
+    return this.blockUserTx(adminId, userId, reason, now)
+      ? this.getAccount(userId, now)
+      : undefined;
+  }
+
+  unblockUser(adminId: number, userId: number, now: number = Date.now()): AdminUserRow | undefined {
+    return this.unblockUserTx(adminId, userId, now) ? this.getAccount(userId, now) : undefined;
+  }
+
+  // Signs every browser of an account out. Returns how many sessions ended, undefined if
+  // there is no such account.
+  endUserSessions(adminId: number, userId: number, now: number = Date.now()): number | undefined {
+    return this.endUserSessionsTx(adminId, userId, now);
+  }
+
+  // Deletes an account at its owner's request: the address and the password are gone, the
+  // sessions closed, the pixels stay in the log without an owner anyone could name. False if
+  // there is no such account.
+  deleteAccount(userId: number): boolean {
+    return this.deleteAccountTx(userId);
+  }
+
+  // The latest actions of administrators, newest first.
+  getAdminLog(limit: number): AdminLogRow[] {
+    return this.selectAdminLog.all(limit) as AdminLogRow[];
   }
 
   // Stores the hash of a token that goes out in an email.

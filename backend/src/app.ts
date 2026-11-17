@@ -12,6 +12,7 @@ import {
   type PlacePixelResponse,
 } from '@mifplace/shared';
 import type { NewEvent } from '@mifplace/db';
+import { createAdminRouter, requireAdmin } from './auth/admin.js';
 import { requireSession, sameOrigin, sessionUser } from './auth/guard.js';
 import { createAuthRouter, type AuthOptions } from './auth/router.js';
 import { createSessions } from './auth/sessions.js';
@@ -101,6 +102,16 @@ export function createApp({
     // added below is protected without saying so. A request that changes something must
     // also come from our own page.
     app.use('/api', requireSession(sessions), sameOrigin(auth.allowedOrigins ?? []));
+
+    // For administrators only: what they can do to accounts
+    app.use(
+      '/api/admin',
+      requireAdmin(),
+      createAdminRouter(
+        { store: auth.store, onSessionsEnded: auth.onSessionsEnded, now: auth.now },
+        limits
+      )
+    );
   }
 
   app.get(

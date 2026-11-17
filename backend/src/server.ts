@@ -11,7 +11,7 @@ import { createApp, listen } from './app.js';
 import type { CanvasStore } from './canvas-state.js';
 import { loadCanvas, placePixel } from './canvas-log.js';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
-import { emailDomainsFromEnv } from './auth/config.js';
+import { adminEmailsFromEnv, emailDomainsFromEnv } from './auth/config.js';
 import { devAccountFromEnv, ensureDevAccount } from './auth/dev-account.js';
 import { VERIFY_WITHIN_MS, type AuthOptions } from './auth/router.js';
 import { createSessions, type Sessions } from './auth/sessions.js';
@@ -65,6 +65,8 @@ const devAccount = devAccountFromEnv();
 // All emails of the server together, see .env.example
 const mailQuota = new HourlyQuota(positiveInt(process.env, 'MAIL_PER_HOUR', 40));
 const emailDomains = emailDomainsFromEnv();
+// Who is an administrator; fails here if an entry is not an address
+const adminEmails = adminEmailsFromEnv();
 
 // Fails loudly if DB_PATH is not set or the file does not exist (run db:setup first).
 const dbPath = resolveDbPath();
@@ -105,6 +107,12 @@ try {
   // One object for the account routes, the check in front of the other routes and the
   // live server
   sessions = createSessions({ store: mifDb, publicUrl });
+
+  // ADMIN_EMAILS is the whole truth about who is an administrator: applied at every start
+  const roles = mifDb.syncAdmins(adminEmails);
+  console.log(
+    `Administrators: ${adminEmails.length} in ADMIN_EMAILS, ${roles.promoted} given the role, ${roles.demoted} lost it`
+  );
   if (devAccount) {
     const id = await ensureDevAccount(mifDb, devAccount);
     console.log(`Development account ready: user ${id} (DEV_USER_EMAIL)`);
@@ -156,6 +164,7 @@ function authOptions(): AuthOptions {
     emailDomains,
     quota: mailQuota,
     allowedOrigins: liveOptions.allowedOrigins,
+    adminEmails,
     sessions,
     // A sign-out, a new password: the live connections of those sessions are closed too
     onSessionsEnded: (ended) => live.endSessions(ended),

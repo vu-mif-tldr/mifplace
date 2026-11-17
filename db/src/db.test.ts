@@ -454,6 +454,116 @@ describe('MifDb accounts', () => {
     assert.equal(mif.findUserByEmail('ona@vu.lt')?.id, pending.id);
   });
 
+  it('makes exactly the verified accounts of the list administrators', () => {
+    const { mif } = accountsDb();
+    const admin = mif.ensureVerifiedUser('admin@vu.lt', 'h', 1000);
+    mif.ensureVerifiedUser('user@vu.lt', 'h', 1000);
+    // In the list, but its owner has not opened the link yet
+    mif.registerUser('pending@vu.lt', 'h', 1000);
+    const list = ['admin@vu.lt', 'pending@vu.lt', 'nobody@vu.lt'];
+
+    assert.deepEqual(mif.syncAdmins(list), { promoted: 1, demoted: 0 });
+    assert.equal(mif.findUserByEmail('admin@vu.lt')?.role, 'admin');
+    assert.equal(mif.findUserByEmail('pending@vu.lt')?.role, 'user');
+    assert.equal(mif.findUserByEmail('user@vu.lt')?.role, 'user');
+    // Nothing to do the second time
+    assert.deepEqual(mif.syncAdmins(list), { promoted: 0, demoted: 0 });
+
+    // Another list: the role moves
+    assert.deepEqual(mif.syncAdmins(['user@vu.lt']), { promoted: 1, demoted: 1 });
+    assert.equal(mif.findUserByEmail('admin@vu.lt')?.role, 'user');
+    assert.equal(mif.getAccount(admin.id, 2000)?.role, 'user');
+    assert.deepEqual(mif.syncAdmins([]), { promoted: 0, demoted: 1 });
+  });
+
+  it('blocks, unblocks and signs out an account, and logs each action', () => {
+    const { mif } = accountsDb();
+    const admin = mif.ensureVerifiedUser('admin@vu.lt', 'h', 1000);
+    const user = mif.ensureVerifiedUser('jonas@vu.lt', 'h', 1000);
+    mif.createSession(hash('s'), user.id, 90_000, 2000);
+    mif.createSession(hash('t'), user.id, 2500, 2000); // expired by 3000
+    assert.equal(mif.getAccount(user.id, 3000)?.sessions, 1);
+
+    const blocked = mif.blockUser(admin.id, user.id, 'spam', 3000);
+    assert.equal(blocked?.banned_at, 3000);
+    assert.equal(blocked?.ban_reason, 'spam');
+    assert.equal(blocked?.sessions, 0);
+    assert.equal(mif.findSession(hash('s'), 3000), undefined);
+
+    const unblocked = mif.unblockUser(admin.id, user.id, 4000);
+    assert.equal(unblocked?.banned_at, null);
+    assert.equal(unblocked?.ban_reason, null);
+
+    mif.createSession(hash('u'), user.id, 90_000, 4000);
+    assert.equal(mif.endUserSessions(admin.id, user.id, 5000), 1);
+    assert.equal(mif.endUserSessions(admin.id, user.id, 5000), 0);
+
+    // User 0 and unknown ids are not accounts: nothing happens and nothing is logged
+    for (const id of [0, 999]) {
+      assert.equal(mif.blockUser(admin.id, id, 'x', 6000), undefined);
+      assert.equal(mif.unblockUser(admin.id, id, 6000), undefined);
+      assert.equal(mif.endUserSessions(admin.id, id, 6000), undefined);
+      assert.equal(mif.getAccount(id, 6000), undefined);
+    }
+    assert.deepEqual(
+      mif
+        .getAdminLog(10)
+        .map((row) => [row.action, row.target_user_id, row.details, row.timestamp]),
+      [
+        ['end_sessions', user.id, null, 5000],
+        ['end_sessions', user.id, null, 5000],
+        ['unblock', user.id, null, 4000],
+        ['block', user.id, 'spam', 3000],
+      ]
+    );
+  });
+
+  it('finds accounts by a part of the address, wildcards taken literally', () => {
+    const { mif } = accountsDb();
+    for (const email of ['jonas@vu.lt', 'jonas_2@vu.lt', 'ona@mif.vu.lt']) {
+      mif.ensureVerifiedUser(email, 'h', 1000);
+    }
+    const emails = (text: string, limit = 20) =>
+      mif.searchUsers(text, limit, 2000).map((user) => user.email);
+    assert.deepEqual(emails('jonas'), ['jonas@vu.lt', 'jonas_2@vu.lt']);
+    assert.deepEqual(emails('vu.lt', 2), ['jonas@vu.lt', 'jonas_2@vu.lt']);
+    assert.deepEqual(emails('s_2'), ['jonas_2@vu.lt']);
+    assert.deepEqual(emails('%'), []);
+    assert.deepEqual(emails('\\'), []);
+    assert.deepEqual(emails('gmail'), []);
+  });
+
+  it('deletes an account but keeps its row, its pixels and the admin log', () => {
+    const { mif, db } = accountsDb();
+    const admin = mif.ensureVerifiedUser('admin@vu.lt', 'h', 1000);
+    const user = mif.ensureVerifiedUser('jonas@vu.lt', 'h', 1000);
+    mif.createSession(hash('s'), user.id, 90_000, 2000);
+    mif.addEmailToken(hash('r'), user.id, 'reset', 90_000);
+    mif.addToWaitlist('jonas@vu.lt', 'w'.repeat(43), 2000);
+    mif.appendEvent({ user_id: user.id, color_id: 0, position: 3 }, 2000);
+    mif.blockUser(admin.id, user.id, 'spam', 2500);
+    mif.unblockUser(admin.id, user.id, 2600);
+
+    assert.equal(mif.deleteAccount(user.id), true);
+    assert.equal(mif.findUserByEmail('jonas@vu.lt'), undefined);
+    assert.equal(mif.getAccount(user.id, 3000), undefined);
+    assert.equal(mif.hasEmailToken(hash('r'), 'reset', 3000), false);
+    const count = (table: string) =>
+      (db.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n;
+    assert.equal(count('sessions'), 0);
+    assert.equal(count('waitlist'), 0);
+    assert.equal(count('events'), 1);
+    assert.equal(count('admin_log'), 2);
+    assert.equal((db.pragma('foreign_key_check') as unknown[]).length, 0);
+
+    // Twice, user 0 and an unknown id: nothing to delete
+    assert.equal(mif.deleteAccount(user.id), false);
+    assert.equal(mif.deleteAccount(0), false);
+    assert.equal(mif.deleteAccount(999), false);
+    // The address is free again
+    assert.notEqual(mif.registerUser('jonas@vu.lt', 'h2', 4000).user.id, user.id);
+  });
+
   it('rejects an account without a password, an upper-case address and an unknown role', () => {
     const { db } = accountsDb();
     const insert = (columns: string, values: string) =>

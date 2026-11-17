@@ -86,6 +86,50 @@ export const ChangePasswordRequestSchema = z.object({
 });
 export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequestSchema>;
 
+// Body of DELETE /api/auth/account: the password once more, so a forgotten open tab is not
+// enough to delete an account
+export const DeleteAccountRequestSchema = z.object({ password: CurrentPasswordSchema });
+export type DeleteAccountRequest = z.infer<typeof DeleteAccountRequestSchema>;
+
+// Body of POST /api/admin/users/:id/block
+export const BlockUserRequestSchema = z.object({
+  reason: z.string().trim().min(1, 'say why the account is blocked').max(500),
+});
+export type BlockUserRequest = z.infer<typeof BlockUserRequestSchema>;
+
+// Query of GET /api/admin/users: a part of the address
+export const AdminUsersQuerySchema = z.object({
+  query: z.string().trim().toLowerCase().min(1).max(100),
+});
+
+// An account as an administrator sees it. Times are Unix milliseconds.
+export const AdminUserSchema = z.object({
+  id: z.int().nonnegative(),
+  email: z.string(),
+  role: UserRoleSchema,
+  createdAt: z.int(),
+  verifiedAt: z.int().nullable(),
+  bannedAt: z.int().nullable(),
+  banReason: z.string().nullable(),
+  // Signed-in browsers
+  sessions: z.int().nonnegative(),
+});
+export type AdminUser = z.infer<typeof AdminUserSchema>;
+
+// 200 response of GET /api/admin/users
+export const AdminUsersResponseSchema = z.object({
+  success: z.literal(true),
+  users: z.array(AdminUserSchema),
+});
+export type AdminUsersResponse = z.infer<typeof AdminUsersResponseSchema>;
+
+// 200 response of the admin routes that act on one account
+export const AdminUserResponseSchema = z.object({
+  success: z.literal(true),
+  user: AdminUserSchema,
+});
+export type AdminUserResponse = z.infer<typeof AdminUserResponseSchema>;
+
 // The signed-in user, as the page sees it
 export const AuthUserSchema = z.object({
   email: z.string(),
@@ -107,7 +151,7 @@ export const AuthErrorCodeSchema = z.enum([
   'invalid_request',
   // 400: the address is not in an allowed domain, or has a "+" part
   'email_not_allowed',
-  // 401 on login, 403 on password change: wrong email or password
+  // 401 on login, 403 on password change and account deletion: wrong email or password
   'invalid_credentials',
   // 401: no session, or it has expired
   'unauthenticated',
@@ -117,6 +161,10 @@ export const AuthErrorCodeSchema = z.enum([
   'banned',
   // 403: the request comes from another site
   'forbidden_origin',
+  // 403: the route is for administrators
+  'forbidden',
+  // 404: there is no such account
+  'not_found',
   // 404: the link from the email is unknown, used or expired
   'invalid_token',
   // 429: too many wrong passwords for this account
