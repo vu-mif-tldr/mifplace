@@ -196,7 +196,8 @@ export function createAuthRouter(
         if (error instanceof HasherBusyError) {
           return fail(res, 503, 'busy', 'The server is busy, please try again in a moment.');
         }
-        console.error(`${req.method} /api/auth${req.path} failed:`, error);
+        // The path comes from the request, so it is an argument, never the format string
+        console.error('%s /api/auth%s failed:', req.method, req.path, error);
         return fail(res, 500, 'internal', 'Internal server error');
       }
     };

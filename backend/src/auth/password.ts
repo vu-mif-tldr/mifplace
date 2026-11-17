@@ -1,22 +1,27 @@
-import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import * as crypto from 'node:crypto';
 
-// Passwords are stored as scrypt hashes (node:crypto, no dependency):
-//   scrypt$<log2 N>$<r>$<p>$<salt>$<key>     salt and key as base64url
+// Passwords are stored as Argon2id hashes (node:crypto since Node 24.7, no dependency) in the
+// usual PHC string format, which other Argon2 libraries read too:
+//   $argon2id$v=19$m=<KiB>,t=<passes>,p=<lanes>$<salt>$<key>     salt and key as base64
 // The parameters are in the string, so they can be raised later without breaking old hashes.
 
-export interface ScryptParams {
-  // CPU and memory cost as a power of two: N = 2 ** logN
-  logN: number;
-  r: number;
-  p: number;
+export interface Argon2Params {
+  // Memory cost in KiB
+  memoryKiB: number;
+  // Number of passes over the memory
+  passes: number;
+  // Number of lanes
+  parallelism: number;
 }
 
-// OWASP Password Storage Cheat Sheet: N = 2^15, r = 8, p = 3. One hash takes 32 MiB
-// (128 * N * r bytes) and about 0.2 s.
-export const DEFAULT_SCRYPT_PARAMS: ScryptParams = { logN: 15, r: 8, p: 3 };
+// OWASP Password Storage Cheat Sheet: m = 19 MiB, t = 2, p = 1. One hash takes 19 MiB and
+// a few tens of milliseconds.
+export const DEFAULT_ARGON2_PARAMS: Argon2Params = { memoryKiB: 19456, passes: 2, parallelism: 1 };
 
 const SALT_BYTES = 16;
 const KEY_BYTES = 32;
+// The only version of Argon2 in use (1.3)
+const VERSION = 19;
 
 // Thrown when too many passwords wait to be hashed; the request is answered with 503.
 export class HasherBusyError extends Error {
@@ -25,33 +30,49 @@ export class HasherBusyError extends Error {
   }
 }
 
-function derive(password: string, salt: Buffer, { logN, r, p }: ScryptParams): Promise<Buffer> {
-  const N = 2 ** logN;
+function derive(password: string, salt: Buffer, params: Argon2Params): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    scrypt(
-      // The same password typed on another keyboard may use other code points (ą as one
-      // character or as a + ogonek); NFKC makes them one.
-      password.normalize('NFKC'),
-      salt,
-      KEY_BYTES,
-      // Node's default maxmem (32 MiB) is below what these parameters need
-      { N, r, p, maxmem: 256 * N * r },
+    crypto.argon2(
+      'argon2id',
+      {
+        // The same password typed on another keyboard may use other code points (ą as one
+        // character or as a + ogonek); NFKC makes them one.
+        message: Buffer.from(password.normalize('NFKC'), 'utf8'),
+        nonce: salt,
+        parallelism: params.parallelism,
+        tagLength: KEY_BYTES,
+        memory: params.memoryKiB,
+        passes: params.passes,
+      },
       (error, key) => (error ? reject(error) : resolve(key))
     );
   });
 }
 
-function parse(stored: string): { params: ScryptParams; salt: Buffer; key: Buffer } | undefined {
-  const [name, logN, r, p, salt, key] = stored.split('$');
-  if (name !== 'scrypt' || !salt || !key) return undefined;
-  const params = { logN: Number(logN), r: Number(r), p: Number(p) };
-  if (![params.logN, params.r, params.p].every((n) => Number.isInteger(n) && n > 0)) {
+// PHC strings use base64 without the "=" padding
+const base64 = (bytes: Buffer) => bytes.toString('base64').replace(/=+$/, '');
+
+function parse(stored: string): { params: Argon2Params; salt: Buffer; key: Buffer } | undefined {
+  const match = stored.match(
+    /^\$argon2id\$v=(\d+)\$m=(\d+),t=(\d+),p=(\d+)\$([A-Za-z0-9+/]+)\$([A-Za-z0-9+/]+)$/
+  );
+  if (!match || Number(match[1]) !== VERSION) return undefined;
+  const params = {
+    memoryKiB: Number(match[2]),
+    passes: Number(match[3]),
+    parallelism: Number(match[4]),
+  };
+  // The limits of Argon2 itself; anything else would make the hash function throw
+  if (params.passes < 1 || params.parallelism < 1 || params.memoryKiB < 8 * params.parallelism) {
     return undefined;
   }
-  return { params, salt: Buffer.from(salt, 'base64url'), key: Buffer.from(key, 'base64url') };
+  const salt = Buffer.from(match[5]!, 'base64');
+  const key = Buffer.from(match[6]!, 'base64');
+  if (salt.length < 8 || key.length !== KEY_BYTES) return undefined;
+  return { params, salt, key };
 }
 
-// Hashes and checks passwords, a few at a time: every hash takes 32 MiB and a thread of the
+// Hashes and checks passwords, a few at a time: every hash takes memory and a thread of the
 // libuv pool, so a burst of sign-ins must wait in a queue instead of exhausting the container.
 export class PasswordHasher {
   private running = 0;
@@ -60,16 +81,21 @@ export class PasswordHasher {
   private dummy: Promise<string> | undefined;
 
   constructor(
-    private readonly params: ScryptParams = DEFAULT_SCRYPT_PARAMS,
+    private readonly params: Argon2Params = DEFAULT_ARGON2_PARAMS,
     private readonly maxConcurrent = 3,
     private readonly maxWaiting = 100
-  ) {}
+  ) {
+    // Said here, at start, and not by a TypeError on the first registration
+    if (typeof crypto.argon2 !== 'function') {
+      throw new Error(`Node 24.7 or newer is needed for crypto.argon2, this is ${process.version}`);
+    }
+  }
 
   async hash(password: string): Promise<string> {
-    const salt = randomBytes(SALT_BYTES);
+    const salt = crypto.randomBytes(SALT_BYTES);
     const key = await this.limited(() => derive(password, salt, this.params));
-    const { logN, r, p } = this.params;
-    return `scrypt$${logN}$${r}$${p}$${salt.toString('base64url')}$${key.toString('base64url')}`;
+    const { memoryKiB, passes, parallelism } = this.params;
+    return `$argon2id$v=${VERSION}$m=${memoryKiB},t=${passes},p=${parallelism}$${base64(salt)}$${base64(key)}`;
   }
 
   // False for a wrong password and for a string that is not one of our hashes.
@@ -77,16 +103,18 @@ export class PasswordHasher {
     const parsed = parse(stored);
     if (!parsed) return false;
     const key = await this.limited(() => derive(password, parsed.salt, parsed.params));
-    return key.length === parsed.key.length && timingSafeEqual(key, parsed.key);
+    return crypto.timingSafeEqual(key, parsed.key);
   }
 
   // Does the work of verify() for an address without an account. Always false.
   async verifyUnknown(password: string): Promise<false> {
     // A failed attempt (a full queue) is not kept: the next call makes the hash again
-    this.dummy ??= this.hash(randomBytes(16).toString('base64url')).catch((error: unknown) => {
-      this.dummy = undefined;
-      throw error;
-    });
+    this.dummy ??= this.hash(crypto.randomBytes(16).toString('base64url')).catch(
+      (error: unknown) => {
+        this.dummy = undefined;
+        throw error;
+      }
+    );
     await this.verify(password, await this.dummy);
     return false;
   }

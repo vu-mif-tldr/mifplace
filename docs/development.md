@@ -4,7 +4,7 @@ Everything needed to work on mifplace locally. Production: [deploy/README.md](..
 
 ## Setup
 
-Node 24 (`.nvmrc`) and npm 11+. Run everything from the repository root.
+Node 24.7 or newer (`.nvmrc`; the accounts use `crypto.argon2`) and npm 11+. Run everything from the repository root.
 
 ```bash
 nvm use

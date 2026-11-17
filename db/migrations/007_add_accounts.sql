@@ -4,7 +4,7 @@
 
 -- users is rebuilt: name goes away, the account columns come in. Existing rows (user 0 of the
 -- seed scripts) become system users: without an email and a password nobody can sign in as them.
--- password_hash is the scrypt string of backend/src/auth/password.ts, never the password.
+-- password_hash is the Argon2id string of backend/src/auth/password.ts, never the password.
 -- verified_at is set once the owner of the address opened the link from the email; an account
 -- without it cannot sign in and is deleted after a day. banned_at set means blocked (FR-13).
 CREATE TABLE users_new (

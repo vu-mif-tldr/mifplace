@@ -83,7 +83,7 @@ async function start(
       mailer,
       publicUrl: 'http://localhost:3000/',
       emailDomains: ['vu.lt'],
-      hasher: new PasswordHasher({ logN: 4, r: 8, p: 1 }),
+      hasher: new PasswordHasher({ memoryKiB: 8, passes: 1, parallelism: 1 }),
       now: () => clock.now,
       ...options,
     },
@@ -141,7 +141,7 @@ describe('registration and sign-in', () => {
     assert.equal(mailer.sent[0]!.to, EMAIL);
     // The password is stored only as a hash
     const stored = db.findUserByEmail(EMAIL);
-    assert.match(stored?.password_hash ?? '', /^scrypt\$4\$8\$1\$/);
+    assert.match(stored?.password_hash ?? '', /^\$argon2id\$v=19\$m=8,t=1,p=1\$/);
     assert.equal(stored?.verified_at, null);
 
     // Verifying does not sign in

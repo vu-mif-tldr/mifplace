@@ -169,7 +169,7 @@ Success bodies are `{"success":true}`; `login` and `me` add the user:
 **Rules**
 
 - **Address:** trimmed and lower-cased. Only the domains of `ALLOWED_EMAIL_DOMAINS` and their subdomains may register (`vu.lt` by default), and not addresses with `+` before the `@` (they reach the same mailbox, so one person could have many accounts).
-- **Password:** 10 to 128 characters, no other rules. Stored only as a scrypt hash.
+- **Password:** 10 to 128 characters, no other rules. Stored only as an Argon2id hash.
 - **Verification:** the email links to `PUBLIC_URL/#/verify/<token>`; the page there has a button that sends `POST /api/auth/verify` (a button, because mail scanners open every link). The link works once, for 24 hours; an account not verified by then is deleted. Verifying does not sign in. Registering again before verifying replaces the password and makes earlier links invalid.
 - **Reset:** the email links to `PUBLIC_URL/#/reset/<token>`, valid once, for 1 hour. A reset also verifies the address.
 - **Session:** the cookie `session` (`__Host-session` over HTTPS) is `HttpOnly`, `SameSite=Lax`, `Secure` over HTTPS, and lasts 90 days. The server keeps only a hash of it. A blocked user has no session.

@@ -149,7 +149,8 @@ describe('emails', () => {
 
   it('the "already registered" email has no token', () => {
     const mail = alreadyRegisteredEmail('a@vu.lt', 'https://vu.place/');
-    assert.ok(mail.text.includes('https://vu.place'));
+    assert.match(mail.text, /^Sign in here: https:\/\/vu\.place$/m);
+    assert.match(mail.html, /<a href="https:\/\/vu\.place">Sign in<\/a>/);
     assert.doesNotMatch(mail.text + mail.html, /#\//);
   });
 });
