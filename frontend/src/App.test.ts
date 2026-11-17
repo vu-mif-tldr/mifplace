@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { flushPromises, mount } from '@vue/test-utils';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import App from './App.vue';
 import CanvasPage from './CanvasPage.vue';
 import { getSession, signOut, verifyEmail } from './auth';
@@ -26,12 +26,19 @@ beforeEach(() => {
   vi.mocked(getSession).mockResolvedValue('anonymous');
   vi.mocked(signOut).mockResolvedValue({ ok: true, value: undefined });
 });
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  // One page at a time: an old one would still listen to the address
+  mounted?.unmount();
+  mounted = undefined;
+  vi.clearAllMocks();
+});
+
+let mounted: VueWrapper | undefined;
 
 async function page() {
-  const wrapper = mount(App, { global: { stubs: { CanvasPage: true } } });
+  mounted = mount(App, { global: { stubs: { CanvasPage: true } } });
   await flushPromises();
-  return wrapper;
+  return mounted;
 }
 
 describe('App', () => {
@@ -80,7 +87,7 @@ describe('App', () => {
   it('waits for the session, and offers to try again when the server cannot be asked', async () => {
     vi.mocked(getSession).mockRejectedValueOnce(new Error('offline'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    const wrapper = mount(App, { global: { stubs: { CanvasPage: true } } });
+    const wrapper = (mounted = mount(App, { global: { stubs: { CanvasPage: true } } }));
     expect(wrapper.getComponent(LoadState).props('failed')).toBe(false);
     await flushPromises();
     expect(wrapper.getComponent(LoadState).props('failed')).toBe(true);
@@ -116,6 +123,22 @@ describe('App', () => {
     expect(wrapper.findComponent(CanvasPage).exists()).toBe(true);
   });
 
+  it('keeps the message about a dead link in front of a signed-in visitor until it is left', async () => {
+    history.replaceState(null, '', `/#/verify/${token}`);
+    vi.mocked(getSession).mockResolvedValue(user);
+    vi.mocked(verifyEmail).mockResolvedValue({ ok: false, code: 'invalid_token' });
+    const wrapper = await page();
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(wrapper.get('.lead').text()).toBe(authTexts.verifyExpired);
+    expect(wrapper.findComponent(CanvasPage).exists()).toBe(false);
+
+    await wrapper.get('.link').trigger('click');
+    await flushPromises();
+    expect(location.hash).toBe('');
+    expect(wrapper.findComponent(CanvasPage).exists()).toBe(true);
+  });
+
   it('starts the sign-in screens afresh when another link is opened in the tab', async () => {
     const wrapper = await page();
     expect(wrapper.get('h2').text()).toBe(authTexts.signInTitle);
@@ -123,6 +146,13 @@ describe('App', () => {
     window.dispatchEvent(new Event('hashchange'));
     await flushPromises();
     expect(wrapper.get('h2').text()).toBe(authTexts.resetTitle);
-    wrapper.unmount();
+
+    // The same address reported again changes nothing: what was typed stays
+    await wrapper.get('input[type=password]').setValue('typed so far');
+    window.dispatchEvent(new Event('hashchange'));
+    await flushPromises();
+    expect((wrapper.get('input[type=password]').element as HTMLInputElement).value).toBe(
+      'typed so far'
+    );
   });
 });

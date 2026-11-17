@@ -17,6 +17,12 @@ export function parseRoute(hash: string): Route {
   return { name: match[1] as 'verify' | 'reset', token: match[2]! };
 }
 
+// Do the two ask for the same thing?
+export function sameRoute(a: Route, b: Route): boolean {
+  const token = (route: Route) => (route.name === 'home' ? '' : route.token);
+  return a.name === b.name && token(a) === token(b);
+}
+
 // Takes the token out of the address bar once it is used, without reloading the page.
 export function clearRoute(): void {
   history.replaceState(null, '', location.pathname + location.search);

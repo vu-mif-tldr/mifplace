@@ -28,7 +28,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   signedIn: [user: AuthUser];
-  // The link was used up or left: the page takes the token out of the address
+  // The link was used, or the message that it no longer works was left: the page takes the
+  // token out of the address and shows what it would without a link
   linkDone: [];
 }>();
 
@@ -159,6 +160,8 @@ const view = computed(() => viewOf(mode.value));
 
 // Another screen: the address stays typed in, the password and the messages do not
 function go(to: Mode) {
+  // A link that no longer works is done with once its message was read and left
+  if (mode.value === 'verifyExpired' || mode.value === 'resetExpired') emit('linkDone');
   mode.value = to;
   password.value = '';
   emailError.value = '';
@@ -235,7 +238,6 @@ async function onVerify() {
     go('signIn');
     notice.value = t.verified;
   } else if (result.code === 'invalid_token') {
-    emit('linkDone');
     go('verifyExpired');
   }
 }
@@ -248,7 +250,6 @@ async function onReset() {
     go('signIn');
     notice.value = t.resetDone;
   } else if (result.code === 'invalid_token') {
-    emit('linkDone');
     go('resetExpired');
   }
 }

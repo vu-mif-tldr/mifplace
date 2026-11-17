@@ -47,10 +47,22 @@ defineEmits<{ signOut: [] }>();
   align-items: center;
   gap: 16px;
   padding: 18px 28px;
+  /* As a grid item of the page it must not grow wider than the page to fit its content */
+  min-width: 0;
 }
 
-.spacer {
-  flex-grow: 1;
+/* Nothing in the bar is squeezed or wraps: on a phone the long "reconnecting" text is cut
+   short instead (LiveStatus), so the way out stays in view. */
+.top-bar > * {
+  flex: none;
+}
+
+.top-bar > .live-status {
+  flex: 0 1 auto;
+}
+
+.top-bar > .spacer {
+  flex: 1 1 0;
 }
 
 /* Quiet: for whoever looks for it, closer to the name than the gap of the bar */
@@ -99,7 +111,13 @@ defineEmits<{ signOut: [] }>();
 
 @media (max-width: 720px) {
   .top-bar {
+    gap: 12px;
     padding: 14px 16px;
+  }
+
+  /* No room for it next to the way out */
+  .version {
+    display: none;
   }
 }
 </style>

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { clearRoute, parseRoute } from './route';
+import { clearRoute, parseRoute, sameRoute } from './route';
 
 const token = 'aB3_-'.repeat(8) + 'xyz';
 
@@ -25,6 +25,17 @@ describe('parseRoute', () => {
     ]) {
       expect(parseRoute(hash), hash).toEqual({ name: 'home' });
     }
+  });
+});
+
+describe('sameRoute', () => {
+  it('compares the kind of link and its token', () => {
+    const other = 'B'.repeat(43);
+    expect(sameRoute({ name: 'home' }, { name: 'home' })).toBe(true);
+    expect(sameRoute({ name: 'verify', token }, { name: 'verify', token })).toBe(true);
+    expect(sameRoute({ name: 'verify', token }, { name: 'verify', token: other })).toBe(false);
+    expect(sameRoute({ name: 'verify', token }, { name: 'reset', token })).toBe(false);
+    expect(sameRoute({ name: 'home' }, { name: 'reset', token })).toBe(false);
   });
 });
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { getSession, signOut, type Session } from './auth';
-import { clearRoute, parseRoute, type Route } from './route';
+import { clearRoute, parseRoute, sameRoute, type Route } from './route';
 import CanvasPage from './CanvasPage.vue';
 import AuthScreen from './components/AuthScreen.vue';
 import LoadState from './components/LoadState.vue';
@@ -35,7 +35,10 @@ async function loadSession() {
 }
 
 function onHashChange() {
-  route.value = parseRoute(window.location.hash);
+  const next = parseRoute(window.location.hash);
+  // Only another link starts the screens afresh, not the same address reported once more
+  if (sameRoute(next, route.value)) return;
+  route.value = next;
   linkNumber.value++;
 }
 

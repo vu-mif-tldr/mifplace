@@ -221,8 +221,10 @@ describe('the link of the registration email', () => {
     await submit(wrapper);
     expect(wrapper.get('.lead').text()).toBe(t.verifyExpired);
     expect(wrapper.find('.submit').exists()).toBe(false);
-    expect(wrapper.emitted('linkDone')).toHaveLength(1);
+    // The message stays until it is left, also for a signed-in visitor (App.vue)
+    expect(wrapper.emitted('linkDone')).toBeUndefined();
     await follow(wrapper, t.register);
+    expect(wrapper.emitted('linkDone')).toHaveLength(1);
     expect(title(wrapper)).toBe(t.registerTitle);
   });
 
@@ -266,8 +268,9 @@ describe('the link of the "forgot password" email', () => {
     await fill(wrapper, { password: 'a brand new password' });
     await submit(wrapper);
     expect(wrapper.get('.lead').text()).toBe(t.resetExpired);
-    expect(wrapper.emitted('linkDone')).toHaveLength(1);
+    expect(wrapper.emitted('linkDone')).toBeUndefined();
     await follow(wrapper, t.sendLink);
+    expect(wrapper.emitted('linkDone')).toHaveLength(1);
     expect(title(wrapper)).toBe(t.forgotTitle);
   });
 });
