@@ -23,6 +23,15 @@
 
 `GET /health` has no limit. The WebSocket `/api/ws` is limited by `WS_MAX_CONNECTIONS` instead.
 
+**Sessions.** Every `/api` route needs a session, the cookie a visitor gets by signing in ([Accounts](#accounts-apiauth)). The exceptions are `/api/auth/*` and `/api/waitlist/*`; `GET /health` is public too. A route added later is closed without saying so.
+
+| Status | Body                                                                         | Case                                                          |
+| ------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `401`  | `{"success":false,"code":"unauthenticated","error":"Not signed in."}`        | No session: none was sent, it expired, or the user is blocked |
+| `403`  | `{"success":false,"code":"forbidden_origin","error":"This request must..."}` | A request other than `GET` from a page of another site        |
+
+The `401` is answered before the per-IP limit of the route is counted. The page shows the sign-in screens when it gets one. `POST /api/pixels` stores the pixel with the user of the session (FR-19).
+
 ### `GET /api/palette`
 
 The frontend requests the palette **once during initial page load**. It keeps the palette locally and does not fetch it again for ordinary pixel updates. A page reload or an explicit full reinitialization may fetch it again.
@@ -123,7 +132,7 @@ The body is checked with the request schema from `@mifplace/shared` (`PlacePixel
 
 ### Waitlist: `POST /api/waitlist`, `/confirm`, `/unsubscribe`
 
-Collects addresses of people who want to play, before launch, with double opt-in. The routes exist only where `PUBLIC_URL` is set (production on vu.place; in development always). The landing pages that call them are in [`deploy/landing/`](../deploy/landing/).
+Collects addresses of people who want to play, before launch, with double opt-in. The routes exist where `WAITLIST_ENABLED` is `true` (production on vu.place) and in development unless it is `false`. The landing pages that call them are in [`deploy/landing/`](../deploy/landing/).
 
 1. `POST /api/waitlist` with `{ "email": "jonas@mif.stud.vu.lt" }` stores the address and emails a link `PUBLIC_URL/confirm.html?t=<token>`. Only `vu.lt` and `*.vu.lt` addresses (`VuEmailSchema` in `@mifplace/shared`); the address is trimmed and lower-cased.
 2. The confirm page has a button that sends `POST /api/waitlist/confirm` with `{ "token": "..." }`. A button and not the link itself, because mail scanners (Outlook Safe Links) open every link in an email. The link expires after 7 days; unconfirmed addresses are deleted then.
@@ -145,7 +154,7 @@ Errors have the usual body `{"success":false,"error":"..."}`.
 
 ### Accounts: `/api/auth/*`
 
-People register with an email address and a password; a session cookie keeps the browser signed in. The routes exist only where `PUBLIC_URL` is set, like the waitlist. Nothing else requires a session yet: `POST /api/pixels` and the canvas routes are still open.
+People register with an email address and a password; a session cookie keeps the browser signed in. Every other `/api` route and the WebSocket need that session (see "Sessions" above). `PUBLIC_URL` says where the page is: the links in the emails point there; production does not start without it.
 
 | Route                            | Body                                   | Success                      |
 | -------------------------------- | -------------------------------------- | ---------------------------- |
@@ -203,6 +212,8 @@ Success bodies are `{"success":true}`; `login` and `me` add the user:
 ## 2. WebSocket — `/api/ws`
 
 WebSocket delivers **pixel updates from server to client**. Clients place pixels through HTTP `POST /api/pixels`. The connection also uses standard WebSocket **ping/pong control frames** for connection health; those are not application JSON pixel messages.
+
+**Only for signed-in visitors.** The upgrade request needs the session cookie, which the browser sends by itself; without a session the server answers `401` instead of upgrading. When a session ends other than by expiring (sign-out, a new password, a block), the server closes its connections with code `4401`. A browser cannot see why an upgrade was refused, so when a connection is closed with `4401` or a new one is not accepted, the page asks `GET /api/auth/me` and shows the sign-in screens if nobody is signed in; otherwise it keeps reconnecting as described below. A plain drop, such as a restart of the server, does not make the pages ask.
 
 ### Connecting and resuming
 

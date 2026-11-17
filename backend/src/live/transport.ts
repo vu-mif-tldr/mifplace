@@ -97,7 +97,7 @@ export function attachLiveTransport(
         return;
       }
 
-      const connection = registry.add(ws, request.ip);
+      const connection = registry.add(ws, request.ip, request.owner);
 
       connections.set(connection.id, connection);
       tracker.touch(connection.id, Date.now());

@@ -1,5 +1,6 @@
 import {
   applyPixels,
+  SIGNED_OUT_CODE,
   connectLive,
   liveUrl,
   reconnectDelay,
@@ -14,7 +15,7 @@ class FakeSocket implements SocketLike {
   readonly listeners = {
     open: [] as (() => void)[],
     message: [] as ((event: { data: unknown }) => void)[],
-    close: [] as (() => void)[],
+    close: [] as ((event: { code?: number }) => void)[],
   };
   // A real socket emits close after close(); the fake does the same at once
   close = vi.fn(() => this.emitClose());
@@ -25,7 +26,7 @@ class FakeSocket implements SocketLike {
 
   addEventListener(type: 'open', listener: () => void): void;
   addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
-  addEventListener(type: 'close', listener: () => void): void;
+  addEventListener(type: 'close', listener: (event: { code?: number }) => void): void;
   addEventListener(type: 'open' | 'message' | 'close', listener: unknown) {
     (this.listeners[type] as unknown[]).push(listener);
   }
@@ -39,8 +40,9 @@ class FakeSocket implements SocketLike {
     for (const listener of this.listeners.message) listener({ data });
   }
 
-  emitClose() {
-    for (const listener of this.listeners.close) listener();
+  // 1006 is what a browser reports for a connection that broke or was never accepted
+  emitClose(code = 1006) {
+    for (const listener of this.listeners.close) listener({ code });
   }
 }
 
@@ -227,6 +229,32 @@ describe('connectLive', () => {
       'connected',
       'reconnecting',
     ]);
+  });
+
+  it('tells when the server refused: a session that ended, or a socket that never opened', () => {
+    const onRefused = vi.fn();
+    const { connection, socket } = connect({ onRefused });
+
+    // A plain drop (the server restarts): every page would ask at once, so it is not told
+    socket.emitClose();
+    expect(onRefused).not.toHaveBeenCalled();
+
+    // The reconnect is not let in: the server is down, or there is no session
+    vi.advanceTimersByTime(500);
+    lastSocket().emitClose();
+    expect(onRefused).toHaveBeenCalledTimes(1);
+
+    // Back, then closed by the server because the session ended
+    vi.advanceTimersByTime(1000);
+    lastSocket().emitOpen();
+    lastSocket().emitClose(SIGNED_OUT_CODE);
+    expect(onRefused).toHaveBeenCalledTimes(2);
+
+    // Closing it ourselves is neither
+    vi.advanceTimersByTime(500);
+    lastSocket().emitOpen();
+    connection.close();
+    expect(onRefused).toHaveBeenCalledTimes(2);
   });
 
   it('keeps painting on the new socket after a reconnect', () => {

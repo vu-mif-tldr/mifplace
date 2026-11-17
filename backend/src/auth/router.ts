@@ -1,4 +1,4 @@
-import express, { Router, type Request, type RequestHandler, type Response } from 'express';
+import express, { Router, type Request, type Response } from 'express';
 import type { EmailTokenPurpose, UserRow } from '@mifplace/db';
 import {
   ChangePasswordRequestSchema,
@@ -16,11 +16,16 @@ import {
 } from '@mifplace/shared';
 import { EmailBudget, type HourlyQuota } from '../email-budget.js';
 import type { Mail, Mailer } from '../mailer.js';
-import { isAllowedOrigin } from '../origin.js';
 import { limiter, perHour, type RateLimits } from '../rate-limits.js';
+import { sameOrigin } from './guard.js';
 import { alreadyRegisteredEmail, passwordResetEmail, verificationEmail } from './emails.js';
 import { HasherBusyError, PasswordHasher } from './password.js';
-import { Sessions, type SessionStore } from './sessions.js';
+import {
+  createSessions,
+  type Sessions,
+  type SessionsEnded,
+  type SessionStore,
+} from './sessions.js';
 import { FailureThrottle } from './throttle.js';
 import { hashToken, newToken } from './tokens.js';
 
@@ -69,6 +74,10 @@ export interface AuthOptions {
   quota?: HourlyQuota;
   // Origins allowed besides the page's own host (WS_ALLOWED_ORIGINS)
   allowedOrigins?: string[];
+  // The sessions shared with the rest of the server; left out, the router makes its own
+  sessions?: Sessions;
+  // Told when sessions end other than by expiring, so open live connections can be closed
+  onSessionsEnded?: (ended: SessionsEnded) => void;
   // Tests pass one with cheap parameters
   hasher?: PasswordHasher;
   now?: () => number;
@@ -104,8 +113,10 @@ export function createAuthRouter(
     emailDomains,
     quota,
     allowedOrigins = [],
+    onSessionsEnded,
     hasher = new PasswordHasher(),
     now = Date.now,
+    sessions = createSessions({ store, publicUrl, now }),
   }: AuthOptions,
   // Requests per IP (rate-limits.ts); the limits per account and per address below are separate
   limits: Pick<
@@ -114,7 +125,6 @@ export function createAuthRouter(
   >
 ): Router {
   const router = Router();
-  const sessions = new Sessions(store, { secure: publicUrl.startsWith('https://'), now });
 
   // Emails to one address: at most one a minute and five a day, whatever they are about.
   const budget = new EmailBudget(MINUTE, 5, quota ?? 40);
@@ -203,20 +213,12 @@ export function createAuthRouter(
     };
   }
 
-  // The session cookie is sent by the browser on its own, so a request that changes something
-  // must come from our page (the Origin header), not from a form on another site.
-  const sameOrigin: RequestHandler = (req, res: AuthResponse, next) => {
-    if (req.method === 'GET' || req.method === 'HEAD') return next();
-    if (isAllowedOrigin(req.headers.origin, req.headers.host, allowedOrigins)) return next();
-    return fail(res, 403, 'forbidden_origin', 'This request must come from the page itself.');
-  };
-
   router.use((_req, res, next) => {
     // Answers about an account must not be kept by a cache
     res.set('Cache-Control', 'no-store');
     next();
   });
-  router.use(sameOrigin);
+  router.use(sameOrigin(allowedOrigins));
 
   // 202 for a new address, for one waiting to be verified and for one that has an account
   // alike: the form must not tell who is registered. The owner of the address learns the rest
@@ -357,7 +359,8 @@ export function createAuthRouter(
     '/logout',
     limiter(limits.authPerMinute),
     route((req, res) => {
-      sessions.end(req.headers.cookie, res);
+      const ended = sessions.end(req.headers.cookie, res);
+      if (ended) onSessionsEnded?.({ session: ended });
       return res.json({ success: true });
     })
   );
@@ -421,6 +424,7 @@ export function createAuthRouter(
       const passwordHash = await hasher.hash(body.data.password);
       const user = store.resetPassword(tokenHash, passwordHash, now());
       if (!user) return expired();
+      onSessionsEnded?.({ userId: user.id });
       console.log(`Password reset: user ${user.id}`);
       return res.json({ success: true });
     })
@@ -452,6 +456,7 @@ export function createAuthRouter(
       }
       const passwordHash = await hasher.hash(body.data.newPassword);
       store.changePassword(session.id, passwordHash, session.tokenHash);
+      onSessionsEnded?.({ userId: session.id, exceptSession: session.tokenHash });
       console.log(`Password changed: user ${session.id}`);
       return res.json({ success: true });
     })

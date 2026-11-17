@@ -109,6 +109,7 @@ export class MifDb {
   private readonly selectUserByEmail;
   private readonly selectUserById;
   private readonly registerUserTx;
+  private readonly upsertVerifiedUser;
   private readonly insertEmailToken;
   private readonly selectEmailToken;
   private readonly insertSession;
@@ -166,6 +167,13 @@ export class MifDb {
          ON CONFLICT (email) DO UPDATE
            SET password_hash = excluded.password_hash, created_at = excluded.created_at
            WHERE verified_at IS NULL
+         RETURNING *`
+    );
+    this.upsertVerifiedUser = db.prepare(
+      `INSERT INTO users (email, password_hash, created_at, verified_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT (email) DO UPDATE
+           SET password_hash = excluded.password_hash,
+               verified_at = COALESCE(verified_at, excluded.verified_at)
          RETURNING *`
     );
     this.insertEmailToken = db.prepare(
@@ -361,6 +369,13 @@ export class MifDb {
     const row = this.registerUserTx(email, passwordHash, now);
     if (row) return { user: row, pending: true };
     return { user: this.selectUserByEmail.get(email) as UserRow, pending: false };
+  }
+
+  // Creates an account whose address counts as verified, or, if the address has an account,
+  // sets its password (and verifies it). For the development account the backend makes at
+  // start; a registration goes through registerUser and the email.
+  ensureVerifiedUser(email: string, passwordHash: string, now: number = Date.now()): UserRow {
+    return this.upsertVerifiedUser.get(email, passwordHash, now, now) as UserRow;
   }
 
   // Stores the hash of a token that goes out in an email.

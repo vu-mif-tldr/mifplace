@@ -8,7 +8,8 @@ import LoadState from './components/LoadState.vue';
 
 // The page: asks the server who is signed in, then shows the canvas to a signed-in visitor
 // and the sign-in screens to everybody else (FR-3 is cancelled: no canvas without sign-in).
-// On a server without accounts (the session is 'off') the canvas is shown to everyone.
+// The server refuses the canvas without a session too; when it does so in the middle of a
+// visit (the session ended), the canvas page says so and the sign-in screens come back.
 
 const session = ref<Session | 'loading' | 'failed'>('loading');
 
@@ -20,9 +21,7 @@ const linkNumber = ref(0);
 const user = computed(() => (typeof session.value === 'object' ? session.value : null));
 
 // A link is for the sign-in screens even when somebody is signed in: it asks for an action
-const showAuth = computed(
-  () => session.value === 'anonymous' || (user.value !== null && route.value.name !== 'home')
-);
+const showAuth = computed(() => user.value === null || route.value.name !== 'home');
 
 async function loadSession() {
   session.value = 'loading';
@@ -78,7 +77,12 @@ onUnmounted(() => window.removeEventListener('hashchange', onHashChange));
     @signed-in="session = $event"
     @link-done="onLinkDone"
   />
-  <CanvasPage v-else :user="user" @sign-out="onSignOut" />
+  <CanvasPage
+    v-else-if="user"
+    :user="user"
+    @sign-out="onSignOut"
+    @signed-out="session = 'anonymous'"
+  />
 </template>
 
 <style scoped>

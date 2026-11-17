@@ -76,13 +76,15 @@ export class ConsoleMailer implements Mailer {
   }
 }
 
-// SMTP_HOST set → SmtpMailer. Without it ConsoleMailer, but not in production: there it would
-// answer "check your mail" and send nothing, so starting fails instead.
+// SMTP_HOST set → SmtpMailer. Without it ConsoleMailer, but not in production: there a
+// registration would answer "check your email" and send nothing, so starting fails instead.
 export function mailerFromEnv(env: NodeJS.ProcessEnv = process.env): Mailer {
   const host = env.SMTP_HOST;
   if (!host) {
     if (env.NODE_ENV === 'production') {
-      throw new Error('SMTP_HOST must be set in production when PUBLIC_URL is set (the waitlist)');
+      throw new Error(
+        'SMTP_HOST must be set in production: registration and the waitlist send emails'
+      );
     }
     return new ConsoleMailer();
   }

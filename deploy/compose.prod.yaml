@@ -22,10 +22,12 @@ services:
       # Loopback only, see compose.yaml
       - '127.0.0.1:3002:3000'
     environment:
-      # The email links point here. Setting it turns the waitlist and the accounts (/api/auth)
-      # on; without SMTP_HOST in app.env the app then refuses to start. Caddy forwards only
-      # /api/waitlist* for now, so /api/auth is not reachable from outside yet.
+      # Where the page is: the links in the emails point here, and https makes the session
+      # cookie Secure. Required, and without SMTP_HOST in app.env the app refuses to start.
       PUBLIC_URL: https://vu.place
+      # The waitlist of the landing page (POST /api/waitlist). Caddy forwards only
+      # /api/waitlist* before launch, so the rest of the app is not reachable from outside yet.
+      WAITLIST_ENABLED: 'true'
       # See compose.yaml
       TRUST_PROXY: uniquelocal
     env_file:
