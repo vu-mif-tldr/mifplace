@@ -24,10 +24,12 @@ export interface LiveHandlers {
   onReset(): void;
   // The state changed, for an indicator on the page
   onState?(state: LiveState): void;
-  // The connection dropped or could not be made, and will be tried again. Called for every
-  // such attempt, while onState reports "reconnecting" only once. The server refuses a
-  // visitor without a session, so the page uses this to check that it still has one.
-  onDrop?(): void;
+  // The server closed the connection because the session ended (close code 4401), or a new
+  // connection never opened: the server is down, or it refused a visitor without a session
+  // (a browser cannot see which). The page uses this to check that it still has a session.
+  // Not called for a plain drop, such as a restart of the server: then every page would ask
+  // at the same moment. Reconnecting goes on either way.
+  onRefused?(): void;
   // How many pages are connected now, the page itself included
   onOnline?(count: number): void;
 }
@@ -36,7 +38,7 @@ export interface LiveHandlers {
 export interface SocketLike {
   addEventListener(type: 'open', listener: () => void): void;
   addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
-  addEventListener(type: 'close', listener: () => void): void;
+  addEventListener(type: 'close', listener: (event: { code?: number }) => void): void;
   close(): void;
 }
 
@@ -69,6 +71,9 @@ export interface LiveOptions {
   // window, or null to reconnect by the delay only
   online?: OnlineEvents | null;
 }
+
+// The close code of a connection whose session ended (docs/api.md, section 2)
+export const SIGNED_OUT_CODE = 4401;
 
 export const DEFAULT_MIN_DELAY_MS = 500;
 export const DEFAULT_MAX_DELAY_MS = 30_000;
@@ -179,20 +184,23 @@ export function connectLive(
 
   function open() {
     const opened = (socket = createSocket(liveUrl(current, location)));
+    // Did the server let this socket in?
+    let accepted = false;
     opened.addEventListener('open', () => {
       if (stopped || opened !== socket) return;
+      accepted = true;
       attempt = 0;
       setState('connected');
     });
     opened.addEventListener('message', (event) => {
       if (!stopped && opened === socket) onMessage(event);
     });
-    opened.addEventListener('close', () => {
+    opened.addEventListener('close', (event) => {
       // Only the current socket counts; one closed by stop() or replaced is not a drop
       if (stopped || opened !== socket) return;
       socket = undefined;
       setState('reconnecting');
-      handlers.onDrop?.();
+      if (!accepted || event?.code === SIGNED_OUT_CODE) handlers.onRefused?.();
       timer = setTimeout(reconnect, reconnectDelay(attempt++, minDelayMs, maxDelayMs, random));
     });
   }

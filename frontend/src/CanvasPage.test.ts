@@ -106,21 +106,21 @@ describe('CanvasPage', () => {
     wrapper.unmount();
   });
 
-  it('asks who is signed in when the live connection drops', async () => {
+  it('asks who is signed in when the server refuses the live connection', async () => {
     const wrapper = await page();
     // The server answers, the session is fine: the connection just keeps trying
     vi.mocked(getSession).mockResolvedValue(user);
-    handlers.onDrop?.();
+    handlers.onRefused?.();
     await flushPromises();
     expect(wrapper.emitted('signedOut')).toBeUndefined();
     // No answer at all: nothing to conclude
     vi.mocked(getSession).mockRejectedValue(new Error('offline'));
-    handlers.onDrop?.();
+    handlers.onRefused?.();
     await flushPromises();
     expect(wrapper.emitted('signedOut')).toBeUndefined();
     // The session ended (signed out elsewhere, a new password, a block)
     vi.mocked(getSession).mockResolvedValue('anonymous');
-    handlers.onDrop?.();
+    handlers.onRefused?.();
     await flushPromises();
     expect(wrapper.emitted('signedOut')).toHaveLength(1);
     wrapper.unmount();

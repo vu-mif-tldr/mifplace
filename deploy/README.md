@@ -199,6 +199,21 @@ database.
    Signups from two networks show two different addresses in
    `sudo docker compose logs | grep "Waitlist signup"`; one address for all means `TRUST_PROXY` is wrong.
 
+**The first update to a version with sign-in.** In that version the waitlist is on only with
+`WAITLIST_ENABLED=true`, which the new [`compose.prod.yaml`](compose.prod.yaml) sets. With the
+old file the container starts, but the form on the landing page gets `401` and no address is
+stored. So download the new file first, then update the image:
+
+```sh
+cd /srv/mifplace-prod
+sudo curl -fsSLo compose.yaml https://raw.githubusercontent.com/vu-mif-tldr/mifplace/main/deploy/compose.prod.yaml
+sudo docker compose pull
+sudo docker compose up -d
+sudo docker compose logs app | grep Waitlist    # "Waitlist: on, email links point to https://vu.place"
+```
+
+Then sign up on <https://vu.place> once more, as in step 5.
+
 **Reading the list** (read-only, safe while the app runs). How many:
 
 ```sh

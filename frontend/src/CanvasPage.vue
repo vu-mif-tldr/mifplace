@@ -45,9 +45,9 @@ function sessionGone(error: unknown): boolean {
   return true;
 }
 
-// The live connection dropped. The server closes it when the session ends and refuses a new
-// one without a session, so ask who is signed in; if the server cannot be reached, the
-// connection simply keeps trying.
+// The server ended the live connection for a session that is over, or did not accept a new
+// one (live.ts, onRefused): ask who is signed in. If the server cannot be reached, there is
+// nothing to conclude and the connection simply keeps trying.
 async function checkSession() {
   try {
     if ((await getSession()) === 'anonymous') emit('signedOut');
@@ -150,7 +150,7 @@ function showSnapshot(size: CanvasSize, state: CanvasState) {
       onReset: reloadSnapshot,
       onState: (state) => (liveState.value = state),
       onOnline: (count) => (online.value = count),
-      onDrop: () => void checkSession(),
+      onRefused: () => void checkSession(),
     }
   );
 }

@@ -80,7 +80,16 @@ export function attachGateway(
 
     // Only a signed-in visitor may connect. The browser sends the session cookie with the
     // upgrade request by itself.
-    const owner = options.authenticate?.(request.headers.cookie);
+    let owner: ConnectionOwner | undefined;
+    try {
+      owner = options.authenticate?.(request.headers.cookie);
+    } catch (error) {
+      // The lookup reads the database. Unlike in a route, nothing catches an error thrown
+      // in an upgrade handler: it would take the process down with every connection.
+      console.error('Live connection: the session could not be checked:', error);
+      reject(socket, 503, 'Service Unavailable');
+      return;
+    }
     if (options.authenticate && !owner) {
       reject(socket, 401, 'Unauthorized');
       return;

@@ -303,6 +303,22 @@ describe('attachGateway with accounts', () => {
     expect(request.owner).toEqual(owner);
   });
 
+  it('answers 503 and stays up when the session cannot be checked', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let broken = true;
+    const flaky = (cookie: string | undefined) => {
+      if (broken) throw new Error('database is locked');
+      return authenticate(cookie);
+    };
+    const { address } = await createServer({ authenticate: flaky });
+    const options = { headers: { cookie: 'session=abc' } };
+
+    expect((await connect(`${address}/api/ws`, options)).status).toBe(503);
+    // The server is still there for the next visitor
+    broken = false;
+    expect((await connect(`${address}/api/ws`, options)).status).toBeUndefined();
+  });
+
   it('answers 401 before it counts the connections', async () => {
     const { address } = await createServer({ authenticate, maxConnections: 1 }, () => 1);
     expect((await connect(`${address}/api/ws`)).status).toBe(401);

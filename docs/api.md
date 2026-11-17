@@ -213,7 +213,7 @@ Success bodies are `{"success":true}`; `login` and `me` add the user:
 
 WebSocket delivers **pixel updates from server to client**. Clients place pixels through HTTP `POST /api/pixels`. The connection also uses standard WebSocket **ping/pong control frames** for connection health; those are not application JSON pixel messages.
 
-**Only for signed-in visitors.** The upgrade request needs the session cookie, which the browser sends by itself; without a session the server answers `401` instead of upgrading. When a session ends other than by expiring (sign-out, a new password, a block), the server closes its connections with code `4401`. A browser cannot see why an upgrade was refused, so after every drop the page asks `GET /api/auth/me` and shows the sign-in screens if nobody is signed in; otherwise it reconnects as described below.
+**Only for signed-in visitors.** The upgrade request needs the session cookie, which the browser sends by itself; without a session the server answers `401` instead of upgrading. When a session ends other than by expiring (sign-out, a new password, a block), the server closes its connections with code `4401`. A browser cannot see why an upgrade was refused, so when a connection is closed with `4401` or a new one is not accepted, the page asks `GET /api/auth/me` and shows the sign-in screens if nobody is signed in; otherwise it keeps reconnecting as described below. A plain drop, such as a restart of the server, does not make the pages ask.
 
 ### Connecting and resuming
 
