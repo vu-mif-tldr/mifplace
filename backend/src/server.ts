@@ -12,7 +12,8 @@ import type { CanvasStore } from './canvas-state.js';
 import { loadCanvas, placePixel } from './canvas-log.js';
 import type { CanvasSize, PaletteColor } from '@mifplace/shared';
 import { adminEmailsFromEnv, emailDomainsFromEnv } from './auth/config.js';
-import { devAccountFromEnv, ensureDevAccount } from './auth/dev-account.js';
+import { devAccountFromEnv } from './auth/dev-account.js';
+import { prepareAccounts } from './auth/startup.js';
 import { VERIFY_WITHIN_MS, type AuthOptions } from './auth/router.js';
 import { createSessions, type Sessions } from './auth/sessions.js';
 import { HourlyQuota } from './email-budget.js';
@@ -108,15 +109,13 @@ try {
   // live server
   sessions = createSessions({ store: mifDb, publicUrl });
 
-  // ADMIN_EMAILS is the whole truth about who is an administrator: applied at every start
-  const roles = mifDb.syncAdmins(adminEmails);
-  console.log(
-    `Administrators: ${adminEmails.length} in ADMIN_EMAILS, ${roles.promoted} given the role, ${roles.demoted} lost it`
-  );
-  if (devAccount) {
-    const id = await ensureDevAccount(mifDb, devAccount);
-    console.log(`Development account ready: user ${id} (DEV_USER_EMAIL)`);
+  const accounts = await prepareAccounts(mifDb, { adminEmails, devAccount });
+  if (accounts.devUserId !== undefined) {
+    console.log(`Development account ready: user ${accounts.devUserId} (DEV_USER_EMAIL)`);
   }
+  console.log(
+    `Administrators: ${adminEmails.length} in ADMIN_EMAILS, ${accounts.promoted} given the role, ${accounts.demoted} lost it`
+  );
   const { eventId, timestamp } = canvas.snapshot();
   console.log(`Canvas loaded up to event ${eventId} (${new Date(timestamp).toISOString()})`);
 } catch (e) {
