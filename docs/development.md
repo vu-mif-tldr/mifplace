@@ -84,8 +84,10 @@ The WebSocket settings (`WS_BATCH_MS`, `WS_IDLE_PING_MS`, `WS_PONG_TIMEOUT_MS`, 
 
 Sign-in with an email address and a password, `/api/auth/*` in [api.md](api.md). The code is in `backend/src/auth/`, the tables (`users`, `sessions`, `email_tokens`) in migration 007.
 
-- **Try it locally:** register any `@vu.lt` address with `POST /api/auth/register`. Without `SMTP_HOST` the email is printed in the backend console; the token is the last part of its link.
-- **Nothing is protected yet:** the canvas and `POST /api/pixels` work without a session, and the page has no sign-in screen.
+- **Try it locally:** open the page and register any `@vu.lt` address. Without `SMTP_HOST` the email is printed in the backend console; open its link to confirm the address, then sign in.
+- **The link points to the backend** (`http://localhost:3000/#/verify/...`), which serves the built frontend. With `npm run dev` either open the same address on port 5173, or set `PUBLIC_URL=http://127.0.0.1:5173` in `.env`.
+- **The page** (`frontend/src/App.vue`) asks `GET /api/auth/me` and shows the sign-in screens (`components/AuthScreen.vue`) or the canvas (`CanvasPage.vue`). The request code is in `auth.ts`, the links of the emails in `route.ts`, the Lithuanian texts in `texts.ts`.
+- **The server protects nothing yet:** the canvas routes and `POST /api/pixels` answer without a session; only the page hides the canvas. On a server without accounts (no `PUBLIC_URL` in production, as the demo) the page shows the canvas to everyone.
 - **User 0** is a system user for the seed scripts: it has no email and no password, so nobody can sign in as it.
 - **No addresses in the logs:** the account code logs user ids only.
 

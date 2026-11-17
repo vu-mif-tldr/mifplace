@@ -15,6 +15,12 @@ describe('BrandMark', () => {
     expect(svg.attributes('width')).toBe('40');
   });
 
+  it('draws only the pixels when the name is turned off', () => {
+    const wrapper = mount(BrandMark, { props: { name: false } });
+    expect(wrapper.text()).toBe('');
+    expect(wrapper.findAll('rect')).toHaveLength(9);
+  });
+
   it('draws the 3x3 pixels of the favicon in fixed colours', () => {
     const rects = mount(BrandMark).findAll('rect');
     expect(rects).toHaveLength(9);
@@ -44,6 +50,18 @@ describe('TopBar', () => {
     expect(online.text()).toBe('7');
     expect(online.find('svg').exists()).toBe(true);
     expect(wrapper.findComponent(LiveStatus).exists()).toBe(true);
+  });
+
+  it('offers the way out to a signed-in user only', async () => {
+    const props = { liveState: 'connected' as const, online: 7 };
+    expect(mount(TopBar, { props }).find('.sign-out').exists()).toBe(false);
+
+    const wrapper = mount(TopBar, { props: { ...props, email: 'ona@vu.lt' } });
+    const button = wrapper.get('.sign-out');
+    expect(button.text()).toBe(texts.signOut);
+    expect(button.attributes('title')).toBe('ona@vu.lt');
+    await button.trigger('click');
+    expect(wrapper.emitted('signOut')).toHaveLength(1);
   });
 
   it('shows none of them without a connection', () => {

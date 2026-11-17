@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // The logo, the 3x3 pixels of the favicon (public/favicon.ico) in its colours, and the name.
-// It keeps its colours whatever colour is selected.
-withDefaults(defineProps<{ size?: number }>(), { size: 28 });
+// It keeps its colours whatever colour is selected. With name = false only the pixels are drawn
+// (the sign-in screen writes the name large next to them).
+withDefaults(defineProps<{ size?: number; name?: boolean }>(), { size: 28, name: true });
 
 // The favicon's pixels row by row, without its dark background
 const PIXELS = [
@@ -25,7 +26,7 @@ const PIXELS = [
         :fill="pixel.color"
       />
     </svg>
-    vu.place
+    <template v-if="name">vu.place</template>
   </span>
 </template>
 

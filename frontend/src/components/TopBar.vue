@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { LiveState } from '../live';
+import { texts } from '../texts';
 import BrandMark from './BrandMark.vue';
 import LiveStatus from './LiveStatus.vue';
 
-// The bar over the canvas: the logo with the commit of the build, how many pages are open and the
-// connection. The cell under the mouse (FR-11) is shown on the canvas, next to it.
+// The bar over the canvas: the logo with the commit of the build, how many pages are open, the
+// connection and the way out (FR-4). The cell under the mouse (FR-11) is shown on the canvas,
+// next to it.
 const appCommit = import.meta.env.APP_COMMIT;
 
 defineProps<{
@@ -12,7 +14,10 @@ defineProps<{
   liveState: LiveState | null;
   // null while not connected: an old count would be wrong
   online: number | null;
+  // The address of the signed-in user; without it there is nobody to sign out
+  email?: string | null;
 }>();
+defineEmits<{ signOut: [] }>();
 </script>
 
 <template>
@@ -30,6 +35,9 @@ defineProps<{
       {{ online }}
     </span>
     <LiveStatus v-if="liveState" :state="liveState" />
+    <button v-if="email" type="button" class="sign-out" :title="email" @click="$emit('signOut')">
+      {{ texts.signOut }}
+    </button>
   </header>
 </template>
 
@@ -39,10 +47,22 @@ defineProps<{
   align-items: center;
   gap: 16px;
   padding: 18px 28px;
+  /* As a grid item of the page it must not grow wider than the page to fit its content */
+  min-width: 0;
 }
 
-.spacer {
-  flex-grow: 1;
+/* Nothing in the bar is squeezed or wraps: on a phone the long "reconnecting" text is cut
+   short instead (LiveStatus), so the way out stays in view. */
+.top-bar > * {
+  flex: none;
+}
+
+.top-bar > .live-status {
+  flex: 0 1 auto;
+}
+
+.top-bar > .spacer {
+  flex: 1 1 0;
 }
 
 /* Quiet: for whoever looks for it, closer to the name than the gap of the bar */
@@ -75,9 +95,29 @@ defineProps<{
   height: 15px;
 }
 
+/* Quiet: it is rarely needed */
+.sign-out {
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.sign-out:hover {
+  color: var(--text);
+}
+
 @media (max-width: 720px) {
   .top-bar {
+    gap: 12px;
     padding: 14px 16px;
+  }
+
+  /* No room for it next to the way out */
+  .version {
+    display: none;
   }
 }
 </style>
