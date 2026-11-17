@@ -126,12 +126,17 @@ export class ConnectionRegistry {
     }
   }
 
-  close(connection: Connection, code: number, reason: string): void {
+  // Starts closing an open connection. False if it is unknown or already closing: it stays
+  // in the registry until its close handshake is over.
+  close(connection: Connection, code: number, reason: string): boolean {
     const entry = this.connections.get(connection.id);
 
-    if (entry && this.isActive(entry)) {
-      entry.ws.close(code, reason);
+    if (!entry || !this.isActive(entry)) {
+      return false;
     }
+
+    entry.ws.close(code, reason);
+    return true;
   }
 
   terminate(connection: Connection): void {
@@ -150,9 +155,8 @@ export class ConnectionRegistry {
   closeWhere(matches: (connection: Connection) => boolean, code: number, reason: string): number {
     let closed = 0;
     for (const { connection } of this.connections.values()) {
-      if (!matches(connection)) continue;
-      this.close(connection, code, reason);
-      closed++;
+      // One that is already closing (its session ended a moment ago) is not closed twice
+      if (matches(connection) && this.close(connection, code, reason)) closed++;
     }
     return closed;
   }

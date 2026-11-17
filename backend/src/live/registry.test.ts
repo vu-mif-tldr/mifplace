@@ -313,5 +313,15 @@ describe('ConnectionRegistry.closeWhere', () => {
     expect(nobody.close).not.toHaveBeenCalled();
     expect(registry.size).toBe(2);
     expect(registry.closeWhere(() => false, 4401, 'Signed out')).toBe(0);
+
+    // A connection whose close handshake is still going on is in the registry, but it is
+    // not closed, or counted, a second time
+    const slow = new FakeSocket();
+    slow.autoClose = false;
+    registry.add(slow as unknown as WebSocket, '1.1.1.1', { userId: 3, session: 'c' });
+    const isSlow = ({ owner }: { owner?: { userId: number } }) => owner?.userId === 3;
+    expect(registry.closeWhere(isSlow, 4401, 'Signed out')).toBe(1);
+    expect(registry.closeWhere(isSlow, 4401, 'Signed out')).toBe(0);
+    expect(slow.close).toHaveBeenCalledOnce();
   });
 });
