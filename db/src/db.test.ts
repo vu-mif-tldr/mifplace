@@ -518,6 +518,33 @@ describe('MifDb accounts', () => {
     );
   });
 
+  it('keeps an unverified account an administrator blocked or acted on, when cleaning up', () => {
+    const { mif } = accountsDb();
+    const admin = mif.ensureVerifiedUser('admin@vu.lt', 'h', 1000);
+    const blocked = mif.registerUser('blocked@vu.lt', 'h', 1000).user;
+    const unblocked = mif.registerUser('unblocked@vu.lt', 'h', 1000).user;
+    const untouched = mif.registerUser('untouched@vu.lt', 'h', 1000).user;
+    mif.blockUser(admin.id, blocked.id, 'spam', 2000);
+    mif.blockUser(admin.id, unblocked.id, 'by mistake', 2000);
+    mif.unblockUser(admin.id, unblocked.id, 2100);
+
+    // A day later: without the rule this delete breaks a foreign key of admin_log, and the
+    // block would be gone with the row
+    const later = 1000 + DAY + 1;
+    assert.deepEqual(mif.removeExpiredAuth(later, later - DAY), {
+      sessions: 0,
+      tokens: 0,
+      users: 1,
+    });
+    assert.equal(mif.findUserByEmail('untouched@vu.lt'), undefined);
+    assert.equal(mif.findUserByEmail('blocked@vu.lt')?.banned_at, 2000);
+    assert.equal(mif.findUserByEmail('unblocked@vu.lt')?.id, unblocked.id);
+    assert.equal(untouched.id > 0, true);
+    assert.equal(mif.getAdminLog(10).length, 3);
+    // The blocked address cannot come back by registering again
+    assert.equal(mif.registerUser('blocked@vu.lt', 'h2', later).user.banned_at, 2000);
+  });
+
   it('finds accounts by a part of the address, wildcards taken literally', () => {
     const { mif } = accountsDb();
     for (const email of ['jonas@vu.lt', 'jonas_2@vu.lt', 'ona@mif.vu.lt']) {

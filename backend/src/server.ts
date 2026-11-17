@@ -173,12 +173,18 @@ function authOptions(): AuthOptions {
 // Expired sessions and email links are of no use, and an account that never verified its
 // address frees the address again.
 function removeExpiredAuth(): void {
-  const now = Date.now();
-  const removed = mifDb.removeExpiredAuth(now, now - VERIFY_WITHIN_MS);
-  if (removed.sessions + removed.tokens + removed.users > 0) {
-    console.log(
-      `Accounts: removed ${removed.sessions} expired sessions, ${removed.tokens} expired email links, ${removed.users} unverified accounts`
-    );
+  // Housekeeping must never take the server down: it runs from a timer, where nothing
+  // catches an exception. What was not removed now is removed the next hour.
+  try {
+    const now = Date.now();
+    const removed = mifDb.removeExpiredAuth(now, now - VERIFY_WITHIN_MS);
+    if (removed.sessions + removed.tokens + removed.users > 0) {
+      console.log(
+        `Accounts: removed ${removed.sessions} expired sessions, ${removed.tokens} expired email links, ${removed.users} unverified accounts`
+      );
+    }
+  } catch (error) {
+    console.error('Accounts: removing expired sessions and accounts failed:', error);
   }
 }
 // At start (above) and then every hour; unref: the timer does not keep the process alive

@@ -235,11 +235,16 @@ export class MifDb {
     );
     const deleteExpiredSessions = db.prepare('DELETE FROM sessions WHERE expires_at <= ?');
     const deleteExpiredTokens = db.prepare('DELETE FROM email_tokens WHERE expires_at <= ?');
-    // Run after the expired tokens are gone: a token left means a link that still works
+    // Run after the expired tokens are gone: a token left means a link that still works.
+    // A blocked account stays, or the block would lift itself after a day; so does one the
+    // admin log refers to (the log keeps its rows, and they point at the user).
     const deleteUnverifiedUsers = db.prepare(
       `DELETE FROM users
          WHERE email IS NOT NULL AND verified_at IS NULL AND created_at < ?
-           AND NOT EXISTS (SELECT 1 FROM email_tokens t WHERE t.user_id = users.id)`
+           AND banned_at IS NULL
+           AND NOT EXISTS (SELECT 1 FROM email_tokens t WHERE t.user_id = users.id)
+           AND NOT EXISTS (SELECT 1 FROM admin_log l
+                             WHERE l.target_user_id = users.id OR l.admin_id = users.id)`
     );
 
     // Links from earlier emails stop working: the address is verified only through the email
@@ -594,7 +599,8 @@ export class MifDb {
 
   // Deletes expired sessions and tokens, and accounts created before unverifiedBefore that
   // never verified their address and have no link left that still works (a link sent again
-  // later keeps its account until it expires). Returns how many of each.
+  // later keeps its account until it expires). An account an administrator blocked or acted
+  // on is kept. Returns how many of each.
   removeExpiredAuth(
     now: number,
     unverifiedBefore: number
