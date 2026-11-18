@@ -425,7 +425,7 @@ const halo = computed(() => {
   box-sizing: border-box;
   border-radius: 50%;
   border: 1.5px solid rgb(255 255 255 / 90%);
-  box-shadow: 0 0 0 1px rgb(12 16 48 / 60%);
+  box-shadow: 0 0 0 1px rgb(43 0 22 / 60%);
 }
 
 .hover-label,

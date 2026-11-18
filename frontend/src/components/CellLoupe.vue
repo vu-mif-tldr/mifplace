@@ -139,9 +139,9 @@ function onClick(event: MouseEvent) {
   background:
     radial-gradient(ellipse 34% 22% at 32% 22%, rgb(255 255 255 / 42%), transparent 70%),
     radial-gradient(ellipse 30% 14% at 70% 86%, rgb(255 255 255 / 12%), transparent 70%),
-    radial-gradient(circle, transparent 62%, rgb(12 16 48 / 32%) 100%);
+    radial-gradient(circle, transparent 62%, rgb(43 0 22 / 32%) 100%);
   box-shadow:
     inset 0 0 0 1px rgb(255 255 255 / 18%),
-    inset 0 -10px 18px rgb(12 16 48 / 25%);
+    inset 0 -10px 18px rgb(43 0 22 / 25%);
 }
 </style>

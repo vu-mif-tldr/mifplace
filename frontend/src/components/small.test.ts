@@ -8,18 +8,12 @@ import TopBar from './TopBar.vue';
 import { texts } from '../texts';
 
 describe('BrandMark', () => {
-  it('shows the name with the logo', () => {
+  it('shows the logo of the university and the name', () => {
     const wrapper = mount(BrandMark, { props: { size: 40 } });
-    expect(wrapper.text()).toBe('vu.place');
-    const svg = wrapper.get('svg');
-    expect(svg.attributes('width')).toBe('40');
-  });
-
-  it('draws the 3x3 pixels of the favicon in fixed colours', () => {
-    const rects = mount(BrandMark).findAll('rect');
-    expect(rects).toHaveLength(9);
-    expect(rects[4].attributes('fill')).toBe('#d2cefd');
-    expect(rects.some((rect) => rect.attributes('fill')?.includes('var('))).toBe(false);
+    expect(wrapper.text()).toBe('VU/place');
+    const logo = wrapper.get('img');
+    expect(logo.attributes('alt')).toBe('Vilniaus universitetas');
+    expect(wrapper.get('.brand').attributes('style')).toContain('--logo: 40px');
   });
 });
 
@@ -36,26 +30,27 @@ describe('LiveStatus', () => {
 });
 
 describe('TopBar', () => {
-  it('shows how many pages are open and the connection', () => {
+  it('shows how many pages are open with a green light while connected', () => {
     const wrapper = mount(TopBar, {
       props: { liveState: 'connected', online: 7 },
     });
     const online = wrapper.get('.online');
     expect(online.text()).toBe('7');
     expect(online.find('svg').exists()).toBe(true);
-    expect(wrapper.findComponent(LiveStatus).exists()).toBe(true);
+    expect(online.find('.light').exists()).toBe(true);
+    expect(wrapper.findComponent(LiveStatus).exists()).toBe(false);
+  });
+
+  it('says the state of the connection in words while it is not up', () => {
+    const wrapper = mount(TopBar, { props: { liveState: 'reconnecting', online: null } });
+    expect(wrapper.find('.online').exists()).toBe(false);
+    expect(wrapper.getComponent(LiveStatus).props('state')).toBe('reconnecting');
   });
 
   it('shows none of them without a connection', () => {
     const wrapper = mount(TopBar, { props: { liveState: null, online: null } });
     expect(wrapper.find('.online').exists()).toBe(false);
     expect(wrapper.findComponent(LiveStatus).exists()).toBe(false);
-  });
-
-  it('shows the version next to the logo, also before the connection', () => {
-    const wrapper = mount(TopBar, { props: { liveState: null, online: null } });
-    expect(wrapper.get('.version').text()).toBe('dev');
-    expect(wrapper.get('.version').element.previousElementSibling?.classList).toContain('brand');
   });
 });
 

@@ -1,31 +1,14 @@
 <script setup lang="ts">
-// The logo, the 3x3 pixels of the favicon (public/favicon.ico) in its colours, and the name.
-// It keeps its colours whatever colour is selected.
-withDefaults(defineProps<{ size?: number }>(), { size: 28 });
-
-// The favicon's pixels row by row, without its dark background
-const PIXELS = [
-  ['#9184d9', '#5d5294', '#b5abfc'],
-  ['#423a6a', '#d2cefd', '#5d5294'],
-  ['#968ae0', '#423a6a', '#9184d9'],
-].flatMap((row, y) => row.map((color, x) => ({ x: 2 + x * 10, y: 2 + y * 10, color })));
+// The logo of the university and the name of the site, set apart by space alone (the logo has
+// a line of its own). White on the bordo page, whatever colour is selected. The logo is large
+// enough to read its words.
+withDefaults(defineProps<{ size?: number }>(), { size: 78 });
 </script>
 
 <template>
-  <span class="brand">
-    <svg :width="size" :height="size" viewBox="0 0 32 32">
-      <rect
-        v-for="pixel in PIXELS"
-        :key="`${pixel.x},${pixel.y}`"
-        :x="pixel.x"
-        :y="pixel.y"
-        width="8"
-        height="8"
-        rx="1"
-        :fill="pixel.color"
-      />
-    </svg>
-    vu.place
+  <span class="brand" :style="{ '--logo': `${size}px` }">
+    <img class="logo" src="/vu-logo.png" alt="Vilniaus universitetas" />
+    <span class="name">VU/place</span>
   </span>
 </template>
 
@@ -33,15 +16,34 @@ const PIXELS = [
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 22px;
-  font-weight: 600;
+  gap: 30px;
+}
+
+.logo {
+  display: block;
+  width: auto;
+  height: var(--logo);
+}
+
+.name {
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 700;
   letter-spacing: -0.02em;
+  line-height: 1;
 }
 
 @media (max-width: 720px) {
   .brand {
-    font-size: 20px;
+    gap: 18px;
+  }
+
+  .logo {
+    height: calc(var(--logo) * 0.65);
+  }
+
+  .name {
+    font-size: 26px;
   }
 }
 </style>
