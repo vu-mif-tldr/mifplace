@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import type { PaletteColor } from '@mifplace/shared';
+import { readableOn } from '../glow';
 import { colorName } from '../texts';
 import ConfirmButton from './ConfirmButton.vue';
 
-// The dock under the canvas: a hint (or the error of the last pixel), the palette and the
-// button that places the pixel
+// The bar under the canvas, kept small so the canvas is the main thing on the page: a hint (or
+// the error of the last pixel), the progress bar of the cooldown, then the palette in one row
+// with the button that places the pixel. On a narrow screen the palette wraps into two rows and
+// the button goes under it.
 defineProps<{
   palette: PaletteColor[];
   selectedId: number | undefined;
@@ -19,115 +22,210 @@ defineEmits<{ select: [color: PaletteColor]; place: [] }>();
 
 <template>
   <footer class="dock">
-    <p v-if="error" class="message error">{{ error }}</p>
-    <p v-else class="message">{{ hint }}</p>
-    <div class="bar">
-      <div class="palette">
-        <button
-          v-for="swatch in palette"
-          :key="swatch.id"
-          type="button"
-          class="swatch"
-          :class="{ selected: swatch.id === selectedId }"
-          :title="colorName(swatch.color)"
-          :style="{ backgroundColor: swatch.color }"
-          @click="$emit('select', swatch)"
-        ></button>
+    <section class="card">
+      <div class="status">
+        <span class="dot" :class="{ ready: canPlace }"></span>
+        <p v-if="error" class="message error">{{ error }}</p>
+        <p v-else class="message">{{ hint }}</p>
       </div>
-      <ConfirmButton :label="placeLabel" :disabled="!canPlace" @press="$emit('place')" />
-    </div>
+      <div class="progress"><span class="fill"></span></div>
+      <div class="controls">
+        <div class="palette">
+          <button
+            v-for="swatch in palette"
+            :key="swatch.id"
+            type="button"
+            class="swatch"
+            :class="{ selected: swatch.id === selectedId }"
+            :title="colorName(swatch.color)"
+            :style="{ backgroundColor: swatch.color }"
+            @click="$emit('select', swatch)"
+          >
+            <svg
+              v-if="swatch.id === selectedId"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              :stroke="readableOn(swatch.color)"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 12.5l4.5 4.5L19 7.5" />
+            </svg>
+          </button>
+        </div>
+        <ConfirmButton
+          class="place"
+          :label="placeLabel"
+          :disabled="!canPlace"
+          @press="$emit('place')"
+        />
+      </div>
+    </section>
   </footer>
 </template>
 
 <style scoped>
 .dock {
   display: flex;
+  justify-content: center;
+  padding: 14px 16px 16px;
+}
+
+.card {
+  display: flex;
   flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 960px;
+  box-sizing: border-box;
+  padding: 12px 14px 14px;
+  border-radius: 20px;
+  background: rgb(255 255 255 / 10%);
+}
+
+.status {
+  display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px 24px;
+  gap: 10px;
+  min-height: 20px;
+}
+
+.dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: #ffffff;
+  transition: background-color 0.3s ease;
+}
+
+.dot.ready {
+  background: var(--ok);
 }
 
 .message {
   margin: 0;
-  min-height: 1.4em;
   font-size: 14px;
-  text-align: center;
-  color: var(--muted);
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .error {
-  padding: 8px 14px;
-  border-radius: 12px;
-  color: #ffffff;
-  background: rgb(255 138 138 / 14%);
-  box-shadow: inset 0 0 0 1px rgb(255 138 138 / 40%);
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgb(255 179 192 / 16%);
+  box-shadow: inset 0 0 0 1px rgb(255 179 192 / 45%);
 }
 
-.bar {
+/* The cooldown (--progress, set by App.vue): full while a pixel may be placed */
+.progress {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 18%);
+}
+
+.fill {
+  display: block;
+  width: var(--progress, 100%);
+  height: 100%;
+  border-radius: 2px;
+  background: var(--ok);
+  transition: width 1s linear;
+}
+
+.controls {
   display: flex;
   align-items: center;
-  gap: 18px;
-  max-width: 100%;
-  box-sizing: border-box;
-  padding: 12px 12px 12px 22px;
-  border-radius: 48px;
-  background: rgb(12 16 48 / 82%);
-  box-shadow:
-    0 0 0 1px rgb(255 255 255 / 10%),
-    0 20px 50px rgb(0 0 0 / 35%);
+  gap: 14px;
 }
 
 .palette {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
 }
 
 .swatch {
-  width: 34px;
-  height: 34px;
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 42px;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: 10px;
   cursor: pointer;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 22%);
-  transition: transform 0.2s ease;
+  transition:
+    transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.3),
+    box-shadow 0.16s ease;
 }
 
-/* Two rings, dark then white, so the selection shows on a white and on a black swatch */
+.swatch:hover {
+  transform: translateY(-2px);
+}
+
+.swatch:active {
+  transform: scale(0.94);
+}
+
+/* Two rings, bordo then white, so the selection shows on a white and on a dark swatch */
 .swatch.selected {
-  transform: scale(1.18);
+  z-index: 1;
   box-shadow:
-    0 0 0 3px var(--ink),
+    0 0 0 3px var(--stage),
     0 0 0 5px #ffffff;
 }
 
-/* Phones: the palette in two rows of large swatches, the button a wide pill under it */
-@media (max-width: 720px) {
-  .dock {
-    padding: 8px 8px 16px;
-  }
+.swatch svg {
+  width: 18px;
+  height: 18px;
+}
 
-  .bar {
+/* The button beside the palette: as wide as its label */
+.controls .place {
+  flex: none;
+  width: auto;
+  height: 46px;
+  padding: 0 22px;
+  border-radius: 14px;
+  font-size: 15px;
+}
+
+/* Too narrow for one row: the palette in two rows, the button under it */
+@media (max-width: 960px) {
+  .controls {
     flex-direction: column;
     align-items: stretch;
-    gap: 14px;
-    width: 100%;
-    padding: 16px 14px 14px;
-    border-radius: 28px;
+    gap: 12px;
   }
 
   .palette {
     display: grid;
     grid-template-columns: repeat(8, minmax(0, 1fr));
-    justify-items: center;
-    gap: 6px;
+    gap: 7px;
   }
 
   .swatch {
-    width: 40px;
-    height: 40px;
+    height: 38px;
+  }
+
+  .controls .place {
+    width: 100%;
+    height: 50px;
+  }
+}
+
+@media (max-width: 720px) {
+  .dock {
+    padding: 10px 12px 12px;
   }
 }
 </style>

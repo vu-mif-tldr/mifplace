@@ -155,7 +155,7 @@ onUnmounted(() => {
   height: 36px;
   overflow: hidden;
   border-top: 1px solid rgb(255 255 255 / 8%);
-  background: rgb(12 16 48 / 60%);
+  background: var(--stage-deep);
   font-family: var(--font-live);
   font-size: 13px;
   font-weight: 500;
@@ -195,7 +195,7 @@ li {
   margin: 0;
   padding: 0 48px 0 16px;
   white-space: nowrap;
-  background: linear-gradient(to right, var(--ink) calc(100% - 32px), transparent);
+  background: linear-gradient(to right, var(--stage-deep) calc(100% - 32px), transparent);
 }
 
 /* Out from the left edge at an easy pace; away quickly when a new pixel comes */

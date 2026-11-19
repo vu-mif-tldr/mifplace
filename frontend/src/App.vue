@@ -20,6 +20,7 @@ import ActivityTicker from './components/ActivityTicker.vue';
 import CanvasView from './components/CanvasView.vue';
 import LoadState from './components/LoadState.vue';
 import PaletteDock from './components/PaletteDock.vue';
+import PixelStrip from './components/PixelStrip.vue';
 import TopBar from './components/TopBar.vue';
 import TopLights from './components/TopLights.vue';
 
@@ -220,6 +221,7 @@ const placeLabel = computed(() =>
     }"
   >
     <TopLights :lights="topLights" />
+    <PixelStrip />
     <TopBar
       :live-state="ready ? liveState : null"
       :online="liveState === 'connected' ? online : null"
@@ -257,20 +259,20 @@ const placeLabel = computed(() =>
 </template>
 
 <style scoped>
-/* A dark night lit by the colour the user holds (--glow). The light is brighter while many
-   people paint (--energy, 0 to 1) and dims when the canvas is quiet. New pixels light it
-   from the top for a moment (TopLights, behind the content: hence the own stacking context). */
+/* VU bordo lit by the colour the user holds (--glow). The light is brighter while many people
+   paint (--energy, 0 to 1) and dims when the canvas is quiet. New pixels light it from the top
+   for a moment (TopLights, behind the content: hence the own stacking context). */
 .page {
   position: relative;
   isolation: isolate;
   height: 100dvh;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   overflow: hidden;
   background:
     radial-gradient(
       60% 55% at 50% 100%,
-      color-mix(in srgb, var(--glow) calc(28% + var(--energy) * 24%), transparent),
+      color-mix(in srgb, var(--glow) calc(22% + var(--energy) * 20%), transparent),
       transparent
     ),
     radial-gradient(
@@ -278,7 +280,7 @@ const placeLabel = computed(() =>
       color-mix(in srgb, var(--glow) calc(10% + var(--energy) * 10%), transparent),
       transparent
     ),
-    var(--ink);
+    var(--stage);
   transition:
     --glow 1.5s ease,
     --energy 2s ease;

@@ -1,12 +1,12 @@
-/* Page-wide settings: colours, the font and base styles. Each component keeps its own styles.
+/* Page-wide settings: colours, the fonts and base styles. Each component keeps its own styles.
    App.vue sets --glow (the light, the colour the user holds) and --progress (how full the
-   rings are) for everything inside it. */
+   progress bar is) for everything inside it. */
 
 /* Registered so the light fades from one colour to the next instead of jumping */
 @property --glow {
   syntax: '<color>';
   inherits: true;
-  initial-value: #8a93c4;
+  initial-value: #ff99aa;
 }
 
 /* How busy the canvas is, 0 to 1; registered so the light brightens and dims smoothly */
@@ -18,20 +18,23 @@
 
 :root {
   color-scheme: dark;
-  --ink: #0c1030;
-  --text: #eef0fa;
-  --muted: #c8cdea;
-  --ok: #5fd68a;
-  --error: #ff8a8a;
-  --warn: #ffd27a;
+  /* VU bordo: the ground of the page */
+  --stage: #7a003f;
+  /* A deeper bordo for the bars that lie on the ground */
+  --stage-deep: #5c0030;
+  /* The darkest bordo: edges and labels that must show on white cells */
+  --ink: #2b0016;
+  --text: #ffffff;
+  --muted: rgb(255 255 255 / 85%);
+  --ok: #7eed56;
+  --error: #ffb3c0;
+  --warn: #ffd635;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Space Grotesk', var(--font-body);
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   /* The live parts of the page: the ticker, the connection and the count of open pages */
-  --font-live: 'Saira Semi Condensed', system-ui, sans-serif;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  --font-live: var(--font-body);
+  font-family: var(--font-body);
 }
 
 html,
@@ -42,7 +45,7 @@ body,
 }
 
 body {
-  background: var(--ink);
+  background: var(--stage);
   color: var(--text);
 }
 
