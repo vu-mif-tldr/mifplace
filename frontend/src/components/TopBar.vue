@@ -120,7 +120,21 @@ defineEmits<{ signOut: [] }>();
 
 @media (max-width: 720px) {
   .top-bar {
+    gap: 8px;
     padding: 12px 16px 10px;
+  }
+
+  /* A smaller logo and name, so the count and the way out fit next to them on a 360px phone */
+  .top-bar :deep(.brand) {
+    gap: 12px;
+  }
+
+  .top-bar :deep(.logo) {
+    height: 38px;
+  }
+
+  .top-bar :deep(.name) {
+    font-size: 22px;
   }
 }
 </style>
