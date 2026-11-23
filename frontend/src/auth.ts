@@ -19,9 +19,8 @@ export type AuthFailure = AuthErrorCode | 'rate_limited' | 'network';
 
 export type AuthResult<T = undefined> = { ok: true; value: T } | { ok: false; code: AuthFailure };
 
-// What the page knows about the visitor when it opens. 'off': this server has no accounts
-// (the demo, until sign-in is required everywhere), so the canvas is shown to everyone.
-export type Session = AuthUser | 'anonymous' | 'off';
+// What the page knows about the visitor: the signed-in user, or nobody
+export type Session = AuthUser | 'anonymous';
 
 async function failure(response: Response): Promise<AuthFailure> {
   const body = AuthErrorResponseSchema.safeParse(await response.json().catch(() => undefined));
@@ -55,7 +54,6 @@ const nothing = () => Promise.resolve(undefined);
 export async function getSession(): Promise<Session> {
   const response = await fetch('/api/auth/me');
   if (response.status === 401) return 'anonymous';
-  if (response.status === 404) return 'off';
   if (!response.ok) throw new Error('Could not load the session');
   const body = AuthUserResponseSchema.safeParse(await response.json());
   if (!body.success) throw new Error('The session from the server is invalid');

@@ -58,9 +58,16 @@ Needs SSH access to the server with `sudo`.
    ```sh
    sudo mkdir -p /srv/mifplace-demo && cd /srv/mifplace-demo
    sudo curl -fsSLo compose.yaml https://raw.githubusercontent.com/vu-mif-tldr/mifplace/main/deploy/compose.yaml
+   sudo nano app.env               # SMTP_* and MAIL_FROM, see the comment in compose.yaml
+   sudo chmod 600 app.env
    sudo docker compose up -d
    curl -s http://127.0.0.1:3001/health   # {"status":"ok",...}
    ```
+
+   The app needs the mail settings: people register with an email address and confirm it by a
+   link. Without `PUBLIC_URL` (set in `compose.yaml`) or `SMTP_HOST` (in `app.env`) the
+   container stops at start and `sudo docker compose logs app` says which one is missing. The
+   values are the same as for production, see [Waitlist on vu.place](#waitlist-on-vuplace).
 
    If the pull fails with `denied` or `unauthorized`, the package is private: make it public in
    GitHub → organization `vu-mif-tldr` → Packages → `mifplace` → Package settings → Change
@@ -80,7 +87,8 @@ Needs SSH access to the server with `sudo`.
 
    Share the password with the team outside the repository.
 
-6. **Check.** <https://demo.vu.place> asks for the password and shows the canvas. If the page does
+6. **Check.** <https://demo.vu.place> asks for the password and shows the sign-in screen;
+   after registering with a VU address and confirming it, the canvas. If the page does
    not open, `sudo journalctl -u caddy -n 50` shows whether the certificate was issued.
 
 ## Update
@@ -95,6 +103,11 @@ sudo docker compose up -d
 
 The old container is stopped before the new one starts, so the demo is down for a few seconds.
 Never run two containers on the same database file.
+
+**The first update to a version with sign-in** needs two things before `up -d`, or the container
+will not start: download the new `compose.yaml` (it sets `PUBLIC_URL` and reads `app.env`) and
+create `app.env` as in step 4 of the setup. The pixels placed before stay; they belong to
+user 0, which nobody can sign in as.
 
 Which build runs: `curl -s http://127.0.0.1:3001/health` shows its commit in `commit`.
 
@@ -185,6 +198,21 @@ database.
    `curl -si -X POST https://vu.place/api/pixels` must not reach the app (Caddy answers, not Express).
    Signups from two networks show two different addresses in
    `sudo docker compose logs | grep "Waitlist signup"`; one address for all means `TRUST_PROXY` is wrong.
+
+**The first update to a version with sign-in.** In that version the waitlist is on only with
+`WAITLIST_ENABLED=true`, which the new [`compose.prod.yaml`](compose.prod.yaml) sets. With the
+old file the container starts, but the form on the landing page gets `401` and no address is
+stored. So download the new file first, then update the image:
+
+```sh
+cd /srv/mifplace-prod
+sudo curl -fsSLo compose.yaml https://raw.githubusercontent.com/vu-mif-tldr/mifplace/main/deploy/compose.prod.yaml
+sudo docker compose pull
+sudo docker compose up -d
+sudo docker compose logs app | grep Waitlist    # "Waitlist: on, email links point to https://vu.place"
+```
+
+Then sign up on <https://vu.place> once more, as in step 5.
 
 **Reading the list** (read-only, safe while the app runs). How many:
 

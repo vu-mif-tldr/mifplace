@@ -8,7 +8,8 @@ import {
   type CanvasState,
   type PaletteColor,
 } from '@mifplace/shared';
-import { getCanvas, getCanvasSize, getPalette, placePixel } from './api';
+import { SignedOutError, getCanvas, getCanvasSize, getPalette, placePixel } from './api';
+import { getSession } from './auth';
 import type { NewBloom } from './blooms';
 import { glowColor } from './glow';
 import { connectLive, type LiveConnection, type LivePixel, type LiveState } from './live';
@@ -29,11 +30,32 @@ import TopLights from './components/TopLights.vue';
 // look is up to the components; this file holds the state and wires them together.
 // App.vue shows it once the visitor is signed in.
 
-defineProps<{
-  // null on a server without accounts: the canvas is open and there is nobody to sign out
-  user: AuthUser | null;
+defineProps<{ user: AuthUser }>();
+const emit = defineEmits<{
+  // The user asked to sign out
+  signOut: [];
+  // The server says there is no session any more: it expired, the user signed out in another
+  // tab or changed the password elsewhere, or the account was blocked
+  signedOut: [];
 }>();
-defineEmits<{ signOut: [] }>();
+
+// A failed request: true if it failed because the session is gone, which the page is told
+function sessionGone(error: unknown): boolean {
+  if (!(error instanceof SignedOutError)) return false;
+  emit('signedOut');
+  return true;
+}
+
+// The server ended the live connection for a session that is over, or did not accept a new
+// one (live.ts, onRefused): ask who is signed in. If the server cannot be reached, there is
+// nothing to conclude and the connection simply keeps trying.
+async function checkSession() {
+  try {
+    if ((await getSession()) === 'anonymous') emit('signedOut');
+  } catch {
+    // No answer: nothing to conclude
+  }
+}
 
 // Colors from the server, loaded together with the canvas
 const palette = ref<PaletteColor[]>([]);
@@ -96,6 +118,7 @@ async function loadCanvas() {
     selectedColor.value = colors.find((c) => c.id === selectedColor.value?.id) ?? colors[0];
     showSnapshot(size, state);
   } catch (error) {
+    if (sessionGone(error)) return;
     console.error(error);
     loadError.value = true;
   } finally {
@@ -109,6 +132,7 @@ async function reloadSnapshot() {
   try {
     showSnapshot(canvasSize.value, await getCanvas());
   } catch (error) {
+    if (sessionGone(error)) return;
     console.error(error);
     loadError.value = true;
   }
@@ -127,6 +151,7 @@ function showSnapshot(size: CanvasSize, state: CanvasState) {
       onReset: reloadSnapshot,
       onState: (state) => (liveState.value = state),
       onOnline: (count) => (online.value = count),
+      onRefused: () => void checkSession(),
     }
   );
 }
@@ -179,6 +204,7 @@ async function place() {
     pixelError.value = '';
     canvasView.value?.paint(cell, color.color);
   } catch (error) {
+    if (sessionGone(error)) return;
     console.error(error);
     pixelError.value = texts.placeFailed;
   } finally {
@@ -233,8 +259,8 @@ const placeLabel = computed(() =>
     <TopBar
       :live-state="ready ? liveState : null"
       :online="liveState === 'connected' ? online : null"
-      :email="user?.email"
-      @sign-out="$emit('signOut')"
+      :email="user.email"
+      @sign-out="emit('signOut')"
     />
 
     <main class="stage">

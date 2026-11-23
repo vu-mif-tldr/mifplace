@@ -21,7 +21,8 @@
 
 demo.vu.place {
 	import security
-	# The app has no sign-in yet: without a password anyone could draw on the demo canvas.
+	# The demo stays behind a password of its own, on top of the sign-in of the app: it is a
+	# test instance, not for everybody with a VU address.
 	basic_auth {
 		demo <output of: caddy hash-password>
 	}
@@ -32,7 +33,7 @@ demo.vu.place {
 
 # Before launch: the static landing page with the waitlist form (landing/ in this directory,
 # copied to /var/www/vu.place). Only the waitlist API goes to the production app (compose.prod.yaml):
-# the app has no sign-in yet, so /api/pixels and the rest must not be reachable here.
+# the launch has not happened yet, so the canvas and the accounts must not be reachable here.
 # "/api/waitlist*" with the star right after the name also matches /api/waitlist itself.
 vu.place {
 	import security

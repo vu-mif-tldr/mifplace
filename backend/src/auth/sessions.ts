@@ -19,6 +19,10 @@ export interface SessionStore {
   deleteSession(tokenHash: string): boolean;
 }
 
+// Which sessions just ended, for whoever holds something open for them (the live connections):
+// every session of a user, optionally but one, or one session by the hash of its token.
+export type SessionsEnded = { userId: number; exceptSession?: string } | { session: string };
+
 // The signed-in user of a request
 export interface SessionUser {
   id: number;
@@ -82,9 +86,25 @@ export class Sessions {
   }
 
   // Signs the browser out: deletes the session of this Cookie header, if any, and the cookie.
-  end(cookieHeader: string | undefined, res: Response): void {
+  // Returns the hash of the token of the session that ended.
+  end(cookieHeader: string | undefined, res: Response): string | undefined {
     const token = readCookie(cookieHeader, this.cookieName);
-    if (token && TOKEN_PATTERN.test(token)) this.store.deleteSession(hashToken(token));
     res.clearCookie(this.cookieName, this.cookieOptions);
+    if (!token || !TOKEN_PATTERN.test(token)) return undefined;
+    const tokenHash = hashToken(token);
+    return this.store.deleteSession(tokenHash) ? tokenHash : undefined;
   }
+}
+
+// The sessions of a server at publicUrl: https turns on the Secure cookie. One object is
+// shared by the account routes, the check in front of the other routes and the live server.
+export function createSessions(options: {
+  store: SessionStore;
+  publicUrl: string;
+  now?: () => number;
+}): Sessions {
+  return new Sessions(options.store, {
+    secure: options.publicUrl.startsWith('https://'),
+    now: options.now,
+  });
 }
