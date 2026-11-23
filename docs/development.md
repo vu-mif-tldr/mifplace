@@ -147,7 +147,7 @@ VS Code with the Prettier (`esbenp.prettier-vscode`), ESLint (`dbaeumer.vscode-e
 
 Every merge to `main` publishes the image `main` and `sha-<commit>`, but makes no version. A version `X.Y.Z` is released by hand: Actions → "Release" → Run workflow on `main`, with **patch** (Z goes up), **minor** (Y goes up, Z back to 0) or **major** (X goes up, Y and Z back to 0), counted from the last tag. It releases the head of `main` once its "Docker image" run is green.
 
-The release adds the Docker tags `X.Y.Z` and `X.Y` to the image of that commit (no rebuild) and creates a git tag `vX.Y.Z` with a GitHub release listing the pull requests since the last one. Nothing in the code holds the version: the `version` of every `package.json` stays `1.0.0`, and the image does not know it. The image knows only its commit (the first 7 characters of the hash): the `commit` field of `GET /health` and the small grey label next to the logo on the page (`dev` outside a Docker build).
+The release adds the Docker tags `X.Y.Z` and `X.Y` to the image of that commit (no rebuild) and creates a git tag `vX.Y.Z` with a GitHub release listing the pull requests since the last one. Nothing in the code holds the version: the `version` of every `package.json` stays `1.0.0`, and the image does not know it. The image knows only its commit (the first 7 characters of the hash): the `commit` field of `GET /health` (`dev` outside a Docker build).
 
 ## Further reading
 

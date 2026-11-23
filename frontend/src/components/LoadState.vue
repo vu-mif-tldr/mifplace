@@ -75,11 +75,11 @@ p {
   height: 48px;
   padding: 0 24px;
   border: 0;
-  border-radius: 24px;
+  border-radius: 18px;
   background: #ffffff;
-  color: var(--ink);
+  color: var(--stage);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 </style>
