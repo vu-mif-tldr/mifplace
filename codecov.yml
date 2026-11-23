@@ -94,6 +94,8 @@ component_management:
         - backend/src/auth/**
         - backend/src/origin.ts
         - shared/src/auth.ts
+        - frontend/src/auth.ts
+        - frontend/src/route.ts
     - component_id: frontend_canvas
       name: Canvas UI
       paths:
@@ -109,6 +111,7 @@ component_management:
         - frontend/src/useActivity.ts
         - frontend/src/belt.ts
         - frontend/src/App.vue
+        - frontend/src/CanvasPage.vue
         - frontend/src/components/**
     - component_id: frontend_api
       name: API client

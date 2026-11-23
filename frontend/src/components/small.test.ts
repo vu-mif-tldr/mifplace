@@ -15,6 +15,12 @@ describe('BrandMark', () => {
     expect(logo.attributes('alt')).toBe('Vilniaus universitetas');
     expect(wrapper.get('.brand').attributes('style')).toContain('--logo: 40px');
   });
+
+  it('draws only the logo when the name is turned off', () => {
+    const wrapper = mount(BrandMark, { props: { name: false } });
+    expect(wrapper.text()).toBe('');
+    expect(wrapper.find('img').exists()).toBe(true);
+  });
 });
 
 describe('LiveStatus', () => {
@@ -45,6 +51,18 @@ describe('TopBar', () => {
     const wrapper = mount(TopBar, { props: { liveState: 'reconnecting', online: null } });
     expect(wrapper.find('.online').exists()).toBe(false);
     expect(wrapper.getComponent(LiveStatus).props('state')).toBe('reconnecting');
+  });
+
+  it('offers the way out to a signed-in user only', async () => {
+    const props = { liveState: 'connected' as const, online: 7 };
+    expect(mount(TopBar, { props }).find('.sign-out').exists()).toBe(false);
+
+    const wrapper = mount(TopBar, { props: { ...props, email: 'ona@vu.lt' } });
+    const button = wrapper.get('.sign-out');
+    expect(button.text()).toBe(texts.signOut);
+    expect(button.attributes('title')).toBe('ona@vu.lt');
+    await button.trigger('click');
+    expect(wrapper.emitted('signOut')).toHaveLength(1);
   });
 
   it('shows none of them without a connection', () => {

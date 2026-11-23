@@ -1,17 +1,22 @@
 <script setup lang="ts">
 import type { LiveState } from '../live';
+import { texts } from '../texts';
 import BrandMark from './BrandMark.vue';
 import LiveStatus from './LiveStatus.vue';
 
 // The bar over the canvas: the logo and the name on the left; on the right how many pages are
-// open, with a green light while the live connection is up. While it is not, the state of the
-// connection in words instead. The cell under the mouse (FR-11) is shown on the canvas.
+// open, with a green light while the live connection is up, and the way out (FR-4). While the
+// connection is not up, its state in words instead. The cell under the mouse (FR-11) is shown
+// on the canvas.
 defineProps<{
   // null while there is no connection yet (loading, or loading failed)
   liveState: LiveState | null;
   // null while not connected: an old count would be wrong
   online: number | null;
+  // The address of the signed-in user; without it there is nobody to sign out
+  email?: string | null;
 }>();
+defineEmits<{ signOut: [] }>();
 </script>
 
 <template>
@@ -28,6 +33,9 @@ defineProps<{
       </svg>
       {{ online }}
     </span>
+    <button v-if="email" type="button" class="sign-out" :title="email" @click="$emit('signOut')">
+      {{ texts.signOut }}
+    </button>
   </header>
 </template>
 
@@ -37,10 +45,22 @@ defineProps<{
   align-items: center;
   gap: 10px;
   padding: 16px 28px 12px;
+  /* As a grid item of the page it must not grow wider than the page to fit its content */
+  min-width: 0;
 }
 
-.spacer {
-  flex-grow: 1;
+/* Nothing in the bar is squeezed or wraps: on a phone the long "reconnecting" text is cut
+   short instead (LiveStatus), so the way out stays in view. */
+.top-bar > * {
+  flex: none;
+}
+
+.top-bar > .live-status {
+  flex: 0 1 auto;
+}
+
+.top-bar > .spacer {
+  flex: 1 1 0;
 }
 
 /* Live, like the ticker */
@@ -84,9 +104,37 @@ defineProps<{
   }
 }
 
+/* Quiet: it is rarely needed */
+.sign-out {
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.sign-out:hover {
+  color: var(--text);
+}
+
 @media (max-width: 720px) {
   .top-bar {
+    gap: 8px;
     padding: 12px 16px 10px;
+  }
+
+  /* A smaller logo and name, so the count and the way out fit next to them on a 360px phone */
+  .top-bar :deep(.brand) {
+    gap: 12px;
+  }
+
+  .top-bar :deep(.logo) {
+    height: 38px;
+  }
+
+  .top-bar :deep(.name) {
+    font-size: 22px;
   }
 }
 </style>

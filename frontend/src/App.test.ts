@@ -1,196 +1,158 @@
 // @vitest-environment happy-dom
-import { flushPromises, mount } from '@vue/test-utils';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import App from './App.vue';
-import { getCanvas, getCanvasSize, getPalette, placePixel } from './api';
-import { connectLive, type LiveHandlers } from './live';
-import { NEUTRAL_GLOW } from './glow';
-import { texts } from './texts';
-import ActivityTicker from './components/ActivityTicker.vue';
-import CanvasView from './components/CanvasView.vue';
+import CanvasPage from './CanvasPage.vue';
+import { getSession, signOut, verifyEmail } from './auth';
+import { authTexts } from './texts';
+import AuthScreen from './components/AuthScreen.vue';
 import LoadState from './components/LoadState.vue';
-import PaletteDock from './components/PaletteDock.vue';
-import SelectionRing from './components/SelectionRing.vue';
-import TopBar from './components/TopBar.vue';
-import TopLights from './components/TopLights.vue';
 
-// The page against a fake server: the API calls and the live connection are mocked
-vi.mock('./api', () => ({
-  getPalette: vi.fn(),
-  getCanvasSize: vi.fn(),
-  getCanvas: vi.fn(),
-  placePixel: vi.fn(),
+// Who sees what: the account requests are mocked, the canvas page is a stub
+vi.mock('./auth', () => ({
+  getSession: vi.fn(),
+  signOut: vi.fn(),
+  signIn: vi.fn(),
+  register: vi.fn(),
+  verifyEmail: vi.fn(),
+  forgotPassword: vi.fn(),
+  resetPassword: vi.fn(),
 }));
-vi.mock('./live', () => ({ connectLive: vi.fn() }));
 
-const palette = [
-  { id: 0, color: '#000000' },
-  { id: 9, color: '#00A2E8' },
-];
-const snapshot = { pixels: [-1, -1, -1, -1], eventId: 5, timestamp: 1000 };
-
-let handlers: LiveHandlers;
-const close = vi.fn();
-
-class FakeResizeObserver {
-  observe() {}
-  disconnect() {}
-}
+const user = { email: 'ona@mif.stud.vu.lt', role: 'user' as const };
+const token = 'A'.repeat(43);
 
 beforeEach(() => {
-  vi.stubGlobal('ResizeObserver', FakeResizeObserver);
-  vi.mocked(getPalette).mockResolvedValue(palette);
-  vi.mocked(getCanvasSize).mockResolvedValue({ width: 2, height: 2 });
-  vi.mocked(getCanvas).mockResolvedValue(snapshot);
-  vi.mocked(placePixel).mockResolvedValue(undefined);
-  vi.mocked(connectLive).mockImplementation((_checkpoint, given) => {
-    handlers = given;
-    given.onState?.('connecting');
-    return { checkpoint: _checkpoint, state: 'connecting', close };
-  });
+  history.replaceState(null, '', '/');
+  vi.mocked(getSession).mockResolvedValue('anonymous');
+  vi.mocked(signOut).mockResolvedValue({ ok: true, value: undefined });
 });
 afterEach(() => {
-  vi.unstubAllGlobals();
+  // One page at a time: an old one would still listen to the address
+  mounted?.unmount();
+  mounted = undefined;
   vi.clearAllMocks();
 });
 
+let mounted: VueWrapper | undefined;
+
 async function page() {
-  const wrapper = mount(App, { attachTo: document.body });
+  mounted = mount(App, { global: { stubs: { CanvasPage: true } } });
   await flushPromises();
-  return wrapper;
+  return mounted;
 }
 
-const pick = (wrapper: Awaited<ReturnType<typeof page>>, x: number, y: number) =>
-  wrapper.getComponent(CanvasView).vm.$emit('pick', { x, y });
-
 describe('App', () => {
-  it('loads the canvas and follows it from the snapshot checkpoint', async () => {
+  it('shows only the sign-in screens to a visitor without a session', async () => {
     const wrapper = await page();
-    expect(wrapper.findComponent(LoadState).exists()).toBe(false);
-    expect(connectLive).toHaveBeenCalledWith({ eventId: 5, timestamp: 1000 }, expect.any(Object));
-    expect(wrapper.getComponent(PaletteDock).props('selectedId')).toBe(0);
-    wrapper.unmount();
-    expect(close).toHaveBeenCalled();
+    expect(wrapper.findComponent(AuthScreen).exists()).toBe(true);
+    expect(wrapper.findComponent(CanvasPage).exists()).toBe(false);
   });
 
-  it('shows the failure and loads again on retry', async () => {
-    vi.mocked(getPalette).mockRejectedValueOnce(new Error('down'));
+  it('shows the canvas to a signed-in visitor, and the sign-in screens after sign-out', async () => {
+    vi.mocked(getSession).mockResolvedValue(user);
+    const wrapper = await page();
+    const canvas = wrapper.getComponent(CanvasPage);
+    expect(canvas.props('user')).toEqual(user);
+    expect(wrapper.findComponent(AuthScreen).exists()).toBe(false);
+
+    canvas.vm.$emit('signOut');
+    await flushPromises();
+    expect(signOut).toHaveBeenCalled();
+    expect(wrapper.findComponent(CanvasPage).exists()).toBe(false);
+    expect(wrapper.findComponent(AuthScreen).exists()).toBe(true);
+  });
+
+  it('stays on the canvas when signing out did not reach the server', async () => {
+    vi.mocked(getSession).mockResolvedValue(user);
+    vi.mocked(signOut).mockResolvedValue({ ok: false, code: 'network' });
+    const wrapper = await page();
+    wrapper.getComponent(CanvasPage).vm.$emit('signOut');
+    await flushPromises();
+    expect(wrapper.findComponent(CanvasPage).exists()).toBe(true);
+  });
+
+  it('shows the canvas once the visitor signs in', async () => {
+    const wrapper = await page();
+    wrapper.getComponent(AuthScreen).vm.$emit('signedIn', user);
+    await flushPromises();
+    expect(wrapper.getComponent(CanvasPage).props('user')).toEqual(user);
+  });
+
+  it('shows the canvas to everyone on a server without accounts', async () => {
+    vi.mocked(getSession).mockResolvedValue('off');
+    const wrapper = await page();
+    expect(wrapper.getComponent(CanvasPage).props('user')).toBeNull();
+  });
+
+  it('waits for the session, and offers to try again when the server cannot be asked', async () => {
+    vi.mocked(getSession).mockRejectedValueOnce(new Error('offline'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    const wrapper = await page();
-    const state = wrapper.getComponent(LoadState);
-    expect(state.props('failed')).toBe(true);
-
-    await state.get('button').trigger('click');
+    const wrapper = (mounted = mount(App, { global: { stubs: { CanvasPage: true } } }));
+    expect(wrapper.getComponent(LoadState).props('failed')).toBe(false);
     await flushPromises();
-    expect(wrapper.findComponent(LoadState).exists()).toBe(false);
-    wrapper.unmount();
+    expect(wrapper.getComponent(LoadState).props('failed')).toBe(true);
+
+    wrapper.getComponent(LoadState).vm.$emit('retry');
+    await flushPromises();
+    expect(wrapper.findComponent(AuthScreen).exists()).toBe(true);
   });
 
-  it('picks a cell with one click and places the pixel with a second', async () => {
+  it('opens the link of an email, and takes its token out of the address once used', async () => {
+    history.replaceState(null, '', `/#/verify/${token}`);
+    vi.mocked(verifyEmail).mockResolvedValue({ ok: true, value: undefined });
     const wrapper = await page();
-    await wrapper.getComponent(PaletteDock).vm.$emit('select', palette[1]);
-    await pick(wrapper, 1, 1);
-    expect(wrapper.getComponent(SelectionRing).props('label')).toBe('1, 1');
-    expect(placePixel).not.toHaveBeenCalled();
+    expect(wrapper.getComponent(AuthScreen).props('link')).toEqual({ name: 'verify', token });
 
-    await pick(wrapper, 1, 1);
+    await wrapper.get('form').trigger('submit');
     await flushPromises();
-    // pos = y * width + x, and the palette id, not the index
-    expect(placePixel).toHaveBeenCalledWith(3, 9);
-    wrapper.unmount();
+    expect(location.hash).toBe('');
+    // The session is asked again: at start and after the link
+    expect(getSession).toHaveBeenCalledTimes(2);
+    // The same screen stays, now on sign-in with the good news
+    expect(wrapper.get('.message.notice').text()).toBe(authTexts.verified);
   });
 
-  it('places with Enter and lets go of the cell with Escape', async () => {
+  it('shows a link to a signed-in visitor too, then the canvas again', async () => {
+    history.replaceState(null, '', `/#/verify/${token}`);
+    vi.mocked(getSession).mockResolvedValue(user);
+    vi.mocked(verifyEmail).mockResolvedValue({ ok: true, value: undefined });
     const wrapper = await page();
-    await pick(wrapper, 0, 1);
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(wrapper.findComponent(AuthScreen).exists()).toBe(true);
+    await wrapper.get('form').trigger('submit');
     await flushPromises();
-    expect(placePixel).toHaveBeenCalledWith(2, 0);
-
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    await flushPromises();
-    expect(wrapper.findComponent(SelectionRing).exists()).toBe(false);
-    wrapper.unmount();
+    expect(wrapper.findComponent(CanvasPage).exists()).toBe(true);
   });
 
-  it('lets go of the cell on a click beside the canvas', async () => {
+  it('keeps the message about a dead link in front of a signed-in visitor until it is left', async () => {
+    history.replaceState(null, '', `/#/verify/${token}`);
+    vi.mocked(getSession).mockResolvedValue(user);
+    vi.mocked(verifyEmail).mockResolvedValue({ ok: false, code: 'invalid_token' });
     const wrapper = await page();
-    await pick(wrapper, 0, 1);
-    expect(wrapper.findComponent(SelectionRing).exists()).toBe(true);
-    await wrapper.get('.viewport').trigger('click');
-    expect(wrapper.findComponent(SelectionRing).exists()).toBe(false);
-    wrapper.unmount();
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(wrapper.get('.lead').text()).toBe(authTexts.verifyExpired);
+    expect(wrapper.findComponent(CanvasPage).exists()).toBe(false);
+
+    await wrapper.get('.link').trigger('click');
+    await flushPromises();
+    expect(location.hash).toBe('');
+    expect(wrapper.findComponent(CanvasPage).exists()).toBe(true);
   });
 
-  it('tells when the pixel was not placed', async () => {
-    vi.mocked(placePixel).mockRejectedValueOnce(new Error('400'));
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('starts the sign-in screens afresh when another link is opened in the tab', async () => {
     const wrapper = await page();
-    await pick(wrapper, 0, 0);
-    await pick(wrapper, 0, 0);
+    expect(wrapper.get('h2').text()).toBe(authTexts.signInTitle);
+    history.replaceState(null, '', `/#/reset/${token}`);
+    window.dispatchEvent(new Event('hashchange'));
     await flushPromises();
-    expect(wrapper.getComponent(PaletteDock).props('error')).toBe(texts.placeFailed);
-    wrapper.unmount();
-  });
+    expect(wrapper.get('h2').text()).toBe(authTexts.resetTitle);
 
-  it('blooms where live pixels arrive and dims while reconnecting', async () => {
-    const wrapper = await page();
-    handlers.onPixels([
-      { pos: 1, colorId: 9 },
-      { pos: 2, colorId: -1 },
-    ]);
-    handlers.onState?.('reconnecting');
+    // The same address reported again changes nothing: what was typed stays
+    await wrapper.get('input[type=password]').setValue('typed so far');
+    window.dispatchEvent(new Event('hashchange'));
     await flushPromises();
-    const view = wrapper.getComponent(CanvasView);
-    expect(view.props('blooms')).toMatchObject([{ x: 1, y: 0, color: '#00a2e8' }]);
-    expect(view.props('paused')).toBe(true);
-    wrapper.unmount();
-  });
-
-  it('shows how many pages are open only while connected', async () => {
-    const wrapper = await page();
-    const bar = wrapper.getComponent(TopBar);
-    handlers.onOnline?.(5);
-    await flushPromises();
-    // Still connecting: no count yet
-    expect(bar.props('online')).toBeNull();
-
-    handlers.onState?.('connected');
-    await flushPromises();
-    expect(bar.props('online')).toBe(5);
-
-    handlers.onState?.('reconnecting');
-    await flushPromises();
-    expect(bar.props('online')).toBeNull();
-    wrapper.unmount();
-  });
-
-  it('lights the page from the top in the colours of live pixels', async () => {
-    const wrapper = await page();
-    handlers.onPixels([
-      { pos: 1, colorId: 9 },
-      { pos: 2, colorId: 0 },
-    ]);
-    await flushPromises();
-    // Black shines in the neutral light, as its bloom does
-    expect(wrapper.getComponent(TopLights).props('lights')).toMatchObject([
-      { color: '#00a2e8' },
-      { color: NEUTRAL_GLOW },
-    ]);
-    wrapper.unmount();
-  });
-
-  it('announces live pixels in the ticker, in their real colour', async () => {
-    const wrapper = await page();
-    handlers.onPixels([
-      { pos: 0, colorId: 9 },
-      { pos: 1, colorId: 0 },
-    ]);
-    await flushPromises();
-    const ticker = wrapper.getComponent(ActivityTicker);
-    const items = ticker.findAll('li');
-    expect(items.map((li) => li.text())).toEqual(['+1', '+1']);
-    // Black stays black here; only its bloom on the canvas is the neutral light
-    expect(items[1].get('.dot').attributes('style')).toContain('background: #000000');
-    wrapper.unmount();
+    expect((wrapper.get('input[type=password]').element as HTMLInputElement).value).toBe(
+      'typed so far'
+    );
   });
 });
