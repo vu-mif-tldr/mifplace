@@ -258,12 +258,24 @@ export function createAuthRouter(
       // nobody can swap the password of an account that is waiting for its owner's click.
       if (verdict === 'address') return res.status(202).json({ success: true });
 
-      const passwordHash = await hasher.hash(password);
-      const { user, pending } = store.registerUser(email, passwordHash, time);
-      // A blocked account gets no emails
-      if (!pending && user.banned_at !== null) return res.status(202).json({ success: true });
-
+      // The email is counted before the slow hash, so requests sent at once cannot all pass
+      // the check above; taken back on every path that sends nothing.
       budget.record(email, time);
+      let registered: { user: UserRow; pending: boolean };
+      try {
+        const passwordHash = await hasher.hash(password);
+        registered = store.registerUser(email, passwordHash, time);
+      } catch (error) {
+        budget.release(email, time);
+        throw error;
+      }
+      const { user, pending } = registered;
+      // A blocked account gets no emails
+      if (!pending && user.banned_at !== null) {
+        budget.release(email, time);
+        return res.status(202).json({ success: true });
+      }
+
       try {
         await mailer.send(
           pending

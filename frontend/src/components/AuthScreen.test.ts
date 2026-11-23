@@ -48,7 +48,7 @@ async function submit(wrapper: VueWrapper) {
 describe('sign-in', () => {
   it('is the first screen, with the name and what the page is', () => {
     const wrapper = screen();
-    expect(wrapper.get('h1').text()).toBe('vu.place');
+    expect(wrapper.get('h1').text()).toBe('VU/place');
     expect(wrapper.get('.about').text()).toBe(t.about);
     expect(title(wrapper)).toBe(t.signInTitle);
     expect(wrapper.get('.submit').text()).toBe(t.signIn);

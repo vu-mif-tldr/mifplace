@@ -4,11 +4,10 @@ import { texts } from '../texts';
 import BrandMark from './BrandMark.vue';
 import LiveStatus from './LiveStatus.vue';
 
-// The bar over the canvas: the logo with the commit of the build, how many pages are open, the
-// connection and the way out (FR-4). The cell under the mouse (FR-11) is shown on the canvas,
-// next to it.
-const appCommit = import.meta.env.APP_COMMIT;
-
+// The bar over the canvas: the logo and the name on the left; on the right how many pages are
+// open, with a green light while the live connection is up, and the way out (FR-4). While the
+// connection is not up, its state in words instead. The cell under the mouse (FR-11) is shown
+// on the canvas.
 defineProps<{
   // null while there is no connection yet (loading, or loading failed)
   liveState: LiveState | null;
@@ -23,10 +22,10 @@ defineEmits<{ signOut: [] }>();
 <template>
   <header class="top-bar">
     <BrandMark />
-    <!-- docs/development.md, "Versions" -->
-    <span class="version">{{ appCommit }}</span>
     <span class="spacer"></span>
+    <LiveStatus v-if="liveState && liveState !== 'connected'" :state="liveState" />
     <span v-if="online !== null" class="online">
+      <span class="light"></span>
       <!-- A person, head and shoulders -->
       <svg viewBox="0 0 16 16" fill="currentColor">
         <circle cx="8" cy="5" r="3" />
@@ -34,7 +33,6 @@ defineEmits<{ signOut: [] }>();
       </svg>
       {{ online }}
     </span>
-    <LiveStatus v-if="liveState" :state="liveState" />
     <button v-if="email" type="button" class="sign-out" :title="email" @click="$emit('signOut')">
       {{ texts.signOut }}
     </button>
@@ -45,8 +43,8 @@ defineEmits<{ signOut: [] }>();
 .top-bar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 18px 28px;
+  gap: 10px;
+  padding: 16px 28px 12px;
   /* As a grid item of the page it must not grow wider than the page to fit its content */
   min-width: 0;
 }
@@ -65,34 +63,45 @@ defineEmits<{ signOut: [] }>();
   flex: 1 1 0;
 }
 
-/* Quiet: for whoever looks for it, closer to the name than the gap of the bar */
-.version {
-  margin-left: -8px;
-  padding-top: 3px;
-  font-size: 12px;
-  color: var(--muted);
-  opacity: 0.55;
-  font-variant-numeric: tabular-nums;
-}
-
-.online {
-  font-size: 14px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Live, like the ticker and the connection next to it */
+/* Live, like the ticker */
 .online {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 12%);
   font-family: var(--font-live);
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .online svg {
   width: 15px;
   height: 15px;
+}
+
+/* Connected: a green light that breathes */
+.light {
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--ok);
+  animation: pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(126 237 86 / 55%);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px rgb(126 237 86 / 0%);
+  }
 }
 
 /* Quiet: it is rarely needed */
@@ -111,13 +120,7 @@ defineEmits<{ signOut: [] }>();
 
 @media (max-width: 720px) {
   .top-bar {
-    gap: 12px;
-    padding: 14px 16px;
-  }
-
-  /* No room for it next to the way out */
-  .version {
-    display: none;
+    padding: 12px 16px 10px;
   }
 }
 </style>

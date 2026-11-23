@@ -28,6 +28,8 @@ describe('PaletteDock', () => {
     const swatches = dock().findAll('.swatch');
     expect(swatches.map((s) => s.attributes('title'))).toEqual(['Žydra', '#123ABC']);
     expect(swatches.map((s) => s.classes().includes('selected'))).toEqual([false, true]);
+    // A check mark on the selected one only
+    expect(swatches.map((s) => s.find('svg').exists())).toEqual([false, true]);
   });
 
   it('reports the colour that was clicked', async () => {
