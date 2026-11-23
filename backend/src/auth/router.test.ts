@@ -552,6 +552,54 @@ describe('protection', () => {
     assert.equal(mailer.sent.length, 6);
   });
 
+  it('registrations sent at once are counted before the slow hash', async () => {
+    const quota = new HourlyQuota(2);
+    const { post, mailer } = await start({ quota });
+    const same = await Promise.all(
+      Array.from({ length: 5 }, () => post('/register', { email: EMAIL, password: PASSWORD }))
+    );
+    assert.deepEqual(
+      same.map((r) => r.status),
+      [202, 202, 202, 202, 202]
+    );
+    assert.equal(mailer.sent.length, 1);
+
+    const others = await Promise.all(
+      ['ona@vu.lt', 'petras@vu.lt', 'rasa@vu.lt'].map((email) =>
+        post('/register', { email, password: PASSWORD })
+      )
+    );
+    assert.deepEqual(others.map((r) => r.status).sort(), [202, 503, 503]);
+    assert.equal(mailer.sent.length, 2);
+  });
+
+  it('a registration that sends nothing does not use up the email limits', async () => {
+    let busy = true;
+    class SometimesBusy extends PasswordHasher {
+      override hash(password: string): Promise<string> {
+        return busy ? Promise.reject(new HasherBusyError()) : super.hash(password);
+      }
+    }
+    const quota = new HourlyQuota(2);
+    const { post, mailer, raw, clock, signUp } = await start({
+      quota,
+      hasher: new SometimesBusy({ memoryKiB: 8, passes: 1, parallelism: 1 }),
+    });
+    // The hasher is busy: no email, and a retry right away works
+    assert.equal((await post('/register', { email: EMAIL, password: PASSWORD })).status, 503);
+    busy = false;
+    await signUp();
+    assert.equal(mailer.sent.length, 1);
+
+    // A blocked account gets no email, and the quota stays for the others
+    raw.prepare('UPDATE users SET banned_at = ? WHERE email = ?').run(clock.now, EMAIL);
+    clock.now += 2 * MINUTE;
+    assert.equal((await post('/register', { email: EMAIL, password: PASSWORD })).status, 202);
+    assert.equal(mailer.sent.length, 1);
+    assert.equal((await post('/register', { email: 'ona@vu.lt', password: PASSWORD })).status, 202);
+    assert.equal(mailer.sent.length, 2);
+  });
+
   it('answers 503 when too many passwords wait to be hashed, 500 when the database fails', async () => {
     class Busy extends PasswordHasher {
       override hash(): Promise<string> {
