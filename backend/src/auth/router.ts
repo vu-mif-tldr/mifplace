@@ -2,6 +2,7 @@ import express, { Router, type Request, type Response } from 'express';
 import type { EmailTokenPurpose, UserRow } from '@mifplace/db';
 import {
   ChangePasswordRequestSchema,
+  DeleteAccountRequestSchema,
   ForgotPasswordRequestSchema,
   LoginRequestSchema,
   RegisterRequestSchema,
@@ -17,6 +18,7 @@ import {
 import { EmailBudget, type HourlyQuota } from '../email-budget.js';
 import type { Mail, Mailer } from '../mailer.js';
 import { limiter, perHour, type RateLimits } from '../rate-limits.js';
+import type { AdminStore } from './admin.js';
 import { sameOrigin } from './guard.js';
 import { alreadyRegisteredEmail, passwordResetEmail, verificationEmail } from './emails.js';
 import { HasherBusyError, PasswordHasher } from './password.js';
@@ -60,10 +62,13 @@ export interface AuthStore extends SessionStore {
   verifyEmail(tokenHash: string, now: number): UserRow | undefined;
   resetPassword(tokenHash: string, passwordHash: string, now: number): UserRow | undefined;
   changePassword(userId: number, passwordHash: string, keepSessionHash: string): void;
+  deleteAccount(userId: number): boolean;
+  syncAdmins(emails: readonly string[]): { promoted: number; demoted: number };
 }
 
 export interface AuthOptions {
-  store: AuthStore;
+  // The database, for the account routes and the admin routes (MifDb is both)
+  store: AuthStore & AdminStore;
   mailer: Mailer;
   // Where the page is, e.g. https://vu.place: the email links point there. https turns on
   // the Secure cookie.
@@ -78,6 +83,9 @@ export interface AuthOptions {
   sessions?: Sessions;
   // Told when sessions end other than by expiring, so open live connections can be closed
   onSessionsEnded?: (ended: SessionsEnded) => void;
+  // The addresses of the administrators (ADMIN_EMAILS). The server applies the list at
+  // start; the router applies it again when one of them verifies its address later.
+  adminEmails?: string[];
   // Tests pass one with cheap parameters
   hasher?: PasswordHasher;
   now?: () => number;
@@ -114,6 +122,7 @@ export function createAuthRouter(
     quota,
     allowedOrigins = [],
     onSessionsEnded,
+    adminEmails = [],
     hasher = new PasswordHasher(),
     now = Date.now,
     sessions = createSessions({ store, publicUrl, now }),
@@ -158,6 +167,12 @@ export function createAuthRouter(
     const ttl = purpose === 'verify' ? VERIFY_WITHIN_MS : RESET_WITHIN_MS;
     store.addEmailToken(hashToken(token), userId, purpose, time + ttl);
     return token;
+  }
+
+  // An address from ADMIN_EMAILS that has just been verified becomes an administrator now,
+  // not at the next restart of the server.
+  function grantAdmin(user: UserRow): void {
+    if (user.email !== null && adminEmails.includes(user.email)) store.syncAdmins(adminEmails);
   }
 
   // Checks a password for an address, counting the failures. 'blocked': too many wrong
@@ -317,6 +332,7 @@ export function createAuthRouter(
           'This link is unknown or has expired, please register again.'
         );
       }
+      grantAdmin(user);
       console.log(`Account verified: user ${user.id}`);
       return res.json({ success: true });
     })
@@ -437,6 +453,8 @@ export function createAuthRouter(
       const user = store.resetPassword(tokenHash, passwordHash, now());
       if (!user) return expired();
       onSessionsEnded?.({ userId: user.id });
+      // A reset verifies the address too
+      grantAdmin(user);
       console.log(`Password reset: user ${user.id}`);
       return res.json({ success: true });
     })
@@ -470,6 +488,40 @@ export function createAuthRouter(
       store.changePassword(session.id, passwordHash, session.tokenHash);
       onSessionsEnded?.({ userId: session.id, exceptSession: session.tokenHash });
       console.log(`Password changed: user ${session.id}`);
+      return res.json({ success: true });
+    })
+  );
+
+  // Deletes the account of the signed-in user (NFR-12): the address and the password are
+  // gone, every browser is signed out, the address can register again. The pixels stay in
+  // the log, with nobody to name as their author. The password is asked once more.
+  router.delete(
+    '/account',
+    perHour(limits.authPasswordPerHour),
+    json,
+    route(async (req, res) => {
+      const session = sessions.authenticate(req.headers.cookie);
+      if (!session) return fail(res, 401, 'unauthenticated', 'Not signed in.');
+      const body = DeleteAccountRequestSchema.safeParse(req.body);
+      if (!body.success) return fail(res, 400, 'invalid_request', zodErrorMessage(body.error));
+
+      const check = await checkPassword(session.email, body.data.password, req.ip, now());
+      if (check.result === 'blocked') {
+        return fail(
+          res,
+          429,
+          'too_many_attempts',
+          'Too many wrong passwords, please try again later.'
+        );
+      }
+      if (check.result === 'wrong') {
+        return fail(res, 403, 'invalid_credentials', 'The password is wrong.');
+      }
+      store.deleteAccount(session.id);
+      // The session went with the account; this takes the cookie away
+      sessions.end(req.headers.cookie, res);
+      onSessionsEnded?.({ userId: session.id });
+      console.log(`Account deleted: user ${session.id}`);
       return res.json({ success: true });
     })
   );

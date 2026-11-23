@@ -5,6 +5,7 @@ import { MIGRATIONS_DIR, MifDb, loadMigrations, migrate } from '@mifplace/db';
 import { onOff } from '../env-number.js';
 import { devAccountFromEnv, ensureDevAccount } from './dev-account.js';
 import { PasswordHasher } from './password.js';
+import { prepareAccounts } from './startup.js';
 
 const account = { DEV_USER_EMAIL: 'Dev@VU.lt', DEV_USER_PASSWORD: 'a password for localhost' };
 
@@ -74,6 +75,41 @@ describe('ensureDevAccount', () => {
     const updated = mif.findUserByEmail('dev@vu.lt')!;
     assert.equal(await hasher.verify('second password', updated.password_hash!), true);
     assert.equal(await hasher.verify('first password', updated.password_hash!), false);
+    mif.close();
+  });
+});
+
+describe('prepareAccounts', () => {
+  const hasher = new PasswordHasher({ memoryKiB: 8, passes: 1, parallelism: 1 });
+  const devAccount = { email: 'dev@vu.lt', password: 'a password for localhost' };
+
+  it('makes the development account an administrator at the very first start', async () => {
+    const db = new Database(':memory:');
+    migrate(db, loadMigrations(MIGRATIONS_DIR));
+    const mif = new MifDb(db);
+
+    // A new database: the account does not exist before this start
+    const first = await prepareAccounts(mif, { adminEmails: ['dev@vu.lt'], devAccount, hasher });
+    assert.deepEqual(first, { devUserId: first.devUserId, promoted: 1, demoted: 0 });
+    assert.equal(mif.findUserByEmail('dev@vu.lt')?.id, first.devUserId);
+    assert.equal(mif.findUserByEmail('dev@vu.lt')?.role, 'admin');
+
+    // The next start changes nothing; one without the address in the list takes the role away
+    const again = await prepareAccounts(mif, { adminEmails: ['dev@vu.lt'], devAccount, hasher });
+    assert.deepEqual(again, { devUserId: first.devUserId, promoted: 0, demoted: 0 });
+    const without = await prepareAccounts(mif, { adminEmails: [], devAccount, hasher });
+    assert.equal(without.demoted, 1);
+    assert.equal(mif.findUserByEmail('dev@vu.lt')?.role, 'user');
+    mif.close();
+  });
+
+  it('only sets the roles when there is no development account (production)', async () => {
+    const db = new Database(':memory:');
+    migrate(db, loadMigrations(MIGRATIONS_DIR));
+    const mif = new MifDb(db);
+    mif.ensureVerifiedUser('admin@vu.lt', 'h', 1000);
+    const result = await prepareAccounts(mif, { adminEmails: ['admin@vu.lt'] });
+    assert.deepEqual(result, { devUserId: undefined, promoted: 1, demoted: 0 });
     mif.close();
   });
 });

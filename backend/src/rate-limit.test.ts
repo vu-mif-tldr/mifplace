@@ -105,6 +105,7 @@ describe('rateLimitsFromEnv', () => {
         RATE_LIMIT_AUTH_LOGIN_PER_MINUTE: '10',
         RATE_LIMIT_AUTH_PASSWORD_PER_HOUR: '11',
         RATE_LIMIT_AUTH_PER_MINUTE: '12',
+        RATE_LIMIT_ADMIN_PER_MINUTE: '13',
       })
     ).toEqual({
       palettePerMinute: 1,
@@ -119,6 +120,7 @@ describe('rateLimitsFromEnv', () => {
       authLoginPerMinute: 10,
       authPasswordPerHour: 11,
       authPerMinute: 12,
+      adminPerMinute: 13,
     });
   });
 

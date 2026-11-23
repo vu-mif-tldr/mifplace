@@ -29,6 +29,8 @@ export type RateLimits = {
   authPasswordPerHour: number;
   // POST /api/auth/verify and /logout, GET /api/auth/me, each counted on its own
   authPerMinute: number;
+  // /api/admin, all its routes together
+  adminPerMinute: number;
   // Everything else: the page itself, its scripts, styles and fonts, and the 404 page
   otherPerMinute: number;
 };
@@ -45,6 +47,7 @@ export const DEFAULT_RATE_LIMITS: RateLimits = {
   authLoginPerMinute: 60,
   authPasswordPerHour: 30,
   authPerMinute: 120,
+  adminPerMinute: 120,
   otherPerMinute: 120,
 };
 
@@ -87,6 +90,7 @@ export function rateLimitsFromEnv(env: NodeJS.ProcessEnv = process.env): RateLim
       d.authPasswordPerHour
     ),
     authPerMinute: positiveInt(env, 'RATE_LIMIT_AUTH_PER_MINUTE', d.authPerMinute),
+    adminPerMinute: positiveInt(env, 'RATE_LIMIT_ADMIN_PER_MINUTE', d.adminPerMinute),
     otherPerMinute: positiveInt(env, 'RATE_LIMIT_OTHER_PER_MINUTE', d.otherPerMinute),
   };
 }
