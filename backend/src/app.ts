@@ -100,8 +100,14 @@ export function createApp({
     app.use('/api/auth', createAuthRouter({ ...auth, sessions }, limits));
     // Closed by default: everything under /api from here on needs a session, so a route
     // added below is protected without saying so. A request that changes something must
-    // also come from our own page.
-    app.use('/api', requireSession(sessions), sameOrigin(auth.allowedOrigins ?? []));
+    // also come from our own page. The limiter goes first: without it a request without a
+    // session would be answered before any limit counts it.
+    app.use(
+      '/api',
+      limiter(limits.sessionPerMinute),
+      requireSession(sessions),
+      sameOrigin(auth.allowedOrigins ?? [])
+    );
 
     // For administrators only: what they can do to accounts
     app.use(

@@ -20,9 +20,10 @@
 | `POST /api/auth/password/*`       | `RATE_LIMIT_AUTH_PASSWORD_PER_HOUR`          | 30/hour  |
 | Other `/api/auth/*`               | `RATE_LIMIT_AUTH_PER_MINUTE`                 | 120/min  |
 | `/api/admin/*` (all together)     | `RATE_LIMIT_ADMIN_PER_MINUTE`                | 120/min  |
+| Every `/api` route with a session | `RATE_LIMIT_SESSION_PER_MINUTE`              | 600/min  |
 | The page, its files, the 404 page | `RATE_LIMIT_OTHER_PER_MINUTE`                | 120/min  |
 
-`GET /health` has no limit. The WebSocket `/api/ws` is limited by `WS_MAX_CONNECTIONS` instead.
+The routes that need a session (see "Sessions" below) also count together, before the session is checked, so a request without one is limited too: `RATE_LIMIT_SESSION_PER_MINUTE`. `GET /health` has no limit. The WebSocket `/api/ws` is limited by `WS_MAX_CONNECTIONS` instead.
 
 **Sessions.** Every `/api` route needs a session, the cookie a visitor gets by signing in ([Accounts](#accounts-apiauth)). The exceptions are `/api/auth/*` and `/api/waitlist/*`; `GET /health` is public too. A route added later is closed without saying so.
 

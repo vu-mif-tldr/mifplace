@@ -20,8 +20,8 @@ export function sameOrigin(allowedOrigins: readonly string[]): RequestHandler {
 }
 
 // Lets a request through only with a session; the routes after it find the user with
-// sessionUser(). A blocked user has no session. Answered before the per-route limits: the
-// check is one lookup by primary key, cheaper than counting the request.
+// sessionUser(). A blocked user has no session. Answered before the per-route limits, after
+// the shared one of all these routes (RATE_LIMIT_SESSION_PER_MINUTE, app.ts).
 export function requireSession(sessions: Sessions): RequestHandler {
   return (req, res: Response<AuthErrorResponse>, next) => {
     const user = sessions.authenticate(req.headers.cookie);

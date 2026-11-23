@@ -31,6 +31,9 @@ export type RateLimits = {
   authPerMinute: number;
   // /api/admin, all its routes together
   adminPerMinute: number;
+  // Every /api route behind the session check, all together, counted before the check: a
+  // request without a session is answered 401 without reaching the limit of its route
+  sessionPerMinute: number;
   // Everything else: the page itself, its scripts, styles and fonts, and the 404 page
   otherPerMinute: number;
 };
@@ -48,6 +51,7 @@ export const DEFAULT_RATE_LIMITS: RateLimits = {
   authPasswordPerHour: 30,
   authPerMinute: 120,
   adminPerMinute: 120,
+  sessionPerMinute: 600,
   otherPerMinute: 120,
 };
 
@@ -91,6 +95,7 @@ export function rateLimitsFromEnv(env: NodeJS.ProcessEnv = process.env): RateLim
     ),
     authPerMinute: positiveInt(env, 'RATE_LIMIT_AUTH_PER_MINUTE', d.authPerMinute),
     adminPerMinute: positiveInt(env, 'RATE_LIMIT_ADMIN_PER_MINUTE', d.adminPerMinute),
+    sessionPerMinute: positiveInt(env, 'RATE_LIMIT_SESSION_PER_MINUTE', d.sessionPerMinute),
     otherPerMinute: positiveInt(env, 'RATE_LIMIT_OTHER_PER_MINUTE', d.otherPerMinute),
   };
 }

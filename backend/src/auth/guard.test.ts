@@ -5,6 +5,7 @@ import { afterEach, describe, it } from 'vitest';
 import Database from 'better-sqlite3';
 import { MIGRATIONS_DIR, MifDb, loadMigrations, migrate, type NewEvent } from '@mifplace/db';
 import { createApp } from '../app.js';
+import type { RateLimits } from '../rate-limits.js';
 import { ConsoleMailer } from '../mailer.js';
 import { PasswordHasher } from './password.js';
 import type { AuthOptions } from './router.js';
@@ -29,7 +30,7 @@ afterEach(() => {
 
 type Json = { success?: boolean; code?: string; error?: string; eventId?: number };
 
-async function start(options: Partial<AuthOptions> = {}) {
+async function start(options: Partial<AuthOptions> = {}, rateLimits: Partial<RateLimits> = {}) {
   const raw = new Database(':memory:');
   raw.pragma('foreign_keys = ON');
   migrate(raw, loadMigrations(MIGRATIONS_DIR));
@@ -44,6 +45,7 @@ async function start(options: Partial<AuthOptions> = {}) {
     checkDbHealth: () => {},
     getCanvasState: () => ({ pixels: [], eventId: 0, timestamp: 0 }),
     appendEvent: (event) => placed.push(event),
+    rateLimits,
     waitlist: { store: mif, mailer, publicUrl: 'http://localhost:3000' },
     auth: {
       store: mif,
@@ -135,6 +137,18 @@ describe('routes without a session', () => {
     );
     // Its own 401: asking who is signed in is allowed to everyone
     assert.equal((await call('GET', '/api/auth/me')).body.code, 'unauthenticated');
+  });
+
+  it('counts them under the shared limit of the routes that need a session', async () => {
+    const { call } = await start({}, { sessionPerMinute: 3 });
+    for (const path of ['/api/palette', '/api/canvas', '/api/anything']) {
+      assert.equal((await call('GET', path)).status, 401, path);
+    }
+    assert.equal((await call('GET', '/api/canvas/size')).status, 429);
+    assert.equal((await call('POST', '/api/pixels', { body: pixel })).status, 429);
+    // The public routes have limits of their own
+    assert.equal((await call('GET', '/api/auth/me')).status, 401);
+    assert.equal((await call('GET', '/health')).status, 200);
   });
 });
 
