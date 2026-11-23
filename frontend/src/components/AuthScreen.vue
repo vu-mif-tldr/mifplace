@@ -265,9 +265,9 @@ function submit() {
       <header class="intro">
         <!-- The ring of the canvas around the logo; it turns while a request is on its way -->
         <span class="ring" :class="{ busy }">
-          <BrandMark :size="44" :name="false" />
+          <BrandMark :size="36" :name="false" />
         </span>
-        <h1>vu.place</h1>
+        <h1>VU/place</h1>
         <p class="about">{{ t.about }}</p>
       </header>
 
@@ -327,7 +327,7 @@ function submit() {
 </template>
 
 <style scoped>
-/* The same night as the canvas page, lit from below in the neutral light: nobody holds a
+/* The same bordo as the canvas page, lit from below in the neutral light: nobody holds a
    colour yet. The canvas itself is not shown before sign-in. */
 .auth {
   min-height: 100dvh;
@@ -341,7 +341,7 @@ function submit() {
       color-mix(in srgb, var(--glow) 30%, transparent),
       transparent
     ),
-    var(--ink);
+    var(--stage);
 }
 
 .column {
@@ -391,9 +391,10 @@ function submit() {
 
 h1 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 44px;
   line-height: 1;
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: -0.03em;
 }
 
