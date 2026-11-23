@@ -12,6 +12,7 @@ import {
   type PlacePixelResponse,
 } from '@mifplace/shared';
 import type { NewEvent } from '@mifplace/db';
+import { createAuthRouter, type AuthOptions } from './auth/router.js';
 import { createWaitlistRouter, type WaitlistOptions } from './waitlist.js';
 import type { LiveStats } from './live/live-server.js';
 import { DEFAULT_RATE_LIMITS, limiter, type RateLimits } from './rate-limits.js';
@@ -41,6 +42,8 @@ export interface AppConfig {
   trustProxy?: boolean | number | string;
   // The waitlist on vu.place (POST /api/waitlist...). Left out, the routes do not exist.
   waitlist?: WaitlistOptions;
+  // The accounts (/api/auth/...). Left out, the routes do not exist.
+  auth?: AuthOptions;
 }
 
 type HealthResponse = {
@@ -66,6 +69,7 @@ export function createApp({
   rateLimits,
   trustProxy = false,
   waitlist,
+  auth,
 }: AppConfig) {
   const app = express();
   app.set('trust proxy', trustProxy);
@@ -183,6 +187,8 @@ export function createApp({
   );
 
   if (waitlist) app.use('/api/waitlist', createWaitlistRouter(waitlist, limits));
+
+  if (auth) app.use('/api/auth', createAuthRouter(auth, limits));
 
   // Everything not answered above: the page itself, its files and the 404 page
   app.use(limiter(limits.otherPerMinute));

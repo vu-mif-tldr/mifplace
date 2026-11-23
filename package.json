@@ -12,7 +12,7 @@
     "tools"
   ],
   "engines": {
-    "node": ">=24"
+    "node": ">=24.7"
   },
   "scripts": {
     "setup": "node scripts/setup.mjs",

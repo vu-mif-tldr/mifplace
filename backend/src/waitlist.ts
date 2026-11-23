@@ -6,6 +6,7 @@ import {
   zodErrorMessage,
   type ErrorResponse,
 } from '@mifplace/shared';
+import { EmailBudget, type HourlyQuota } from './email-budget.js';
 import type { Mailer } from './mailer.js';
 import { limiter, perHour, type RateLimits } from './rate-limits.js';
 
@@ -36,11 +37,16 @@ export interface WaitlistOptions {
   emailsPerAddressPerDay?: number;
   // All emails together. The SendPulse free plan sends 50 per hour, we stay below it.
   emailsPerHour?: number;
+  // The hourly quota shared with the other emails of the server (accounts); replaces emailsPerHour.
+  quota?: HourlyQuota;
   // A pending address must be confirmed within this time, later the link expires.
   confirmWithinMs?: number;
 }
 
 export type WaitlistResponse = { success: true };
+
+// Was defined here; the accounts use it too
+export { EmailBudget };
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -48,57 +54,6 @@ const DAY = 24 * HOUR;
 
 // How long a pending address may wait for confirmation; the server also deletes older ones on start.
 export const CONFIRM_WITHIN_MS = 7 * DAY;
-
-// In-memory email limits. A restart forgets them, which is fine for a waitlist.
-export class EmailBudget {
-  private readonly global: number[] = [];
-  private readonly perAddress = new Map<string, number[]>();
-  private lastPrune = 0;
-
-  constructor(
-    private readonly emailIntervalMs: number,
-    private readonly emailsPerAddressPerDay: number,
-    private readonly emailsPerHour: number
-  ) {}
-
-  // 'address': this address got enough emails, skip quietly (the answer must not differ).
-  // 'global': the hourly quota is used up, the user is asked to try later.
-  check(email: string, now: number): 'ok' | 'address' | 'global' {
-    this.prune(now);
-    const times = (this.perAddress.get(email) ?? []).filter((t) => now - t < DAY);
-    const last = times[times.length - 1];
-    if (last !== undefined && now - last < this.emailIntervalMs) return 'address';
-    if (times.length >= this.emailsPerAddressPerDay) return 'address';
-    while (this.global.length > 0 && now - this.global[0]! >= HOUR) this.global.shift();
-    if (this.global.length >= this.emailsPerHour) return 'global';
-    return 'ok';
-  }
-
-  record(email: string, now: number): void {
-    this.global.push(now);
-    const times = (this.perAddress.get(email) ?? []).filter((t) => now - t < DAY);
-    times.push(now);
-    this.perAddress.set(email, times);
-  }
-
-  // Takes back a record() whose email was not sent, so a retry is not counted against the limits.
-  release(email: string, time: number): void {
-    const times = this.perAddress.get(email);
-    const i = times?.lastIndexOf(time) ?? -1;
-    if (i < 0) return;
-    times!.splice(i, 1);
-    this.global.splice(this.global.lastIndexOf(time), 1);
-  }
-
-  // Drops addresses without emails in the last day, at most every 10 minutes.
-  private prune(now: number): void {
-    if (now - this.lastPrune < 10 * MINUTE) return;
-    this.lastPrune = now;
-    for (const [email, times] of this.perAddress) {
-      if (times.every((t) => now - t >= DAY)) this.perAddress.delete(email);
-    }
-  }
-}
 
 export function confirmationEmail(email: string, publicUrl: string, token: string) {
   const base = publicUrl.replace(/\/+$/, '');
@@ -141,6 +96,7 @@ export function createWaitlistRouter(
     emailIntervalMs = 10 * MINUTE,
     emailsPerAddressPerDay = 3,
     emailsPerHour = 40,
+    quota,
     confirmWithinMs = CONFIRM_WITHIN_MS,
   }: WaitlistOptions,
   // Requests per IP for the three routes (rate-limits.ts); the email limits above are separate
@@ -150,7 +106,7 @@ export function createWaitlistRouter(
   >
 ): Router {
   const router = Router();
-  const budget = new EmailBudget(emailIntervalMs, emailsPerAddressPerDay, emailsPerHour);
+  const budget = new EmailBudget(emailIntervalMs, emailsPerAddressPerDay, quota ?? emailsPerHour);
 
   const signupLimiter = perHour(
     limits.waitlistSignupsPerHour,
