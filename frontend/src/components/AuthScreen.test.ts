@@ -33,11 +33,16 @@ async function follow(wrapper: VueWrapper, label: string) {
   await link!.trigger('click');
 }
 
-async function fill(wrapper: VueWrapper, values: { email?: string; password?: string }) {
+// A new password goes into both of its fields unless `repeat` says otherwise
+async function fill(
+  wrapper: VueWrapper,
+  values: { email?: string; password?: string; repeat?: string }
+) {
   if (values.email !== undefined) await wrapper.get('input[type=email]').setValue(values.email);
-  if (values.password !== undefined) {
-    await wrapper.get('input[type=password]').setValue(values.password);
-  }
+  const [first, second] = wrapper.findAll('input[type=password]');
+  if (values.password !== undefined) await first.setValue(values.password);
+  const repeat = values.repeat ?? values.password;
+  if (second && repeat !== undefined) await second.setValue(repeat);
 }
 
 async function submit(wrapper: VueWrapper) {
@@ -105,16 +110,10 @@ describe('sign-in', () => {
     expect(wrapper.get('.ring').classes()).not.toContain('busy');
   });
 
-  it('shows the password on request', async () => {
+  it('asks for the password once, with no button beside it', () => {
     const wrapper = screen();
-    await fill(wrapper, { password: 'a good password' });
-    const reveal = wrapper.get('.reveal');
-    expect(reveal.text()).toBe(t.show);
-    await reveal.trigger('click');
-    expect(wrapper.get('.field input[autocomplete=current-password]').attributes('type')).toBe(
-      'text'
-    );
-    expect(reveal.text()).toBe(t.hide);
+    expect(wrapper.findAll('input[type=password]')).toHaveLength(1);
+    expect(wrapper.find('.field button').exists()).toBe(false);
   });
 });
 
@@ -124,7 +123,17 @@ describe('registration', () => {
     const wrapper = screen();
     await follow(wrapper, t.toRegister);
     expect(title(wrapper)).toBe(t.registerTitle);
-    expect(wrapper.get('input[type=password]').attributes('autocomplete')).toBe('new-password');
+    // The password and its repetition; password managers fill both
+    const passwords = wrapper.findAll('input[type=password]');
+    expect(passwords.map((input) => input.attributes('autocomplete'))).toEqual([
+      'new-password',
+      'new-password',
+    ]);
+    expect(wrapper.findAll('.field .label').map((label) => label.text())).toEqual([
+      t.email,
+      t.password,
+      t.repeatPassword,
+    ]);
     expect(wrapper.get('.hint').text()).toBe(t.passwordHint);
 
     await fill(wrapper, { email: 'ona@mif.stud.vu.lt', password: 'a good password' });
@@ -148,6 +157,31 @@ describe('registration', () => {
     expect(register).not.toHaveBeenCalled();
   });
 
+  it('asks for the same password twice before asking the server', async () => {
+    vi.mocked(register).mockResolvedValue(ok);
+    const wrapper = screen();
+    await follow(wrapper, t.toRegister);
+    await fill(wrapper, {
+      email: 'ona@vu.lt',
+      password: 'a good password',
+      repeat: 'a good pasword',
+    });
+    await submit(wrapper);
+    expect(register).not.toHaveBeenCalled();
+    expect(wrapper.findAll('.field .error').map((error) => error.text())).toEqual([
+      t.passwordsDiffer,
+    ]);
+
+    // An empty repetition is not the same either
+    await fill(wrapper, { repeat: '' });
+    await submit(wrapper);
+    expect(register).not.toHaveBeenCalled();
+
+    await fill(wrapper, { repeat: 'a good password' });
+    await submit(wrapper);
+    expect(register).toHaveBeenCalledWith('ona@vu.lt', 'a good password');
+  });
+
   it('says when the address is not a VU one, and keeps the form', async () => {
     vi.mocked(register).mockResolvedValue({ ok: false, code: 'email_not_allowed' });
     const wrapper = screen();
@@ -165,7 +199,8 @@ describe('registration', () => {
     await submit(wrapper);
     await follow(wrapper, t.toRegister);
     expect((wrapper.get('input[type=email]').element as HTMLInputElement).value).toBe('ona@vu.lt');
-    expect((wrapper.get('input[type=password]').element as HTMLInputElement).value).toBe('');
+    const passwords = wrapper.findAll('input[type=password]');
+    expect(passwords.map((input) => (input.element as HTMLInputElement).value)).toEqual(['', '']);
     expect(wrapper.find('.message').exists()).toBe(false);
   });
 });
@@ -247,10 +282,20 @@ describe('the link of the "forgot password" email', () => {
     expect(title(wrapper)).toBe(t.resetTitle);
     expect(wrapper.find('input[type=email]').exists()).toBe(false);
 
+    expect(wrapper.findAll('.field .label').map((label) => label.text())).toEqual([
+      t.newPassword,
+      t.repeatPassword,
+    ]);
+
     await fill(wrapper, { password: 'short' });
     await submit(wrapper);
     expect(resetPassword).not.toHaveBeenCalled();
     expect(wrapper.get('.field .error').text()).toBe(t.shortPassword);
+
+    await fill(wrapper, { password: 'a brand new password', repeat: 'a brand new passwort' });
+    await submit(wrapper);
+    expect(resetPassword).not.toHaveBeenCalled();
+    expect(wrapper.get('.field .error').text()).toBe(t.passwordsDiffer);
 
     await fill(wrapper, { password: 'a brand new password' });
     await submit(wrapper);

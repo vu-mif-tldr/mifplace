@@ -51,14 +51,17 @@ const token = props.link.name === 'home' ? '' : props.link.token;
 
 const email = ref('');
 const password = ref('');
+// A new password is typed twice, so a typo does not lock the visitor out
+const repeat = ref('');
 const emailError = ref('');
 const passwordError = ref('');
+const repeatError = ref('');
 // The answer of the server to the last request: what went wrong, or what worked
 const error = ref('');
 const notice = ref('');
 const busy = ref(false);
 
-type Field = 'email' | 'password' | 'newPassword';
+type Field = 'email' | 'password' | 'newPassword' | 'repeatPassword';
 
 interface View {
   title: string;
@@ -88,7 +91,7 @@ function viewOf(screen: Mode): View {
     case 'register':
       return {
         title: t.registerTitle,
-        fields: ['email', 'newPassword'],
+        fields: ['email', 'newPassword', 'repeatPassword'],
         submit: { label: t.register, action: onRegister },
         links: [{ to: 'signIn', label: t.toSignIn }],
       };
@@ -139,7 +142,7 @@ function viewOf(screen: Mode): View {
     case 'reset':
       return {
         title: t.resetTitle,
-        fields: ['newPassword'],
+        fields: ['newPassword', 'repeatPassword'],
         submit: { label: t.savePassword, action: onReset },
         links: [],
       };
@@ -158,14 +161,16 @@ function viewOf(screen: Mode): View {
 
 const view = computed(() => viewOf(mode.value));
 
-// Another screen: the address stays typed in, the password and the messages do not
+// Another screen: the address stays typed in, the passwords and the messages do not
 function go(to: Mode) {
   // A link that no longer works is done with once its message was read and left
   if (mode.value === 'verifyExpired' || mode.value === 'resetExpired') emit('linkDone');
   mode.value = to;
   password.value = '';
+  repeat.value = '';
   emailError.value = '';
   passwordError.value = '';
+  repeatError.value = '';
   error.value = '';
   notice.value = '';
 }
@@ -188,6 +193,11 @@ function checkNewPassword(): boolean {
         ? t.longPassword
         : '';
   return passwordError.value === '';
+}
+
+function checkRepeat(): boolean {
+  repeatError.value = repeat.value === password.value ? '' : t.passwordsDiffer;
+  return repeatError.value === '';
 }
 
 function checkPassword(): boolean {
@@ -219,7 +229,7 @@ async function onSignIn() {
 }
 
 async function onRegister() {
-  const valid = [checkEmail(), checkNewPassword()].every(Boolean);
+  const valid = [checkEmail(), checkNewPassword(), checkRepeat()].every(Boolean);
   if (!valid) return;
   const result = await send(() => register(email.value, password.value));
   if (result.ok) go('registered');
@@ -243,7 +253,8 @@ async function onVerify() {
 }
 
 async function onReset() {
-  if (!checkNewPassword()) return;
+  const valid = [checkNewPassword(), checkRepeat()].every(Boolean);
+  if (!valid) return;
   const result = await send(() => resetPassword(token, password.value));
   if (result.ok) {
     emit('linkDone');
@@ -301,6 +312,14 @@ function submit() {
           :label="mode === 'reset' ? t.newPassword : t.password"
           :hint="t.passwordHint"
           :error="passwordError"
+        />
+        <AuthField
+          v-if="view.fields.includes('repeatPassword')"
+          v-model="repeat"
+          type="password"
+          autocomplete="new-password"
+          :label="t.repeatPassword"
+          :error="repeatError"
         />
 
         <p v-if="error" class="message error">{{ error }}</p>

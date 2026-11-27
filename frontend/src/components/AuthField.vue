@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { authTexts } from '../texts';
-
-// One labelled input of the account forms: an email address or a password. A password can be
-// shown while typing, so the forms need no "repeat the password" field.
+// One labelled input of the account forms: an email address or a password
 const value = defineModel<string>({ required: true });
 defineProps<{
   label: string;
@@ -15,8 +11,6 @@ defineProps<{
   hint?: string;
   error?: string;
 }>();
-
-const shown = ref(false);
 </script>
 
 <template>
@@ -25,15 +19,12 @@ const shown = ref(false);
     <span class="box">
       <input
         v-model="value"
-        :type="type === 'password' && shown ? 'text' : type"
+        :type="type"
         :autocomplete="autocomplete"
         :placeholder="placeholder"
         autocapitalize="none"
         spellcheck="false"
       />
-      <button v-if="type === 'password'" type="button" class="reveal" @click="shown = !shown">
-        {{ shown ? authTexts.hide : authTexts.show }}
-      </button>
     </span>
     <span v-if="error" class="error">{{ error }}</span>
     <span v-else-if="hint" class="hint">{{ hint }}</span>
@@ -52,7 +43,7 @@ const shown = ref(false);
   color: var(--muted);
 }
 
-/* The input and the "show" button share one frame */
+/* The frame of the input */
 .box {
   display: flex;
   align-items: center;
@@ -88,19 +79,6 @@ input {
 
 input::placeholder {
   color: rgb(255 255 255 / 32%);
-}
-
-.reveal {
-  flex: none;
-  height: 36px;
-  margin-right: 8px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 14px;
-  cursor: pointer;
 }
 
 .hint,
