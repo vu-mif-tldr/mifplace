@@ -27,6 +27,15 @@ export function cellCenter(cell: Cell, offset: Cell, cellPx: number): Cell {
   return { x: offset.x + (cell.x + 0.5) * cellPx, y: offset.y + (cell.y + 0.5) * cellPx };
 }
 
+// The cell at a point in viewport px, or null when the point is beside the canvas. The canvas
+// starts at `offset` and has `cellPx` px per cell.
+export function cellAt(point: Cell, offset: Cell, cellPx: number, size: CanvasSize): Cell | null {
+  const x = Math.floor((point.x - offset.x) / cellPx);
+  const y = Math.floor((point.y - offset.y) / cellPx);
+  if (x < 0 || y < 0 || x >= size.width || y >= size.height) return null;
+  return { x, y };
+}
+
 // A click on the cell that is already selected places the pixel (FR-7: pick, then confirm);
 // a click anywhere else only moves the selection
 export function clickAction(selected: Cell | null, clicked: Cell): 'place' | 'select' {

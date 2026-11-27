@@ -5,8 +5,11 @@ import {
   type PaletteColor,
 } from '@mifplace/shared';
 
-// The <canvas> element has one pixel per cell. It is scaled up on screen with a CSS
-// transform, so cells stay sharp (image-rendering: pixelated) at any size.
+// The cells live in a source <canvas> that is not on the page, one pixel per cell; the loupe
+// reads them from there too. The <canvas> on the page has the size of the viewport in screen
+// pixels, and showCanvas copies the source onto it at the current zoom and offset, without
+// smoothing. Scaling the source with a CSS transform and image-rendering: pixelated instead
+// leaves the cells blurred in Safari.
 
 // Draw the whole canvas received from the server
 export function drawCanvas(
@@ -56,17 +59,42 @@ export function paintCell(canvas: HTMLCanvasElement, x: number, y: number, color
   ctx.fillRect(x, y, 1, 1);
 }
 
-// Find which cell was clicked. The position is taken from the canvas rectangle on screen,
-// so it is right at any zoom: offsetX can be rounded to whole pixels, and one pixel
-// of the element is a whole cell.
-export function getClickedCell(event: MouseEvent, size: CanvasSize) {
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  const cell = (client: number, start: number, length: number, cells: number) =>
-    // A click exactly on the far edge still belongs to the last cell
-    Math.min(cells - 1, Math.max(0, Math.floor(((client - start) / length) * cells)));
+// What the page shows: the viewport size and the canvas offset in CSS px, CSS px per cell,
+// and screen pixels per CSS px (devicePixelRatio)
+export type CanvasView = {
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  cellPx: number;
+  pixelRatio: number;
+};
 
-  return {
-    x: cell(event.clientX, rect.left, rect.width, size.width),
-    y: cell(event.clientY, rect.top, rect.height, size.height),
-  };
+// Show the source canvas on the page canvas, each cell a block of screen pixels in one colour
+export function showCanvas(
+  target: HTMLCanvasElement,
+  source: HTMLCanvasElement,
+  size: CanvasSize,
+  view: CanvasView
+) {
+  const width = Math.round(view.width * view.pixelRatio);
+  const height = Math.round(view.height * view.pixelRatio);
+  // Setting the size clears the canvas and resets the context, so only when it changes
+  if (target.width !== width) target.width = width;
+  if (target.height !== height) target.height = height;
+
+  const ctx = target.getContext('2d');
+  if (!ctx) return;
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  ctx.imageSmoothingEnabled = false;
+
+  // From cells to screen pixels
+  const scale = view.cellPx * view.pixelRatio;
+  ctx.setTransform(scale, 0, 0, scale, view.x * view.pixelRatio, view.y * view.pixelRatio);
+  // White until the first snapshot is drawn on the source
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, size.width, size.height);
+  if (source.width === size.width && source.height === size.height) ctx.drawImage(source, 0, 0);
 }

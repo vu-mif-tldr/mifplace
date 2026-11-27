@@ -170,7 +170,9 @@ describe('CanvasPage', () => {
     const wrapper = await page();
     await pick(wrapper, 0, 1);
     expect(wrapper.findComponent(SelectionRing).exists()).toBe(true);
-    await wrapper.get('.viewport').trigger('click');
+    // happy-dom measures nothing: the 2x2 canvas is 1 px per cell from the viewport corner,
+    // so 5, 5 is beside it
+    await wrapper.get('canvas.canvas').trigger('click', { clientX: 5, clientY: 5 });
     expect(wrapper.findComponent(SelectionRing).exists()).toBe(false);
     wrapper.unmount();
   });

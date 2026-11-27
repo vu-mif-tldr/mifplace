@@ -1,4 +1,5 @@
 import {
+  cellAt,
   cellCenter,
   clampOffset,
   clickAction,
@@ -58,6 +59,42 @@ describe('cellCenter', () => {
   it('is the middle of the cell on screen', () => {
     expect(cellCenter({ x: 0, y: 0 }, { x: 10, y: 20 }, 5)).toEqual({ x: 12.5, y: 22.5 });
     expect(cellCenter({ x: 3, y: 1 }, { x: -100, y: 0 }, 10)).toEqual({ x: -65, y: 15 });
+  });
+});
+
+describe('cellAt', () => {
+  const size = { width: 128, height: 128 };
+  const origin = { x: 0, y: 0 };
+
+  it('turns a point into a cell (5x5 px each on a 640 px canvas)', () => {
+    expect(cellAt({ x: 12, y: 7 }, origin, 5, size)).toEqual({ x: 2, y: 1 });
+  });
+
+  it('keeps points on a cell edge in that cell', () => {
+    expect(cellAt({ x: 0, y: 4.9 }, origin, 5, size)).toEqual({ x: 0, y: 0 });
+    expect(cellAt({ x: 5, y: 5 }, origin, 5, size)).toEqual({ x: 1, y: 1 });
+  });
+
+  it('takes the canvas offset and zoom into account', () => {
+    // Zoomed in 4 times (20 px per cell) and moved, the canvas starts at 100, 50
+    expect(cellAt({ x: 100 + 20 * 7 + 19, y: 50 + 20 * 3 }, { x: 100, y: 50 }, 20, size)).toEqual({
+      x: 7,
+      y: 3,
+    });
+  });
+
+  it('works for a non-square canvas', () => {
+    // 200x100 cells shown as 640x320 px, 3.2 px per cell
+    const wide = { width: 200, height: 100 };
+    expect(cellAt({ x: 639, y: 319 }, origin, 3.2, wide)).toEqual({ x: 199, y: 99 });
+    expect(cellAt({ x: 3.3, y: 3.1 }, origin, 3.2, wide)).toEqual({ x: 1, y: 0 });
+  });
+
+  it('finds no cell beside the canvas', () => {
+    expect(cellAt({ x: 99, y: 60 }, { x: 100, y: 50 }, 5, size)).toBeNull();
+    expect(cellAt({ x: 120, y: 49 }, { x: 100, y: 50 }, 5, size)).toBeNull();
+    expect(cellAt({ x: 740, y: 60 }, { x: 100, y: 50 }, 5, size)).toBeNull();
+    expect(cellAt({ x: 120, y: 690 }, { x: 100, y: 50 }, 5, size)).toBeNull();
   });
 });
 
