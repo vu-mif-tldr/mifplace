@@ -29,8 +29,7 @@ export const authTexts = {
   password: 'Slaptažodis',
   newPassword: 'Naujas slaptažodis',
   passwordHint: 'Bent 10 simbolių',
-  show: 'Rodyti',
-  hide: 'Slėpti',
+  repeatPassword: 'Pakartok slaptažodį',
 
   signInTitle: 'Prisijunk',
   signIn: 'Prisijungti',
@@ -69,6 +68,7 @@ export const authTexts = {
   noPassword: 'Įvesk slaptažodį.',
   shortPassword: 'Slaptažodis turi būti bent 10 simbolių.',
   longPassword: 'Slaptažodis per ilgas: daugiausia 128 simboliai.',
+  passwordsDiffer: 'Slaptažodžiai nesutampa.',
 };
 
 // What to say when an account request fails, by the code of the answer (auth.ts). The English
