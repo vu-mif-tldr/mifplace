@@ -1,4 +1,4 @@
-import { drawCanvas, getClickedCell, paintCell } from './canvas';
+import { drawCanvas, paintCell, showCanvas } from './canvas';
 
 // Ids have a gap on purpose: colors must be looked up by id, not by index
 const palette = [
@@ -18,52 +18,62 @@ function fakeCanvas() {
 
 const noContextCanvas = () => ({ getContext: () => null }) as unknown as HTMLCanvasElement;
 
-// A click on a canvas shown at left, top with the given on-screen size
-function click(
-  clientX: number,
-  clientY: number,
-  rect = { left: 0, top: 0, width: 640, height: 640 }
-) {
-  const currentTarget = { getBoundingClientRect: () => rect };
-  return { clientX, clientY, currentTarget } as unknown as MouseEvent;
+// A canvas element that records what is drawn on it
+function recordingCanvas() {
+  const ctx = {
+    fillStyle: '',
+    imageSmoothingEnabled: true,
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    fillRect: vi.fn(),
+    drawImage: vi.fn(),
+  };
+  const canvas = { width: 300, height: 150, getContext: vi.fn(() => ctx) };
+  return { canvas: canvas as unknown as HTMLCanvasElement, ctx };
 }
 
-describe('getClickedCell', () => {
+describe('showCanvas', () => {
   const size = { width: 128, height: 128 };
+  const source = { width: 128, height: 128 } as HTMLCanvasElement;
+  const view = { width: 800.4, height: 600, x: 80.5, y: -10, cellPx: 3.5, pixelRatio: 2 };
 
-  it('turns the click position into a cell (5x5 px each on a 640 px canvas)', () => {
-    expect(getClickedCell(click(12, 7), size)).toEqual({ x: 2, y: 1 });
+  it('fills the viewport in screen pixels and draws the cells there without smoothing', () => {
+    const { canvas, ctx } = recordingCanvas();
+
+    showCanvas(canvas, source, size, view);
+
+    expect(canvas.width).toBe(1601);
+    expect(canvas.height).toBe(1200);
+    expect(ctx.clearRect).toHaveBeenCalledWith(0, 0, 1601, 1200);
+    expect(ctx.imageSmoothingEnabled).toBe(false);
+    // 7 screen pixels per cell, the canvas starts at 161, -20 screen pixels
+    expect(ctx.setTransform).toHaveBeenLastCalledWith(7, 0, 0, 7, 161, -20);
+    expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 128, 128);
+    expect(ctx.drawImage).toHaveBeenCalledWith(source, 0, 0);
   });
 
-  it('keeps clicks on a cell edge in that cell', () => {
-    expect(getClickedCell(click(0, 4.9), size)).toEqual({ x: 0, y: 0 });
-    expect(getClickedCell(click(5, 5), size)).toEqual({ x: 1, y: 1 });
+  it('keeps the size of the element while it fits, so it is not reset on every frame', () => {
+    const { canvas } = recordingCanvas();
+    showCanvas(canvas, source, size, view);
+    const widthSetter = vi.fn();
+    Object.defineProperty(canvas, 'width', { get: () => 1601, set: widthSetter });
+
+    showCanvas(canvas, source, size, { ...view, x: 0 });
+
+    expect(widthSetter).not.toHaveBeenCalled();
   });
 
-  it('takes the canvas position and zoom into account', () => {
-    // Zoomed in 4 times (20 px per cell) and moved, the canvas starts at 100, 50
-    const rect = { left: 100, top: 50, width: 2560, height: 2560 };
-    expect(getClickedCell(click(100 + 20 * 7 + 19, 50 + 20 * 3, rect), size)).toEqual({
-      x: 7,
-      y: 3,
-    });
+  it('shows only the white background until a snapshot is drawn on the source', () => {
+    const { canvas, ctx } = recordingCanvas();
+
+    showCanvas(canvas, { width: 300, height: 150 } as HTMLCanvasElement, size, view);
+
+    expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 128, 128);
+    expect(ctx.drawImage).not.toHaveBeenCalled();
   });
 
-  it('works for a non-square canvas', () => {
-    // 200x100 cells shown as 640x320 px, 3.2 px per cell
-    const rect = { left: 0, top: 0, width: 640, height: 320 };
-    expect(getClickedCell(click(639, 319, rect), { width: 200, height: 100 })).toEqual({
-      x: 199,
-      y: 99,
-    });
-    expect(getClickedCell(click(3.3, 3.1, rect), { width: 200, height: 100 })).toEqual({
-      x: 1,
-      y: 0,
-    });
-  });
-
-  it('keeps a click on the far edge in the last cell', () => {
-    expect(getClickedCell(click(640, 640), size)).toEqual({ x: 127, y: 127 });
+  it('does nothing when the canvas has no 2d context', () => {
+    expect(() => showCanvas(noContextCanvas(), source, size, view)).not.toThrow();
   });
 });
 

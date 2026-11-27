@@ -2,10 +2,18 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { CanvasSize, CanvasState, PaletteColor } from '@mifplace/shared';
 import type { Bloom } from '../blooms';
-import { drawCanvas, getClickedCell, paintCell } from '../canvas';
+import { drawCanvas, paintCell, showCanvas } from '../canvas';
 import { texts } from '../texts';
 import { LOUPE_UNTIL_PX, lensPoint, loupePlace } from '../loupe';
-import { cellCenter, clampOffset, fitCellSize, visiblePart, zoomOffset, type Cell } from '../view';
+import {
+  cellAt,
+  cellCenter,
+  clampOffset,
+  fitCellSize,
+  visiblePart,
+  zoomOffset,
+  type Cell,
+} from '../view';
 import BloomLayer from './BloomLayer.vue';
 import CellLoupe from './CellLoupe.vue';
 import CoordsLabel from './CoordsLabel.vue';
@@ -48,18 +56,22 @@ const y = ref(0);
 const cellPx = computed(() => cellSize.value * scale.value);
 const offset = computed(() => ({ x: x.value, y: y.value }));
 
-// Counts what is drawn on the canvas element, so the loupe copies it again
+// The cells, one pixel each, on a canvas that is not on the page (see canvas.ts). The canvas
+// element on the page shows them at the current zoom; the loupe reads them from here.
+const source = document.createElement('canvas');
+
+// Counts what is drawn on the source, so the page canvas and the loupe copy it again
 const drawn = ref(0);
 
-// Draw a whole snapshot, or one cell, on the canvas element. The size is passed in: the page
-// draws right after it learns the size, before the prop has reached this component.
+// Draw a whole snapshot, or one cell, on the source. The size is passed in: the page draws
+// right after it learns the size, before the prop has reached this component.
 function draw(size: CanvasSize, state: CanvasState, palette: PaletteColor[]) {
-  if (canvasEl.value) drawCanvas(canvasEl.value, size, state, palette);
+  drawCanvas(source, size, state, palette);
   drawn.value++;
 }
 
 function paint(cell: Cell, color: string) {
-  if (canvasEl.value) paintCell(canvasEl.value, cell.x, cell.y, color);
+  paintCell(source, cell.x, cell.y, color);
   drawn.value++;
 }
 
@@ -97,19 +109,66 @@ const resizeObserver = new window.ResizeObserver(([entry]) => {
   fitToViewport();
 });
 
+// Screen pixels per CSS px. It changes when the window moves to another screen or the page
+// is zoomed; a media query for the current ratio reports that.
+const pixelRatio = ref(window.devicePixelRatio || 1);
+let ratioQuery: ReturnType<typeof window.matchMedia> | null = null;
+
+function watchPixelRatio() {
+  ratioQuery?.removeEventListener('change', onRatioChange);
+  ratioQuery = window.matchMedia?.(`(resolution: ${pixelRatio.value}dppx)`) ?? null;
+  ratioQuery?.addEventListener('change', onRatioChange);
+}
+
+function onRatioChange() {
+  pixelRatio.value = window.devicePixelRatio || 1;
+  watchPixelRatio();
+}
+
 onMounted(() => {
   if (viewportEl.value) resizeObserver.observe(viewportEl.value);
+  watchPixelRatio();
 });
-onUnmounted(() => resizeObserver.disconnect());
+onUnmounted(() => {
+  resizeObserver.disconnect();
+  ratioQuery?.removeEventListener('change', onRatioChange);
+});
+
+// The canvas element in whole screen pixels, so the browser does not scale it again
+const canvasBox = computed(() => ({
+  width: `${Math.round(viewWidth.value * pixelRatio.value) / pixelRatio.value}px`,
+  height: `${Math.round(viewHeight.value * pixelRatio.value) / pixelRatio.value}px`,
+}));
+
+// Show the cells again whenever they or the view change; changes within one tick are shown
+// once, after the page has updated
+watch(
+  [drawn, x, y, cellPx, viewWidth, viewHeight, pixelRatio, () => props.size],
+  () => {
+    const size = props.size;
+    if (!canvasEl.value || !size) return;
+    showCanvas(canvasEl.value, source, size, {
+      width: viewWidth.value,
+      height: viewHeight.value,
+      x: x.value,
+      y: y.value,
+      cellPx: cellPx.value,
+      pixelRatio: pixelRatio.value,
+    });
+  },
+  { flush: 'post' }
+);
 
 function cellUnderPointer(event: MouseEvent): Cell | null {
   const size = props.size;
-  if (!canvasEl.value || !size) return null;
-  const rect = canvasEl.value.getBoundingClientRect();
-  const cx = Math.floor(((event.clientX - rect.left) / rect.width) * size.width);
-  const cy = Math.floor(((event.clientY - rect.top) / rect.height) * size.height);
-  if (cx < 0 || cy < 0 || cx >= size.width || cy >= size.height) return null;
-  return { x: cx, y: cy };
+  if (!viewportEl.value || !size) return null;
+  const rect = viewportEl.value.getBoundingClientRect();
+  return cellAt(
+    { x: event.clientX - rect.left, y: event.clientY - rect.top },
+    offset.value,
+    cellPx.value,
+    size
+  );
 }
 
 // Whether the cell under the mouse is one in the loupe: its coordinates are shown there
@@ -207,16 +266,14 @@ function onPointerLeave(event: PointerEvent) {
   if (event.pointerType !== 'touch') setHovered(null);
 }
 
-// Ignored at the end of a drag or a pinch, so moving the canvas does not pick anything
+// A click on a cell picks it, a click in the empty space around the canvas lets go. The
+// canvas element covers the whole viewport; the loupe over it handles its own clicks.
+// Ignored at the end of a drag or a pinch, so moving the canvas does not pick anything.
 function onCanvasClick(event: MouseEvent) {
   if (moved || !props.size) return;
-  emit('pick', getClickedCell(event, props.size));
-}
-
-// Only on the empty space itself: clicks on the canvas and the loupe are theirs
-function onViewportClick(event: MouseEvent) {
-  if (moved || event.target !== event.currentTarget) return;
-  emit('release');
+  const cell = cellUnderPointer(event);
+  if (cell) emit('pick', cell);
+  else emit('release');
 }
 
 const ring = computed(() =>
@@ -307,14 +364,8 @@ const halo = computed(() => {
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
       @pointerleave="onPointerLeave"
-      @click="onViewportClick"
     >
-      <canvas
-        ref="canvasEl"
-        class="canvas"
-        :style="{ transform: `translate(${x}px, ${y}px) scale(${cellPx})` }"
-        @click="onCanvasClick"
-      ></canvas>
+      <canvas ref="canvasEl" class="canvas" :style="canvasBox" @click="onCanvasClick"></canvas>
 
       <div class="overlay">
         <BloomLayer :blooms="blooms" :offset="offset" :cell-px="cellPx" />
@@ -350,7 +401,7 @@ const halo = computed(() => {
           <CellLoupe
             v-if="loupe && size && selectedCell"
             :class="{ paused }"
-            :source="canvasEl"
+            :source="source"
             :size="size"
             :cell="selectedCell"
             :color="selectedColor"
@@ -392,10 +443,9 @@ const halo = computed(() => {
   left: 0;
   top: 0;
   display: block;
-  /* One element pixel per cell, scaled up from the corner by a CSS transform */
-  transform-origin: 0 0;
+  /* Drawn in screen pixels (showCanvas); should the browser still scale it a little, it keeps
+     the cells sharp */
   image-rendering: pixelated;
-  background: #ffffff;
   transition: filter 0.6s ease;
 }
 
