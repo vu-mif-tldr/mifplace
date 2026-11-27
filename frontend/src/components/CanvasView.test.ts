@@ -361,6 +361,38 @@ describe('CanvasView', () => {
     });
   });
 
+  it('draws in screen pixels again when the window moves to a denser screen', async () => {
+    // A media query for the current ratio reports when it stops matching
+    const queries: { query: string; listener?: () => void; removed: boolean }[] = [];
+    vi.stubGlobal('matchMedia', (query: string) => {
+      const entry: (typeof queries)[number] = { query, removed: false };
+      queries.push(entry);
+      return {
+        addEventListener: (_: string, listener: () => void) => (entry.listener = listener),
+        removeEventListener: () => (entry.removed = true),
+      };
+    });
+    vi.stubGlobal('devicePixelRatio', 1);
+    const { wrapper, canvas } = canvasView();
+    resize(640, 640);
+    await wrapper.vm.$nextTick();
+    const element = canvas.element as HTMLCanvasElement;
+    expect(element.width).toBe(640);
+    expect(queries.map(({ query }) => query)).toEqual(['(resolution: 1dppx)']);
+
+    vi.stubGlobal('devicePixelRatio', 2);
+    queries[0].listener!();
+    await wrapper.vm.$nextTick();
+    expect(element.width).toBe(1280);
+    expect(element.style.width).toBe('640px');
+    // The old query is dropped, the new one watches the new ratio
+    expect(queries[0].removed).toBe(true);
+    expect(queries[1].query).toBe('(resolution: 2dppx)');
+
+    wrapper.unmount();
+    expect(queries[1].removed).toBe(true);
+  });
+
   it('dims the canvas while paused', () => {
     expect(canvasView({ paused: true }).wrapper.get('.viewport').classes()).toContain('paused');
   });
