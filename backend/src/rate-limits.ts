@@ -20,6 +20,20 @@ export type RateLimits = {
   waitlistConfirmPerMinute: number;
   // POST /api/waitlist/unsubscribe
   waitlistUnsubscribePerMinute: number;
+  // POST /api/auth/register. Like the waitlist it is generous for shared addresses: what an
+  // address can receive is limited by the email limits of the accounts.
+  authRegisterPerHour: number;
+  // POST /api/auth/login; wrong passwords are also counted per account (auth/router.ts)
+  authLoginPerMinute: number;
+  // POST /api/auth/password/forgot, /reset and /change, each counted on its own
+  authPasswordPerHour: number;
+  // POST /api/auth/verify and /logout, GET /api/auth/me, each counted on its own
+  authPerMinute: number;
+  // /api/admin, all its routes together
+  adminPerMinute: number;
+  // Every /api route behind the session check, all together, counted before the check: a
+  // request without a session is answered 401 without reaching the limit of its route
+  sessionPerMinute: number;
   // Everything else: the page itself, its scripts, styles and fonts, and the 404 page
   otherPerMinute: number;
 };
@@ -32,6 +46,12 @@ export const DEFAULT_RATE_LIMITS: RateLimits = {
   waitlistSignupsPerHour: 30,
   waitlistConfirmPerMinute: 120,
   waitlistUnsubscribePerMinute: 120,
+  authRegisterPerHour: 100,
+  authLoginPerMinute: 60,
+  authPasswordPerHour: 30,
+  authPerMinute: 120,
+  adminPerMinute: 120,
+  sessionPerMinute: 600,
   otherPerMinute: 120,
 };
 
@@ -62,6 +82,20 @@ export function rateLimitsFromEnv(env: NodeJS.ProcessEnv = process.env): RateLim
       'RATE_LIMIT_WAITLIST_UNSUBSCRIBE_PER_MINUTE',
       d.waitlistUnsubscribePerMinute
     ),
+    authRegisterPerHour: positiveInt(
+      env,
+      'RATE_LIMIT_AUTH_REGISTER_PER_HOUR',
+      d.authRegisterPerHour
+    ),
+    authLoginPerMinute: positiveInt(env, 'RATE_LIMIT_AUTH_LOGIN_PER_MINUTE', d.authLoginPerMinute),
+    authPasswordPerHour: positiveInt(
+      env,
+      'RATE_LIMIT_AUTH_PASSWORD_PER_HOUR',
+      d.authPasswordPerHour
+    ),
+    authPerMinute: positiveInt(env, 'RATE_LIMIT_AUTH_PER_MINUTE', d.authPerMinute),
+    adminPerMinute: positiveInt(env, 'RATE_LIMIT_ADMIN_PER_MINUTE', d.adminPerMinute),
+    sessionPerMinute: positiveInt(env, 'RATE_LIMIT_SESSION_PER_MINUTE', d.sessionPerMinute),
     otherPerMinute: positiveInt(env, 'RATE_LIMIT_OTHER_PER_MINUTE', d.otherPerMinute),
   };
 }

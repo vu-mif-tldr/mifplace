@@ -1,4 +1,5 @@
 import type { Server } from 'node:http';
+import type { SessionsEnded } from '../auth/sessions.js';
 import { Broadcaster, type LiveEvent } from './broadcaster.js';
 import { catchUp } from './catch-up.js';
 import { OnlineAnnouncer } from './online.js';
@@ -34,6 +35,10 @@ export interface LiveLog {
   eventsBetween(afterId: number, toId: number): PixelEvent[];
 }
 
+// The close code of a connection whose session ended (docs/api.md): 4000-4999 are for
+// applications, 4401 echoes HTTP 401
+export const SIGNED_OUT_CODE = 4401;
+
 // What GET /health reports under WS
 export type LiveStats = { open: number; slowDropped: number; terminated: number };
 
@@ -41,6 +46,9 @@ export interface LiveServer {
   // Called right after a pixel is stored and applied to memory
   publish(event: LiveEvent): void;
   stats(): LiveStats;
+  // Closes the live connections of sessions that ended (sign-out, a new password, a block)
+  // with code 4401; the page then finds out it is signed out. Returns how many were closed.
+  endSessions(ended: SessionsEnded): number;
   // Stops the batches and the liveness check, closes every client with 1001
   close(): void;
 }
@@ -120,6 +128,17 @@ export function startLiveServer(
   return {
     publish: (event) => broadcaster.publish(event),
     stats: () => transport.registry.stats(),
+    endSessions(ended) {
+      return transport.registry.closeWhere(
+        ({ owner }) =>
+          owner !== undefined &&
+          ('session' in ended
+            ? owner.session === ended.session
+            : owner.userId === ended.userId && owner.session !== ended.exceptSession),
+        SIGNED_OUT_CODE,
+        'Signed out'
+      );
+    },
     close() {
       broadcaster.close();
       online.close();

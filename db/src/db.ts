@@ -1,15 +1,44 @@
 import Database from 'better-sqlite3';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { CanvasSize, PaletteColor } from '@mifplace/shared';
+import type { CanvasSize, PaletteColor, UserRole } from '@mifplace/shared';
 import { resolveFromRoot } from './env.js';
 
 export type Db = Database.Database;
 
+// An account has an email and a password hash; a system user (user 0 of the seed scripts) has
+// neither and cannot sign in.
 export interface UserRow {
   id: number;
-  name: string;
+  email: string | null;
+  password_hash: string | null;
+  role: UserRole;
+  created_at: number;
+  verified_at: number | null;
+  banned_at: number | null;
+  ban_reason: string | null;
 }
+
+// The user of a session, with the time the session was last seen
+export type SessionUserRow = UserRow & { session_last_seen_at: number };
+
+// An account as an administrator sees it: with the number of its sessions that have not expired
+export type AdminUserRow = UserRow & { sessions: number };
+
+export type AdminAction = 'block' | 'unblock' | 'end_sessions';
+
+export interface AdminLogRow {
+  id: number;
+  admin_id: number;
+  action: AdminAction;
+  target_user_id: number;
+  // The reason of a block
+  details: string | null;
+  timestamp: number;
+}
+
+// What a token from an email is for
+export type EmailTokenPurpose = 'verify' | 'reset';
 
 export interface EventRow {
   id: number;
@@ -92,6 +121,28 @@ export class MifDb {
   private readonly updateWaitlistConfirmed;
   private readonly deleteWaitlistToken;
   private readonly deletePendingWaitlist;
+  private readonly selectUserByEmail;
+  private readonly selectUserById;
+  private readonly registerUserTx;
+  private readonly upsertVerifiedUser;
+  private readonly insertEmailToken;
+  private readonly selectEmailToken;
+  private readonly insertSession;
+  private readonly selectSessionUser;
+  private readonly updateSessionSeen;
+  private readonly deleteSessionByHash;
+  private readonly verifyEmailTx;
+  private readonly resetPasswordTx;
+  private readonly changePasswordTx;
+  private readonly removeExpiredAuthTx;
+  private readonly syncAdminsTx;
+  private readonly selectAccounts;
+  private readonly selectAccount;
+  private readonly blockUserTx;
+  private readonly unblockUserTx;
+  private readonly endUserSessionsTx;
+  private readonly deleteAccountTx;
+  private readonly selectAdminLog;
 
   constructor(private readonly db: Db) {
     this.insertEvent = db.prepare(
@@ -129,6 +180,198 @@ export class MifDb {
     this.deletePendingWaitlist = db.prepare(
       'DELETE FROM waitlist WHERE confirmed_at IS NULL AND created_at < ?'
     );
+
+    this.selectUserByEmail = db.prepare('SELECT * FROM users WHERE email = ?');
+    this.selectUserById = db.prepare('SELECT * FROM users WHERE id = ?');
+    // A repeated registration of an address that is not verified yet replaces the password and
+    // restarts the day it has to be verified in. A verified account is left alone (no row back).
+    const upsertPendingUser = db.prepare(
+      `INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, ?)
+         ON CONFLICT (email) DO UPDATE
+           SET password_hash = excluded.password_hash, created_at = excluded.created_at
+           WHERE verified_at IS NULL
+         RETURNING *`
+    );
+    this.upsertVerifiedUser = db.prepare(
+      `INSERT INTO users (email, password_hash, created_at, verified_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT (email) DO UPDATE
+           SET password_hash = excluded.password_hash,
+               verified_at = COALESCE(verified_at, excluded.verified_at)
+         RETURNING *`
+    );
+    this.insertEmailToken = db.prepare(
+      'INSERT INTO email_tokens (token_hash, user_id, purpose, expires_at) VALUES (?, ?, ?, ?)'
+    );
+    this.selectEmailToken = db.prepare(
+      'SELECT user_id FROM email_tokens WHERE token_hash = ? AND purpose = ? AND expires_at > ?'
+    );
+    this.insertSession = db.prepare(
+      `INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_seen_at)
+         VALUES (?, ?, ?, ?, ?)`
+    );
+    this.selectSessionUser = db.prepare(
+      `SELECT u.*, s.last_seen_at AS session_last_seen_at
+         FROM sessions s JOIN users u ON u.id = s.user_id
+         WHERE s.token_hash = ? AND s.expires_at > ?`
+    );
+    this.updateSessionSeen = db.prepare(
+      'UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?'
+    );
+    this.deleteSessionByHash = db.prepare('DELETE FROM sessions WHERE token_hash = ?');
+
+    const setVerified = db.prepare(
+      'UPDATE users SET verified_at = COALESCE(verified_at, ?) WHERE id = ?'
+    );
+    const setPassword = db.prepare(
+      'UPDATE users SET password_hash = ? WHERE id = ? AND email IS NOT NULL'
+    );
+    const deleteTokensOf = db.prepare('DELETE FROM email_tokens WHERE user_id = ?');
+    const deleteVerifyTokensOf = db.prepare(
+      `DELETE FROM email_tokens WHERE user_id = ? AND purpose = 'verify'`
+    );
+    const deleteSessionsOf = db.prepare('DELETE FROM sessions WHERE user_id = ?');
+    const deleteOtherSessionsOf = db.prepare(
+      'DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?'
+    );
+    const deleteExpiredSessions = db.prepare('DELETE FROM sessions WHERE expires_at <= ?');
+    const deleteExpiredTokens = db.prepare('DELETE FROM email_tokens WHERE expires_at <= ?');
+    // Run after the expired tokens are gone: a token left means a link that still works.
+    // A blocked account stays, or the block would lift itself after a day; so does one the
+    // admin log refers to (the log keeps its rows, and they point at the user).
+    const deleteUnverifiedUsers = db.prepare(
+      `DELETE FROM users
+         WHERE email IS NOT NULL AND verified_at IS NULL AND created_at < ?
+           AND banned_at IS NULL
+           AND NOT EXISTS (SELECT 1 FROM email_tokens t WHERE t.user_id = users.id)
+           AND NOT EXISTS (SELECT 1 FROM admin_log l
+                             WHERE l.target_user_id = users.id OR l.admin_id = users.id)`
+    );
+
+    // Links from earlier emails stop working: the address is verified only through the email
+    // of the registration whose password the account now has.
+    this.registerUserTx = db.transaction(
+      (email: string, passwordHash: string, now: number): UserRow | undefined => {
+        const row = upsertPendingUser.get(email, passwordHash, now) as UserRow | undefined;
+        if (row) deleteVerifyTokensOf.run(row.id);
+        return row;
+      }
+    );
+
+    // The token is checked and used up in one step, so it works once.
+    this.verifyEmailTx = db.transaction((tokenHash: string, now: number): UserRow | undefined => {
+      const token = this.selectEmailToken.get(tokenHash, 'verify', now) as
+        { user_id: number } | undefined;
+      if (!token) return undefined;
+      setVerified.run(now, token.user_id);
+      deleteVerifyTokensOf.run(token.user_id);
+      return this.selectUserById.get(token.user_id) as UserRow;
+    });
+
+    // The new password, the used-up token and the closed sessions must change together.
+    this.resetPasswordTx = db.transaction(
+      (tokenHash: string, passwordHash: string, now: number): UserRow | undefined => {
+        const token = this.selectEmailToken.get(tokenHash, 'reset', now) as
+          { user_id: number } | undefined;
+        if (!token) return undefined;
+        setPassword.run(passwordHash, token.user_id);
+        // The link came by email, so the address is verified too
+        setVerified.run(now, token.user_id);
+        deleteTokensOf.run(token.user_id);
+        deleteSessionsOf.run(token.user_id);
+        return this.selectUserById.get(token.user_id) as UserRow;
+      }
+    );
+
+    this.changePasswordTx = db.transaction(
+      (userId: number, passwordHash: string, keepSessionHash: string): void => {
+        setPassword.run(passwordHash, userId);
+        deleteTokensOf.run(userId);
+        deleteOtherSessionsOf.run(userId, keepSessionHash);
+      }
+    );
+
+    this.removeExpiredAuthTx = db.transaction((now: number, unverifiedBefore: number) => ({
+      sessions: deleteExpiredSessions.run(now).changes,
+      tokens: deleteExpiredTokens.run(now).changes,
+      users: deleteUnverifiedUsers.run(unverifiedBefore).changes,
+    }));
+
+    // The administrators are the verified accounts with these addresses (a JSON list), nobody else
+    const demoteAdmins = db.prepare(
+      `UPDATE users SET role = 'user'
+         WHERE role = 'admin'
+           AND (email IS NULL OR email NOT IN (SELECT value FROM json_each(?)))`
+    );
+    const promoteAdmins = db.prepare(
+      `UPDATE users SET role = 'admin'
+         WHERE role = 'user' AND verified_at IS NOT NULL
+           AND email IN (SELECT value FROM json_each(?))`
+    );
+    this.syncAdminsTx = db.transaction((emails: string) => ({
+      demoted: demoteAdmins.run(emails).changes,
+      promoted: promoteAdmins.run(emails).changes,
+    }));
+
+    const accountColumns = `u.*, (SELECT count(*) FROM sessions s
+                                    WHERE s.user_id = u.id AND s.expires_at > ?) AS sessions`;
+    this.selectAccounts = db.prepare(
+      `SELECT ${accountColumns} FROM users u
+         WHERE u.email LIKE ? ESCAPE '\\' ORDER BY u.email LIMIT ?`
+    );
+    // Only accounts: a system user or a deleted account has no address
+    this.selectAccount = db.prepare(
+      `SELECT ${accountColumns} FROM users u WHERE u.id = ? AND u.email IS NOT NULL`
+    );
+    const insertAdminLog = db.prepare(
+      `INSERT INTO admin_log (admin_id, action, target_user_id, details, timestamp)
+         VALUES (?, ?, ?, ?, ?)`
+    );
+    const setBlocked = db.prepare(
+      'UPDATE users SET banned_at = ?, ban_reason = ? WHERE id = ? AND email IS NOT NULL'
+    );
+
+    // The block, the closed sessions and the log entry change together.
+    this.blockUserTx = db.transaction(
+      (adminId: number, userId: number, reason: string, now: number): boolean => {
+        if (setBlocked.run(now, reason, userId).changes === 0) return false;
+        deleteSessionsOf.run(userId);
+        insertAdminLog.run(adminId, 'block', userId, reason, now);
+        return true;
+      }
+    );
+    this.unblockUserTx = db.transaction((adminId: number, userId: number, now: number): boolean => {
+      if (setBlocked.run(null, null, userId).changes === 0) return false;
+      insertAdminLog.run(adminId, 'unblock', userId, null, now);
+      return true;
+    });
+    this.endUserSessionsTx = db.transaction(
+      (adminId: number, userId: number, now: number): number | undefined => {
+        if (!this.selectAccount.get(now, userId)) return undefined;
+        const ended = deleteSessionsOf.run(userId).changes;
+        insertAdminLog.run(adminId, 'end_sessions', userId, null, now);
+        return ended;
+      }
+    );
+
+    // The row stays, because the event log and the admin log refer to it, but nothing in it
+    // says whose it was: no address, no password. The address leaves the waitlist too.
+    const emptyUser = db.prepare(
+      `UPDATE users
+         SET email = NULL, password_hash = NULL, verified_at = NULL, role = 'user',
+             banned_at = NULL, ban_reason = NULL
+         WHERE id = ?`
+    );
+    const deleteWaitlistEmail = db.prepare('DELETE FROM waitlist WHERE email = ?');
+    this.deleteAccountTx = db.transaction((userId: number): boolean => {
+      const user = this.selectUserById.get(userId) as UserRow | undefined;
+      if (!user || user.email === null) return false;
+      deleteSessionsOf.run(userId);
+      deleteTokensOf.run(userId);
+      deleteWaitlistEmail.run(user.email);
+      emptyUser.run(userId);
+      return true;
+    });
+    this.selectAdminLog = db.prepare('SELECT * FROM admin_log ORDER BY id DESC LIMIT ?');
 
     // The event and the cooldown timestamp must change together.
     this.appendTx = db.transaction((event: NewEvent, now: number): number => {
@@ -213,6 +456,156 @@ export class MifDb {
   // Deletes pending rows created before the cutoff and returns how many.
   removeExpiredWaitlist(before: number): number {
     return this.deletePendingWaitlist.run(before).changes;
+  }
+
+  // The account with this address (as stored: trimmed, lower case), verified or not.
+  findUserByEmail(email: string): UserRow | undefined {
+    return this.selectUserByEmail.get(email) as UserRow | undefined;
+  }
+
+  // Creates an account that still has to verify its address, or, if the address has one that
+  // is not verified yet, replaces its password and drops its earlier 'verify' tokens. pending
+  // is false when the address belongs to a verified account: that one is returned unchanged.
+  registerUser(
+    email: string,
+    passwordHash: string,
+    now: number = Date.now()
+  ): { user: UserRow; pending: boolean } {
+    const row = this.registerUserTx(email, passwordHash, now);
+    if (row) return { user: row, pending: true };
+    return { user: this.selectUserByEmail.get(email) as UserRow, pending: false };
+  }
+
+  // Creates an account whose address counts as verified, or, if the address has an account,
+  // sets its password (and verifies it). For the development account the backend makes at
+  // start; a registration goes through registerUser and the email.
+  ensureVerifiedUser(email: string, passwordHash: string, now: number = Date.now()): UserRow {
+    return this.upsertVerifiedUser.get(email, passwordHash, now, now) as UserRow;
+  }
+
+  // Makes the verified accounts with these addresses administrators and everybody else a
+  // user. The list comes from ADMIN_EMAILS: the backend calls this at start and when an
+  // address from the list gets verified. Returns how many roles changed.
+  syncAdmins(emails: readonly string[]): { promoted: number; demoted: number } {
+    return this.syncAdminsTx(JSON.stringify(emails));
+  }
+
+  // Accounts whose address contains the text, in the order of the addresses.
+  searchUsers(text: string, limit: number, now: number = Date.now()): AdminUserRow[] {
+    // % and _ in the text are letters, not wildcards
+    const pattern = `%${text.replace(/[\\%_]/g, '\\$&')}%`;
+    return this.selectAccounts.all(now, pattern, limit) as AdminUserRow[];
+  }
+
+  // One account by the id of its user. Undefined for a system user and a deleted account.
+  getAccount(userId: number, now: number = Date.now()): AdminUserRow | undefined {
+    return this.selectAccount.get(now, userId) as AdminUserRow | undefined;
+  }
+
+  // Blocks an account (FR-13), closes its sessions and writes it to the admin log.
+  // Undefined if there is no such account.
+  blockUser(
+    adminId: number,
+    userId: number,
+    reason: string,
+    now: number = Date.now()
+  ): AdminUserRow | undefined {
+    return this.blockUserTx(adminId, userId, reason, now)
+      ? this.getAccount(userId, now)
+      : undefined;
+  }
+
+  unblockUser(adminId: number, userId: number, now: number = Date.now()): AdminUserRow | undefined {
+    return this.unblockUserTx(adminId, userId, now) ? this.getAccount(userId, now) : undefined;
+  }
+
+  // Signs every browser of an account out. Returns how many sessions ended, undefined if
+  // there is no such account.
+  endUserSessions(adminId: number, userId: number, now: number = Date.now()): number | undefined {
+    return this.endUserSessionsTx(adminId, userId, now);
+  }
+
+  // Deletes an account at its owner's request: the address and the password are gone, the
+  // sessions closed, the pixels stay in the log without an owner anyone could name. False if
+  // there is no such account.
+  deleteAccount(userId: number): boolean {
+    return this.deleteAccountTx(userId);
+  }
+
+  // The latest actions of administrators, newest first.
+  getAdminLog(limit: number): AdminLogRow[] {
+    return this.selectAdminLog.all(limit) as AdminLogRow[];
+  }
+
+  // Stores the hash of a token that goes out in an email.
+  addEmailToken(
+    tokenHash: string,
+    userId: number,
+    purpose: EmailTokenPurpose,
+    expiresAt: number
+  ): void {
+    this.insertEmailToken.run(tokenHash, userId, purpose, expiresAt);
+  }
+
+  // Is this a token for that purpose that has not expired? It stays usable.
+  hasEmailToken(tokenHash: string, purpose: EmailTokenPurpose, now: number = Date.now()): boolean {
+    return this.selectEmailToken.get(tokenHash, purpose, now) !== undefined;
+  }
+
+  // Uses up a 'verify' token: marks the address of its account as verified and returns the
+  // account. Undefined for an unknown, used or expired token.
+  verifyEmail(tokenHash: string, now: number = Date.now()): UserRow | undefined {
+    return this.verifyEmailTx(tokenHash, now);
+  }
+
+  // Uses up a 'reset' token: sets the new password hash and closes every session of the
+  // account. Undefined for an unknown, used or expired token.
+  resetPassword(
+    tokenHash: string,
+    passwordHash: string,
+    now: number = Date.now()
+  ): UserRow | undefined {
+    return this.resetPasswordTx(tokenHash, passwordHash, now);
+  }
+
+  // Sets a new password hash and closes every session of the account but the one given.
+  changePassword(userId: number, passwordHash: string, keepSessionHash: string): void {
+    this.changePasswordTx(userId, passwordHash, keepSessionHash);
+  }
+
+  createSession(
+    tokenHash: string,
+    userId: number,
+    expiresAt: number,
+    now: number = Date.now()
+  ): void {
+    this.insertSession.run(tokenHash, userId, now, expiresAt, now);
+  }
+
+  // The user of a session that has not expired. A blocked user is returned too (banned_at),
+  // the caller decides.
+  findSession(tokenHash: string, now: number = Date.now()): SessionUserRow | undefined {
+    return this.selectSessionUser.get(tokenHash, now) as SessionUserRow | undefined;
+  }
+
+  touchSession(tokenHash: string, now: number = Date.now()): void {
+    this.updateSessionSeen.run(now, tokenHash);
+  }
+
+  // Signs one browser out. False if there was no such session.
+  deleteSession(tokenHash: string): boolean {
+    return this.deleteSessionByHash.run(tokenHash).changes > 0;
+  }
+
+  // Deletes expired sessions and tokens, and accounts created before unverifiedBefore that
+  // never verified their address and have no link left that still works (a link sent again
+  // later keeps its account until it expires). An account an administrator blocked or acted
+  // on is kept. Returns how many of each.
+  removeExpiredAuth(
+    now: number,
+    unverifiedBefore: number
+  ): { sessions: number; tokens: number; users: number } {
+    return this.removeExpiredAuthTx(now, unverifiedBefore);
   }
 
   // Online backup that is safe while the server is running.

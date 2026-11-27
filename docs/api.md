@@ -6,18 +6,33 @@
 
 **Rate limits.** Every endpoint counts requests per client IP on its own; above the limit the answer is `429` with the usual body `{"success":false,"error":"..."}`. The limits are set in `.env` (`RATE_LIMIT_*`, see [`.env.example`](../.env.example)):
 
-| Endpoint                          | Setting                                      | Default |
-| --------------------------------- | -------------------------------------------- | ------- |
-| `GET /api/palette`                | `RATE_LIMIT_PALETTE_PER_MINUTE`              | 120/min |
-| `GET /api/canvas/size`            | `RATE_LIMIT_CANVAS_SIZE_PER_MINUTE`          | 120/min |
-| `GET /api/canvas`                 | `RATE_LIMIT_CANVAS_PER_MINUTE`               | 20/min  |
-| `POST /api/pixels`                | `RATE_LIMIT_PIXELS_PER_MINUTE`               | 10/min  |
-| `POST /api/waitlist`              | `RATE_LIMIT_WAITLIST_SIGNUP_PER_HOUR`        | 30/hour |
-| `POST /api/waitlist/confirm`      | `RATE_LIMIT_WAITLIST_CONFIRM_PER_MINUTE`     | 120/min |
-| `POST /api/waitlist/unsubscribe`  | `RATE_LIMIT_WAITLIST_UNSUBSCRIBE_PER_MINUTE` | 120/min |
-| The page, its files, the 404 page | `RATE_LIMIT_OTHER_PER_MINUTE`                | 120/min |
+| Endpoint                          | Setting                                      | Default  |
+| --------------------------------- | -------------------------------------------- | -------- |
+| `GET /api/palette`                | `RATE_LIMIT_PALETTE_PER_MINUTE`              | 120/min  |
+| `GET /api/canvas/size`            | `RATE_LIMIT_CANVAS_SIZE_PER_MINUTE`          | 120/min  |
+| `GET /api/canvas`                 | `RATE_LIMIT_CANVAS_PER_MINUTE`               | 20/min   |
+| `POST /api/pixels`                | `RATE_LIMIT_PIXELS_PER_MINUTE`               | 10/min   |
+| `POST /api/waitlist`              | `RATE_LIMIT_WAITLIST_SIGNUP_PER_HOUR`        | 30/hour  |
+| `POST /api/waitlist/confirm`      | `RATE_LIMIT_WAITLIST_CONFIRM_PER_MINUTE`     | 120/min  |
+| `POST /api/waitlist/unsubscribe`  | `RATE_LIMIT_WAITLIST_UNSUBSCRIBE_PER_MINUTE` | 120/min  |
+| `POST /api/auth/register`         | `RATE_LIMIT_AUTH_REGISTER_PER_HOUR`          | 100/hour |
+| `POST /api/auth/login`            | `RATE_LIMIT_AUTH_LOGIN_PER_MINUTE`           | 60/min   |
+| `POST /api/auth/password/*`       | `RATE_LIMIT_AUTH_PASSWORD_PER_HOUR`          | 30/hour  |
+| Other `/api/auth/*`               | `RATE_LIMIT_AUTH_PER_MINUTE`                 | 120/min  |
+| `/api/admin/*` (all together)     | `RATE_LIMIT_ADMIN_PER_MINUTE`                | 120/min  |
+| Every `/api` route with a session | `RATE_LIMIT_SESSION_PER_MINUTE`              | 600/min  |
+| The page, its files, the 404 page | `RATE_LIMIT_OTHER_PER_MINUTE`                | 120/min  |
 
-`GET /health` has no limit. The WebSocket `/api/ws` is limited by `WS_MAX_CONNECTIONS` instead.
+The routes that need a session (see "Sessions" below) also count together, before the session is checked, so a request without one is limited too: `RATE_LIMIT_SESSION_PER_MINUTE`. `GET /health` has no limit. The WebSocket `/api/ws` is limited by `WS_MAX_CONNECTIONS` instead.
+
+**Sessions.** Every `/api` route needs a session, the cookie a visitor gets by signing in ([Accounts](#accounts-apiauth)). The exceptions are `/api/auth/*` and `/api/waitlist/*`; `GET /health` is public too. A route added later is closed without saying so.
+
+| Status | Body                                                                         | Case                                                          |
+| ------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `401`  | `{"success":false,"code":"unauthenticated","error":"Not signed in."}`        | No session: none was sent, it expired, or the user is blocked |
+| `403`  | `{"success":false,"code":"forbidden_origin","error":"This request must..."}` | A request other than `GET` from a page of another site        |
+
+The `401` is answered before the per-IP limit of the route is counted. The page shows the sign-in screens when it gets one. `POST /api/pixels` stores the pixel with the user of the session (FR-19).
 
 ### `GET /api/palette`
 
@@ -119,7 +134,7 @@ The body is checked with the request schema from `@mifplace/shared` (`PlacePixel
 
 ### Waitlist: `POST /api/waitlist`, `/confirm`, `/unsubscribe`
 
-Collects addresses of people who want to play, before launch, with double opt-in. The routes exist only where `PUBLIC_URL` is set (production on vu.place; in development always). The landing pages that call them are in [`deploy/landing/`](../deploy/landing/).
+Collects addresses of people who want to play, before launch, with double opt-in. The routes exist where `WAITLIST_ENABLED` is `true` (production on vu.place) and in development unless it is `false`. The landing pages that call them are in [`deploy/landing/`](../deploy/landing/).
 
 1. `POST /api/waitlist` with `{ "email": "jonas@mif.stud.vu.lt" }` stores the address and emails a link `PUBLIC_URL/confirm.html?t=<token>`. Only `vu.lt` and `*.vu.lt` addresses (`VuEmailSchema` in `@mifplace/shared`); the address is trimmed and lower-cased.
 2. The confirm page has a button that sends `POST /api/waitlist/confirm` with `{ "token": "..." }`. A button and not the link itself, because mail scanners (Outlook Safe Links) open every link in an email. The link expires after 7 days; unconfirmed addresses are deleted then.
@@ -139,9 +154,108 @@ Collects addresses of people who want to play, before launch, with double opt-in
 
 Errors have the usual body `{"success":false,"error":"..."}`.
 
+### Accounts: `/api/auth/*`
+
+People register with an email address and a password; a session cookie keeps the browser signed in. Every other `/api` route and the WebSocket need that session (see "Sessions" above). `PUBLIC_URL` says where the page is: the links in the emails point there; production does not start without it.
+
+| Route                            | Body                                   | Success                      |
+| -------------------------------- | -------------------------------------- | ---------------------------- |
+| `POST /api/auth/register`        | `{ "email", "password" }`              | `202`, an email is sent      |
+| `POST /api/auth/verify`          | `{ "token" }`                          | `200`, the address counts    |
+| `POST /api/auth/login`           | `{ "email", "password" }`              | `200` with `user`, cookie    |
+| `POST /api/auth/logout`          | none                                   | `200`, cookie deleted        |
+| `GET /api/auth/me`               | none                                   | `200` with `user`            |
+| `POST /api/auth/password/forgot` | `{ "email" }`                          | `202`, an email is sent      |
+| `POST /api/auth/password/reset`  | `{ "token", "password" }`              | `200`, all sessions closed   |
+| `POST /api/auth/password/change` | `{ "currentPassword", "newPassword" }` | `200`, other sessions closed |
+| `DELETE /api/auth/account`       | `{ "password" }`                       | `200`, the account is gone   |
+
+Success bodies are `{"success":true}`; `login` and `me` add the user:
+
+```json
+{ "success": true, "user": { "email": "jonas@mif.stud.vu.lt", "role": "user" } }
+```
+
+`role` is `user` or `admin`. The schemas are in `@mifplace/shared` (`auth.ts`).
+
+**Rules**
+
+- **Address:** trimmed and lower-cased. Only the domains of `ALLOWED_EMAIL_DOMAINS` and their subdomains may register (`vu.lt` by default), and not addresses with `+` before the `@` (they reach the same mailbox, so one person could have many accounts).
+- **Password:** 10 to 128 characters, no other rules. Stored only as an Argon2id hash.
+- **Verification:** the email links to `PUBLIC_URL/#/verify/<token>`; the page there has a button that sends `POST /api/auth/verify` (a button, because mail scanners open every link). The link works once, for 24 hours; an account not verified by then is deleted. Verifying does not sign in. Registering again before verifying replaces the password and makes earlier links invalid.
+- **Reset:** the email links to `PUBLIC_URL/#/reset/<token>`, valid once, for 1 hour. A reset also verifies the address.
+- **Session:** the cookie `session` (`__Host-session` over HTTPS) is `HttpOnly`, `SameSite=Lax`, `Secure` over HTTPS, and lasts 90 days. The server keeps only a hash of it. A blocked user has no session.
+- **Deleting an account** (`DELETE /api/auth/account`, with the password once more): the address and the password hash are removed, every browser is signed out, the address leaves the waitlist too and can register again as a new account. The pixels stay in the log: their user row is kept, emptied, so nobody can be named as their author.
+- **Roles:** `user`, or `admin` for the verified accounts whose addresses are in `ADMIN_EMAILS`. The server applies the list at every start and when such an address is verified; an address taken out of the list loses the role at the next start.
+- **Who is registered stays private:** `register` and `forgot` answer `202` whether the address has an account or not (its owner gets an email saying so); `login` answers the same `401` for an unknown address and a wrong password.
+- **Same site only:** a request other than `GET` with an `Origin` header of another site is refused (`403`). The page's own host is allowed, `WS_ALLOWED_ORIGINS` adds others.
+- **Limits besides the per-IP ones:** 5 wrong passwords for one account from one IP in 15 minutes, or 30 from anywhere in an hour, then `429`. One address gets at most one email a minute and 5 a day (above that still `202`, without an email, and a repeated registration changes nothing). All emails of the server together: `MAIL_PER_HOUR` (40).
+
+**Errors** have the usual body plus a `code` the page can pick its text by:
+
+```json
+{ "success": false, "code": "invalid_credentials", "error": "Wrong email or password." }
+```
+
+| Status | `code`                | Case                                                                  |
+| ------ | --------------------- | --------------------------------------------------------------------- |
+| `400`  | `invalid_request`     | The body does not match the schema (schema message in `error`)        |
+| `400`  | `email_not_allowed`   | `register`: domain not allowed, or an address with `+`                |
+| `401`  | `invalid_credentials` | `login`: unknown address or wrong password                            |
+| `401`  | `unauthenticated`     | `me`, `password/change`: no session, or it expired                    |
+| `403`  | `invalid_credentials` | `password/change`, `DELETE account`: the password is wrong            |
+| `403`  | `email_not_verified`  | `login`: right password, address not verified; the link is sent again |
+| `403`  | `banned`              | `login`: the account is blocked                                       |
+| `403`  | `forbidden_origin`    | The request comes from another site                                   |
+| `404`  | `invalid_token`       | `verify`, `password/reset`: unknown, used or expired link             |
+| `429`  | `too_many_attempts`   | Too many wrong passwords for this account                             |
+| `429`  | none                  | Per-IP limit reached (see rate limits above)                          |
+| `503`  | `mail_unavailable`    | The email could not be sent, or `MAIL_PER_HOUR` is used up            |
+| `503`  | `busy`                | Too many passwords are being checked at once, try again               |
+| `500`  | `internal`            | Anything else                                                         |
+
+### Administrators: `/api/admin/*`
+
+What an administrator can do to accounts (FR-13). There are no admin screens yet: the routes are called with the session cookie of an administrator, for example from the browser console of the page. Every action is written to the table `admin_log` (who, what, to whom, when).
+
+| Route                                    | Body           | Does                                                                                 |
+| ---------------------------------------- | -------------- | ------------------------------------------------------------------------------------ |
+| `GET /api/admin/users?query=<text>`      | none           | Up to 20 accounts whose address contains the text                                    |
+| `POST /api/admin/users/:id/block`        | `{ "reason" }` | Blocks the account: its sessions and live connections end at once, it cannot sign in |
+| `POST /api/admin/users/:id/unblock`      | none           | Lifts the block                                                                      |
+| `POST /api/admin/users/:id/sessions/end` | none           | Signs every browser of the account out; its owner can sign in again                  |
+
+`:id` is the `id` of the account from the search. The search answers `{"success":true,"users":[...]}`, the others `{"success":true,"user":{...}}` with the account after the action:
+
+```json
+{
+  "id": 12,
+  "email": "jonas@mif.stud.vu.lt",
+  "role": "user",
+  "createdAt": 1760000000000,
+  "verifiedAt": 1760000060000,
+  "bannedAt": null,
+  "banReason": null,
+  "sessions": 2
+}
+```
+
+Times are Unix milliseconds, `sessions` is the number of signed-in browsers.
+
+| Status | `code`            | Case                                                                                                       |
+| ------ | ----------------- | ---------------------------------------------------------------------------------------------------------- |
+| `400`  | `invalid_request` | No `query`, no `reason`, or the account is an administrator (take the address out of `ADMIN_EMAILS` first) |
+| `401`  | `unauthenticated` | No session                                                                                                 |
+| `403`  | `forbidden`       | The signed-in user is not an administrator                                                                 |
+| `404`  | `not_found`       | No account with that id (also for user 0 and a deleted account)                                            |
+
+The role is read from the database on every request, so a role taken away stops working at once.
+
 ## 2. WebSocket — `/api/ws`
 
 WebSocket delivers **pixel updates from server to client**. Clients place pixels through HTTP `POST /api/pixels`. The connection also uses standard WebSocket **ping/pong control frames** for connection health; those are not application JSON pixel messages.
+
+**Only for signed-in visitors.** The upgrade request needs the session cookie, which the browser sends by itself; without a session the server answers `401` instead of upgrading. When a session ends other than by expiring (sign-out, a new password, a block), the server closes its connections with code `4401`. A browser cannot see why an upgrade was refused, so when a connection is closed with `4401` or a new one is not accepted, the page asks `GET /api/auth/me` and shows the sign-in screens if nobody is signed in; otherwise it keeps reconnecting as described below. A plain drop, such as a restart of the server, does not make the pages ask.
 
 ### Connecting and resuming
 

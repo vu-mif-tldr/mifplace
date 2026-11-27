@@ -14,7 +14,10 @@ const LABELS: Record<LiveState, string> = {
 </script>
 
 <template>
-  <span class="live-status" :class="state"> <span class="dot"></span>{{ LABELS[state] }} </span>
+  <span class="live-status" :class="state">
+    <span class="dot"></span>
+    <span class="label">{{ LABELS[state] }}</span>
+  </span>
 </template>
 
 <style scoped>
@@ -30,9 +33,18 @@ const LABELS: Record<LiveState, string> = {
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
+  /* May get narrower than its text (a narrow top bar); the text is then cut short */
+  min-width: 0;
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dot {
+  flex: none;
   width: 7px;
   height: 7px;
   border-radius: 50%;

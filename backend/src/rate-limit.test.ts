@@ -101,6 +101,12 @@ describe('rateLimitsFromEnv', () => {
         RATE_LIMIT_WAITLIST_CONFIRM_PER_MINUTE: '6',
         RATE_LIMIT_WAITLIST_UNSUBSCRIBE_PER_MINUTE: '7',
         RATE_LIMIT_OTHER_PER_MINUTE: '8',
+        RATE_LIMIT_AUTH_REGISTER_PER_HOUR: '9',
+        RATE_LIMIT_AUTH_LOGIN_PER_MINUTE: '10',
+        RATE_LIMIT_AUTH_PASSWORD_PER_HOUR: '11',
+        RATE_LIMIT_AUTH_PER_MINUTE: '12',
+        RATE_LIMIT_ADMIN_PER_MINUTE: '13',
+        RATE_LIMIT_SESSION_PER_MINUTE: '14',
       })
     ).toEqual({
       palettePerMinute: 1,
@@ -111,6 +117,12 @@ describe('rateLimitsFromEnv', () => {
       waitlistConfirmPerMinute: 6,
       waitlistUnsubscribePerMinute: 7,
       otherPerMinute: 8,
+      authRegisterPerHour: 9,
+      authLoginPerMinute: 10,
+      authPasswordPerHour: 11,
+      authPerMinute: 12,
+      adminPerMinute: 13,
+      sessionPerMinute: 14,
     });
   });
 

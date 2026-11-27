@@ -1,4 +1,4 @@
-import { getCanvas, getCanvasSize, getPalette, placePixel } from './api';
+import { SignedOutError, getCanvas, getCanvasSize, getPalette, placePixel } from './api';
 
 describe('api', () => {
   const fetchMock = vi.fn();
@@ -10,6 +10,17 @@ describe('api', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('throws SignedOutError when the server says there is no session', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 401 });
+    await expect(getPalette()).rejects.toBeInstanceOf(SignedOutError);
+    await expect(getCanvasSize()).rejects.toBeInstanceOf(SignedOutError);
+    await expect(getCanvas()).rejects.toBeInstanceOf(SignedOutError);
+    await expect(placePixel(0, 0)).rejects.toBeInstanceOf(SignedOutError);
+    // Any other failure is not about the session
+    fetchMock.mockResolvedValue({ ok: false, status: 403 });
+    await expect(placePixel(0, 0)).rejects.not.toBeInstanceOf(SignedOutError);
   });
 
   describe('getPalette', () => {

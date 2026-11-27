@@ -4,7 +4,7 @@ Everything needed to work on mifplace locally. Production: [deploy/README.md](..
 
 ## Setup
 
-Node 24 (`.nvmrc`) and npm 11+. Run everything from the repository root.
+Node 24.7 or newer (`.nvmrc`; the accounts use `crypto.argon2`) and npm 11+. Run everything from the repository root.
 
 ```bash
 nvm use
@@ -78,7 +78,21 @@ There is one `.env` in the root (copy of `.env.example`). The backend, `db:setup
 | `HOST`    | `127.0.0.1` | Backend address; `0.0.0.0` in Docker                                     |
 | `WS_*`    | see below   | Live updates over WebSocket                                              |
 
-The WebSocket settings (`WS_BATCH_MS`, `WS_IDLE_PING_MS`, `WS_PONG_TIMEOUT_MS`, `WS_LIVENESS_CHECK_MS`, `WS_MAX_CONNECTIONS`, `WS_MAX_BACKLOG`, `WS_MAX_BUFFERED_BYTES`, `WS_ALLOWED_ORIGINS`) are described in `.env.example`; the defaults are those of [api.md](api.md). A value that is not a positive integer stops the server at start. `TRUST_PROXY`, `PUBLIC_URL` and the SMTP settings are described there too.
+The WebSocket settings (`WS_BATCH_MS`, `WS_IDLE_PING_MS`, `WS_PONG_TIMEOUT_MS`, `WS_LIVENESS_CHECK_MS`, `WS_MAX_CONNECTIONS`, `WS_MAX_BACKLOG`, `WS_MAX_BUFFERED_BYTES`, `WS_ALLOWED_ORIGINS`) are described in `.env.example`; the defaults are those of [api.md](api.md). A value that is not a positive integer stops the server at start. `TRUST_PROXY`, `PUBLIC_URL`, `ALLOWED_EMAIL_DOMAINS`, `MAIL_PER_HOUR` and the SMTP settings are described there too.
+
+## Accounts
+
+Sign-in with an email address and a password, `/api/auth/*` in [api.md](api.md). The code is in `backend/src/auth/`, the tables (`users`, `sessions`, `email_tokens`) in migration 007.
+
+- **Sign in locally:** with the development account, `DEV_USER_EMAIL` and `DEV_USER_PASSWORD` in `.env` (the values of `.env.example` work). The backend creates it at start, already confirmed. A checkout with an older `.env` needs these two lines copied from `.env.example`. Production refuses to start with them.
+- **Try the registration:** open the page and register any `@vu.lt` address. Without `SMTP_HOST` the email is printed in the backend console; open its link to confirm the address, then sign in.
+- **The link points to the backend** (`http://localhost:3000/#/verify/...`), which serves the built frontend. With `npm run dev` either open the same address on port 5173, or set `PUBLIC_URL=http://127.0.0.1:5173` in `.env`.
+- **The page** (`frontend/src/App.vue`) asks `GET /api/auth/me` and shows the sign-in screens (`components/AuthScreen.vue`) or the canvas (`CanvasPage.vue`). The request code is in `auth.ts`, the links of the emails in `route.ts`, the Lithuanian texts in `texts.ts`.
+- **Everything needs a session:** every `/api` route except `/api/auth/*` and `/api/waitlist/*`, and the WebSocket. A new route is closed without saying so (`requireSession` in `backend/src/app.ts`); the user of a request is `sessionUser(res)`. `curl` and scripts sign in first, as `tools/src/pixel-rain.ts` does.
+- **Administrators** are the verified accounts whose addresses are in `ADMIN_EMAILS` (to try the admin routes locally: `ADMIN_EMAILS=dev@vu.lt`, restart the backend). The routes are `/api/admin/*` in [api.md](api.md), the code is `backend/src/auth/admin.ts`, every action goes to the table `admin_log` (migration 008). There are no admin screens yet.
+- **Production** needs `PUBLIC_URL` and the SMTP settings, or it does not start. The waitlist is on only with `WAITLIST_ENABLED=true`.
+- **User 0** is a system user for the seed scripts: it has no email and no password, so nobody can sign in as it.
+- **No addresses in the logs:** the account code logs user ids only.
 
 ## Database
 

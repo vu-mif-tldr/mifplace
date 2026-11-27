@@ -1,9 +1,17 @@
 import WebSocket, { type RawData } from 'ws';
 
+// Whose connection it is: the user and the session (the hash of its token) of the upgrade
+// request. Absent on a server without accounts.
+export interface ConnectionOwner {
+  userId: number;
+  session: string;
+}
+
 export interface Connection {
   readonly id: number;
   readonly ip: string;
   readonly connectedAt: number;
+  readonly owner?: ConnectionOwner;
 }
 
 export interface RegistryHooks {
@@ -29,11 +37,12 @@ export class ConnectionRegistry {
     private readonly hooks: RegistryHooks = {}
   ) {}
 
-  add(ws: WebSocket, ip: string): Connection {
+  add(ws: WebSocket, ip: string, owner?: ConnectionOwner): Connection {
     const connection: Connection = {
       id: this.nextId++,
       ip,
       connectedAt: Date.now(),
+      owner,
     };
 
     const entry: RegisteredConnection = {
@@ -117,12 +126,17 @@ export class ConnectionRegistry {
     }
   }
 
-  close(connection: Connection, code: number, reason: string): void {
+  // Starts closing an open connection. False if it is unknown or already closing: it stays
+  // in the registry until its close handshake is over.
+  close(connection: Connection, code: number, reason: string): boolean {
     const entry = this.connections.get(connection.id);
 
-    if (entry && this.isActive(entry)) {
-      entry.ws.close(code, reason);
+    if (!entry || !this.isActive(entry)) {
+      return false;
     }
+
+    entry.ws.close(code, reason);
+    return true;
   }
 
   terminate(connection: Connection): void {
@@ -135,6 +149,16 @@ export class ConnectionRegistry {
     entry.terminating = true;
     this.terminated++;
     entry.ws.terminate();
+  }
+
+  // Closes the connections the test picks and returns how many.
+  closeWhere(matches: (connection: Connection) => boolean, code: number, reason: string): number {
+    let closed = 0;
+    for (const { connection } of this.connections.values()) {
+      // One that is already closing (its session ended a moment ago) is not closed twice
+      if (matches(connection) && this.close(connection, code, reason)) closed++;
+    }
+    return closed;
   }
 
   closeAll(code: number, reason: string): void {

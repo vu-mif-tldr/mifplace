@@ -1,12 +1,17 @@
 import http, { type IncomingMessage } from 'node:http';
 import type { Socket } from 'node:net';
 import WebSocket, { WebSocketServer } from 'ws';
+import { isAllowedOrigin } from '../origin.js';
+import type { ConnectionOwner } from './registry.js';
 
 export interface GatewayOptions {
   path: string;
   maxConnections: number;
   allowedOrigins: string[];
   maxPayload: number;
+  // Who the upgrade request comes from, by its Cookie header; undefined refuses it with 401.
+  // Left out, anyone may connect (a server without accounts).
+  authenticate?: (cookieHeader: string | undefined) => ConnectionOwner | undefined;
 }
 
 export function getClientIp(remoteIp: string, forwarded: string | string[] | undefined): string {
@@ -29,7 +34,7 @@ export function attachGateway(
   server: http.Server,
   options: GatewayOptions,
   currentCount: () => number,
-  onConnection: (ws: WebSocket, request: { ip: string; url: URL }) => void
+  onConnection: (ws: WebSocket, request: { ip: string; url: URL; owner?: ConnectionOwner }) => void
 ): { close(): void } {
   const wss = new WebSocketServer({
     noServer: true,
@@ -51,53 +56,6 @@ export function attachGateway(
     );
   }
 
-  function isAllowedOrigin(request: IncomingMessage): boolean {
-    const origin = request.headers.origin;
-
-    // Non-browser clients may omit Origin.
-    if (origin === undefined) {
-      return true;
-    }
-
-    const host = request.headers.host;
-
-    if (!host) {
-      return false;
-    }
-
-    try {
-      const parsedOrigin = new URL(origin);
-
-      if (
-        !['http:', 'https:'].includes(parsedOrigin.protocol) ||
-        parsedOrigin.username ||
-        parsedOrigin.password ||
-        parsedOrigin.pathname !== '/' ||
-        parsedOrigin.search ||
-        parsedOrigin.hash ||
-        parsedOrigin.origin === 'null'
-      ) {
-        return false;
-      }
-
-      // Allow the page's own host.
-      if (parsedOrigin.host.toLowerCase() === host.toLowerCase()) {
-        return true;
-      }
-
-      // Allow explicitly configured additional origins.
-      return options.allowedOrigins.some((allowed) => {
-        try {
-          return new URL(allowed).origin === parsedOrigin.origin;
-        } catch {
-          return false;
-        }
-      });
-    } catch {
-      return false;
-    }
-  }
-
   function handleUpgrade(request: IncomingMessage, socket: Socket, head: Buffer): void {
     let url: URL;
 
@@ -115,8 +73,25 @@ export function attachGateway(
     }
 
     // Reject unauthorized origins.
-    if (!isAllowedOrigin(request)) {
+    if (!isAllowedOrigin(request.headers.origin, request.headers.host, options.allowedOrigins)) {
       reject(socket, 403, 'Forbidden');
+      return;
+    }
+
+    // Only a signed-in visitor may connect. The browser sends the session cookie with the
+    // upgrade request by itself.
+    let owner: ConnectionOwner | undefined;
+    try {
+      owner = options.authenticate?.(request.headers.cookie);
+    } catch (error) {
+      // The lookup reads the database. Unlike in a route, nothing catches an error thrown
+      // in an upgrade handler: it would take the process down with every connection.
+      console.error('Live connection: the session could not be checked:', error);
+      reject(socket, 503, 'Service Unavailable');
+      return;
+    }
+    if (options.authenticate && !owner) {
+      reject(socket, 401, 'Unauthorized');
       return;
     }
 
@@ -141,7 +116,7 @@ export function attachGateway(
         }
       });
 
-      onConnection(ws, { ip, url });
+      onConnection(ws, { ip, url, owner });
     });
   }
 

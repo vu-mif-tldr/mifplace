@@ -5,6 +5,8 @@
 //   Defaults: 8 pixels a second for 30 s. Each pixel is a random cell in a random palette color.
 // The backend is http://localhost:PORT, PORT from the environment, then from .env in the
 // repository root. RATE_LIMIT_PIXELS_PER_MINUTE limits it: 8 a second is 480 a minute.
+// It signs in as the development account (DEV_USER_EMAIL and DEV_USER_PASSWORD in .env, which
+// the backend creates at start), like a browser would.
 import { loadDotEnv } from '@mifplace/db';
 import { CanvasSizeSchema, PaletteSchema } from '@mifplace/shared';
 
@@ -17,8 +19,28 @@ if (!(perSecond > 0) || !(seconds > 0)) {
 loadDotEnv();
 const base = `http://localhost:${process.env.PORT ?? 3000}`;
 
+// Signs in and returns the session cookie for the requests that follow
+async function signIn(): Promise<string> {
+  const email = process.env.DEV_USER_EMAIL;
+  const password = process.env.DEV_USER_PASSWORD;
+  if (!email || !password) {
+    throw new Error('Set DEV_USER_EMAIL and DEV_USER_PASSWORD in .env (see .env.example)');
+  }
+  const response = await fetch(`${base}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const cookie = response.headers.getSetCookie()[0]?.split(';')[0];
+  if (!response.ok || !cookie) {
+    throw new Error(`Could not sign in as ${email}: ${response.status}. Restart the backend?`);
+  }
+  return cookie;
+}
+const cookie = await signIn();
+
 const getJson = async (path: string): Promise<unknown> => {
-  const response = await fetch(`${base}${path}`);
+  const response = await fetch(`${base}${path}`, { headers: { cookie } });
   if (!response.ok) throw new Error(`GET ${path}: ${response.status}`);
   return response.json();
 };
@@ -34,7 +56,7 @@ async function place() {
   try {
     const response = await fetch(`${base}/api/pixels`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', cookie },
       body: JSON.stringify({
         pos: random(size.width * size.height),
         colorIndex: palette[random(palette.length)].id,

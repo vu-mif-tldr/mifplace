@@ -12,6 +12,10 @@ import {
   type PlacePixelResponse,
 } from '@mifplace/shared';
 import type { NewEvent } from '@mifplace/db';
+import { createAdminRouter, requireAdmin } from './auth/admin.js';
+import { requireSession, sameOrigin, sessionUser } from './auth/guard.js';
+import { createAuthRouter, type AuthOptions } from './auth/router.js';
+import { createSessions } from './auth/sessions.js';
 import { createWaitlistRouter, type WaitlistOptions } from './waitlist.js';
 import type { LiveStats } from './live/live-server.js';
 import { DEFAULT_RATE_LIMITS, limiter, type RateLimits } from './rate-limits.js';
@@ -41,7 +45,15 @@ export interface AppConfig {
   trustProxy?: boolean | number | string;
   // The waitlist on vu.place (POST /api/waitlist...). Left out, the routes do not exist.
   waitlist?: WaitlistOptions;
+  // The accounts (/api/auth/...). With them every other /api route needs a session. Left
+  // out (tests of single routes; the server always passes it), there are no accounts, the
+  // routes are open and pixels belong to the system user.
+  auth?: AuthOptions;
 }
+
+// User 0 of the database: it has no address and no password (migration 007). The seed
+// scripts place pixels as it.
+const SYSTEM_USER_ID = 0;
 
 type HealthResponse = {
   status: 'ok' | 'down';
@@ -66,6 +78,7 @@ export function createApp({
   rateLimits,
   trustProxy = false,
   waitlist,
+  auth,
 }: AppConfig) {
   const app = express();
   app.set('trust proxy', trustProxy);
@@ -78,6 +91,34 @@ export function createApp({
   const paletteIds = new Set(palette.map(({ id }) => id));
   // The size does not change while the server runs, so the position check is built once
   const cell = positionSchema(canvasSize);
+
+  // The public part of the API: the waitlist and the accounts.
+  if (waitlist) app.use('/api/waitlist', createWaitlistRouter(waitlist, limits));
+
+  if (auth) {
+    const sessions = auth.sessions ?? createSessions(auth);
+    app.use('/api/auth', createAuthRouter({ ...auth, sessions }, limits));
+    // Closed by default: everything under /api from here on needs a session, so a route
+    // added below is protected without saying so. A request that changes something must
+    // also come from our own page. The limiter goes first: without it a request without a
+    // session would be answered before any limit counts it.
+    app.use(
+      '/api',
+      limiter(limits.sessionPerMinute),
+      requireSession(sessions),
+      sameOrigin(auth.allowedOrigins ?? [])
+    );
+
+    // For administrators only: what they can do to accounts
+    app.use(
+      '/api/admin',
+      requireAdmin(),
+      createAdminRouter(
+        { store: auth.store, onSessionsEnded: auth.onSessionsEnded, now: auth.now },
+        limits
+      )
+    );
+  }
 
   app.get(
     '/api/palette',
@@ -169,7 +210,8 @@ export function createApp({
       }
       try {
         const eventId = appendEvent({
-          user_id: 0, // dev user
+          // Without accounts (see AppConfig.auth) nobody is signed in
+          user_id: sessionUser(res)?.id ?? SYSTEM_USER_ID,
           color_id: colorIndex,
           position: position.data,
         });
@@ -181,8 +223,6 @@ export function createApp({
       }
     }
   );
-
-  if (waitlist) app.use('/api/waitlist', createWaitlistRouter(waitlist, limits));
 
   // Everything not answered above: the page itself, its files and the 404 page
   app.use(limiter(limits.otherPerMinute));

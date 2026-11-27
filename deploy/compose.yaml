@@ -5,6 +5,17 @@
 #
 #   docker compose pull && docker compose up -d     update to the latest main
 #   MIFPLACE_TAG=0.4.1 in .env                      pin a version (rollback)
+#
+# On the server: /srv/mifplace-demo/compose.yaml (this file) and app.env next to it with the
+# mail settings (not in git), the same as for production (compose.prod.yaml): people register
+# with an email address, so the app does not start without them.
+#
+#   SMTP_HOST=smtp-pulse.com
+#   SMTP_PORT=2525
+#   SMTP_USER=...
+#   SMTP_PASS=...
+#   MAIL_FROM=vu.place <noreply@vu.place>
+#   ADMIN_EMAILS=...        # who may block accounts (/api/admin), comma-separated addresses
 
 name: mifplace-demo
 
@@ -17,9 +28,14 @@ services:
       # from the internet without TLS and without the password.
       - '127.0.0.1:3001:3000'
     environment:
+      # Where the page is: the links in the emails point here, and https makes the session
+      # cookie Secure. Required: the app does not start in production without it.
+      PUBLIC_URL: https://demo.vu.place
       # Caddy reaches the container through the Docker bridge (a private address), so the app
       # trusts X-Forwarded-For from there and sees the real client addresses.
       TRUST_PROXY: uniquelocal
+    env_file:
+      - app.env
     volumes:
       - data:/data
     mem_limit: 1024m

@@ -1,14 +1,15 @@
 <script setup lang="ts">
 // The logo of the university and the name of the site, set apart by space alone (the logo has
 // a line of its own). White on the bordo page, whatever colour is selected. The logo is large
-// enough to read its words.
-withDefaults(defineProps<{ size?: number }>(), { size: 78 });
+// enough to read its words. With name = false only the logo is drawn (the sign-in screen
+// writes the name large under it).
+withDefaults(defineProps<{ size?: number; name?: boolean }>(), { size: 78, name: true });
 </script>
 
 <template>
   <span class="brand" :style="{ '--logo': `${size}px` }">
     <img class="logo" src="/vu-logo.png" alt="Vilniaus universitetas" />
-    <span class="name">VU/place</span>
+    <span v-if="name" class="name">VU/place</span>
   </span>
 </template>
 

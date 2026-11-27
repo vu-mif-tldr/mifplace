@@ -18,7 +18,77 @@ export const texts = {
   coordinates: (x: number, y: number) => `${x}, ${y}`,
   newPixels: (count: number) => `+${count}`,
   quiet: 'Dabar ramu...',
+  signOut: 'Atsijungti',
 };
+
+// The sign-in, registration and password screens (components/AuthScreen.vue)
+export const authTexts = {
+  about: 'Bendra Vilniaus universiteto drobė, piešiama po vieną pikselį.',
+  email: 'VU el. paštas',
+  emailExample: 'vardas.pavarde@mif.stud.vu.lt',
+  password: 'Slaptažodis',
+  newPassword: 'Naujas slaptažodis',
+  passwordHint: 'Bent 10 simbolių',
+  show: 'Rodyti',
+  hide: 'Slėpti',
+
+  signInTitle: 'Prisijunk',
+  signIn: 'Prisijungti',
+  toRegister: 'Neturi paskyros? Registruokis',
+  forgot: 'Pamiršai slaptažodį?',
+
+  registerTitle: 'Registracija',
+  register: 'Registruotis',
+  toSignIn: 'Jau turi paskyrą? Prisijunk',
+
+  forgotTitle: 'Pamiršai slaptažodį?',
+  forgotLead: 'Įvesk savo el. paštą: atsiųsime nuorodą naujam slaptažodžiui nustatyti.',
+  sendLink: 'Siųsti nuorodą',
+  backToSignIn: 'Grįžti į prisijungimą',
+
+  checkEmailTitle: 'Patikrink el. paštą',
+  registeredLead: (email: string) =>
+    `Išsiuntėme laišką adresu ${email}. Atidaryk jame esančią nuorodą: ji galioja 24 valandas.`,
+  forgotSentLead: (email: string) =>
+    `Jei adresas ${email} turi paskyrą, išsiuntėme jam nuorodą. Ji galioja 1 valandą.`,
+  noEmail: 'Laiško nėra? Pažiūrėk šlamšto aplanke.',
+
+  verifyTitle: 'Patvirtink el. paštą',
+  verifyLead: 'Liko vienas žingsnis: patvirtink, kad šis el. pašto adresas yra tavo.',
+  verify: 'Patvirtinti adresą',
+  verified: 'Adresas patvirtintas. Dabar prisijunk.',
+  verifyExpired:
+    'Ši nuoroda nebegalioja arba jau panaudota. Jei adresas dar nepatvirtintas, registruokis iš naujo.',
+
+  resetTitle: 'Nustatyk naują slaptažodį',
+  savePassword: 'Išsaugoti slaptažodį',
+  resetDone: 'Slaptažodis pakeistas. Prisijunk su naujuoju.',
+  resetExpired: 'Ši nuoroda nebegalioja arba jau panaudota. Paprašyk naujos.',
+
+  invalidEmail: 'Įvesk el. pašto adresą.',
+  noPassword: 'Įvesk slaptažodį.',
+  shortPassword: 'Slaptažodis turi būti bent 10 simbolių.',
+  longPassword: 'Slaptažodis per ilgas: daugiausia 128 simboliai.',
+};
+
+// What to say when an account request fails, by the code of the answer (auth.ts). The English
+// text of the server is for developers and is not shown.
+const AUTH_ERRORS: Record<string, string> = {
+  invalid_credentials: 'Neteisingas el. paštas arba slaptažodis.',
+  email_not_verified: 'El. paštas dar nepatvirtintas. Atidaryk nuorodą iš mūsų laiško.',
+  banned: 'Ši paskyra užblokuota.',
+  too_many_attempts: 'Per daug neteisingų bandymų. Pabandyk po 15 minučių.',
+  rate_limited: 'Per daug užklausų iš tavo tinklo. Pabandyk vėliau.',
+  email_not_allowed:
+    'Registruotis galima tik su VU el. paštu (pvz., vardas.pavarde@mif.stud.vu.lt), be „+“ ženklo adrese.',
+  mail_unavailable: 'Šiuo metu negalime išsiųsti laiško. Pabandyk po valandos.',
+  busy: 'Serveris užimtas. Pabandyk dar kartą po akimirkos.',
+  network: 'Nepavyko pasiekti serverio. Patikrink interneto ryšį.',
+};
+
+export function authError(code: string): string {
+  return AUTH_ERRORS[code] ?? 'Kažkas nepavyko. Pabandyk dar kartą.';
+}
 
 // Names of the colours of the default palette. The palette comes from the server, so a colour
 // without a name here is called by its code.
